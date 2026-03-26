@@ -1,0 +1,1 @@
+JPA Entities for the application.

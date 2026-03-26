@@ -1,0 +1,1 @@
+Directory to handle endpoints beign exposed.
