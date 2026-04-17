@@ -1,25 +1,28 @@
 package org.workflow.entity
 
 import jakarta.persistence.*
+import org.hibernate.annotations.JdbcTypeCode
+import org.hibernate.type.SqlTypes
+import java.util.UUID
 
 @Entity
 @Table(name = "tasks")
+/** Task entity belonging to a workflow with JSONB execution config. */
 class Task(
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    val id: Long = 0,
+    @Id @GeneratedValue(strategy = GenerationType.UUID)
+    var id: UUID? = null,
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 64)
     var name: String,
 
-    @Column(columnDefinition = "TEXT", nullable = false)
-    var scriptContent: String,
+    @Column(nullable = false, length = 64)
+    var type: String,
 
-    @Column(nullable = false)
-    var maxRetries: Int = 3,
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "jsonb", nullable = false)
+    var config: Map<String, Any> = mutableMapOf(),
 
-    // Each task belongs to a workflow
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "workflow_id", nullable = false)
-    val workflow: Workflow
-)
+    var workflow_id: Workflow
+) : Timestamp()

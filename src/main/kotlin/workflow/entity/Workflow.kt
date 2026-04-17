@@ -1,23 +1,19 @@
 package org.workflow.entity
 
 import jakarta.persistence.*
+import java.util.UUID
 
 @Entity
 @Table(name = "workflows")
+/** Workflow aggregate root owned by a user and composed of tasks. */
 class Workflow(
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    val id: Long = 0,
+    @Id @GeneratedValue(strategy = GenerationType.UUID)
+    var id: UUID? = null,
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 64)
     var name: String,
 
-    // Every workflow belongs to one specific user [cite: 24]
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
-    val user: User,
-
-    // One workflow has many tasks.
-    @OneToMany(mappedBy = "workflow", cascade = [CascadeType.ALL], orphanRemoval = true)
-    var tasks: MutableList<Task> = mutableListOf()
-)
+    var created_by: User
+) : Timestamp()

@@ -43,3 +43,10 @@ bin/
 
 ### Mac OS ###
 .DS_Store
+.github
+.github/*
+.github/**/**
+./idea/**
+./idea/**/**
+/ref
+/ref/**
