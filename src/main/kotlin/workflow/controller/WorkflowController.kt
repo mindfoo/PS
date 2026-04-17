@@ -5,7 +5,6 @@ import io.swagger.v3.oas.annotations.media.Content
 import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
-import io.swagger.v3.oas.annotations.security.SecurityRequirement
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
@@ -34,7 +33,6 @@ import java.util.UUID
 
 @RestController
 @Tag(name = "Workflows", description = "Workflow CRUD and manual run")
-@SecurityRequirement(name = "bearerAuth")
 /** Handles workflow CRUD operations and manual execution triggers. */
 class WorkflowController(
     private val workflowService: WorkflowService,
