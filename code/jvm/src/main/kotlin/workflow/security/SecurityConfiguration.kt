@@ -11,6 +11,7 @@ import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.security.web.SecurityFilterChain
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter
 import org.springframework.web.method.support.HandlerMethodArgumentResolver
+import org.springframework.web.servlet.config.annotation.CorsRegistry
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer
 import org.workflow.security.pipeline.AuthenticatedUserArgumentResolver
@@ -79,5 +80,13 @@ class SecurityConfig(
 
     override fun addArgumentResolvers(resolvers: MutableList<HandlerMethodArgumentResolver>) {
         resolvers.add(authenticatedUserArgumentResolver)
+    }
+
+    override fun addCorsMappings(registry: CorsRegistry) {
+        registry.addMapping("/api/**")
+            .allowedOrigins("http://localhost:5173")
+            .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
+            .allowedHeaders("*")
+            .allowCredentials(true)
     }
 }
