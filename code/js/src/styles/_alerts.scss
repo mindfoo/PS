@@ -1,0 +1,21 @@
+// ── Alerts ────────────────────────────────────────────────────────────────────
+@use 'variables' as *;
+
+.alert {
+  padding: 0.75rem 1rem;
+  border-radius: $radius;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+
+  &-error {
+    background: rgba($danger,  0.15);
+    border: 1px solid rgba($danger,  0.3);
+    color: #fca5a5;
+  }
+
+  &-success {
+    background: rgba($success, 0.15);
+    border: 1px solid rgba($success, 0.3);
+    color: #86efac;
+  }
+}

@@ -17,7 +17,7 @@ export function Layout({ children }: { children: ReactNode }) {
       <nav className="sidebar">
         <div className="sidebar-logo">
           <span className="logo-icon">⚡</span>
-          <span>Workflow Platform</span>
+          <span className="logo"><Link to="/dashboard">Workflow Platform</Link></span>
         </div>
         <ul className="nav-links">
           <li><Link to="/dashboard">🗂 Workflows</Link></li>

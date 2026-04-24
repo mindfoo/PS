@@ -5,6 +5,22 @@ import { taskApi, type TaskResponse } from '../api/tasks'
 import { usePermissions } from '../contexts/AuthContext'
 import { Layout } from '../components/Layout'
 
+function configSummary(type: string, config: Record<string, unknown>): string {
+  switch (type) {
+    case 'HTTP':     return `${config.method ?? 'GET'} ${config.url ?? ''}`
+    case 'SCRIPT': {
+      const cmd  = config.command  ?? ''
+      const file = config.fileName ?? ''
+      const dir  = config.directory ? `(in ${config.directory}) ` : ''
+      const args = Array.isArray(config.args) ? ' ' + (config.args as string[]).join(' ') : ''
+      return `${dir}${cmd} ${file}${args}`.trim()
+    }
+    case 'EMAIL':    return `To: ${config.to ?? ''} — ${config.subject ?? ''}`
+    case 'DATABASE': return String(config.query ?? '').slice(0, 60)
+    default:         return JSON.stringify(config)
+  }
+}
+
 export function WorkflowDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -86,7 +102,7 @@ export function WorkflowDetailPage() {
                 <tr key={t.id}>
                   <td>{t.name}</td>
                   <td><span className="badge">{t.type}</span></td>
-                  <td><code className="config-preview">{JSON.stringify(t.config)}</code></td>
+                  <td><code className="config-preview">{configSummary(t.type, t.config)}</code></td>
                   <td className="actions-cell">
                     {perms.canWriteTasks && (
                       <Link to={`/tasks/${t.id}/edit?workflowId=${id}`} className="btn btn-sm btn-secondary">Edit</Link>

@@ -108,8 +108,8 @@ export function SchedulesPage() {
               </div>
             )}
             <div className="form-group">
-              <label>Cron expression</label>
-              <input value={cron} onChange={e => setCron(e.target.value)} placeholder="0 * * * *" required />
+              <label>find a way of doing a schedule</label>
+              <input value={cron} onChange={e => setCron(e.target.value)} placeholder="whatever format" required />
               <small className="hint">Format: minute hour day month weekday</small>
             </div>
             <div className="form-group">

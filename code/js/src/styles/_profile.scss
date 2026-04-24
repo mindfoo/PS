@@ -1,0 +1,47 @@
+// ── Profile page ──────────────────────────────────────────────────────────────
+@use 'variables' as *;
+
+.profile-card { max-width: 500px; }
+
+.profile-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: $primary;
+  color: $white;
+  font-size: 1.75rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1rem;
+}
+
+.profile-info {
+  margin-bottom: 1.5rem;
+
+  h2 { margin-bottom: 0.35rem; }
+}
+
+.profile-permissions {
+  h3 {
+    font-size: 0.95rem;
+    margin-bottom: 0.75rem;
+  }
+}
+
+.permission-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.perm-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+
+  &.denied { color: $text-muted; }
+}

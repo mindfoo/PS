@@ -1,0 +1,52 @@
+// ── Buttons ───────────────────────────────────────────────────────────────────
+@use 'variables' as *;
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.5rem 1rem;
+  border-radius: $radius;
+  border: none;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: background 0.15s, opacity 0.15s;
+  text-decoration: none;
+  color: inherit;
+
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  &-primary {
+    background: $primary;
+    color: $white;
+    &:hover:not(:disabled) { background: $primary-hover; }
+  }
+
+  &-secondary {
+    background: $surface2;
+    color: $text;
+    border: 1px solid $border;
+    &:hover:not(:disabled) { border-color: $primary; }
+  }
+
+  &-success { background: $success; color: $white; }
+  &-danger  { background: $danger;  color: $white; }
+
+  &-ghost {
+    background: transparent;
+    color: $text-muted;
+    &:hover { background: $surface2; color: $text; }
+  }
+
+  &-sm { padding: 0.3rem 0.7rem; font-size: 0.8rem; }
+}
+
+.link-btn {
+  background: none;
+  border: none;
+  color: $primary;
+  cursor: pointer;
+  text-decoration: underline;
+  font-size: inherit;
+}

@@ -1,0 +1,16 @@
+
+@use 'variables';   // SCSS tokens (not emitted — used via @use in partials)
+@use 'reset';       // *, :root, body
+@use 'layout';      // sidebar, main-content, page chrome
+@use 'auth';        // auth-page, auth-card
+@use 'buttons';     // .btn and all variants
+@use 'cards';       // .card-grid, .card
+@use 'forms';       // .form-card, .form-group, inputs
+@use 'tables';      // .table, .config-preview
+@use 'badges';      // .badge, .role-badge
+@use 'alerts';      // .alert variants
+@use 'states';      // .loading, .empty-state
+@use 'profile';     // .profile-card, avatar, permissions
+@use 'stats';       // .stat-card
+@use 'tabs';        // .tabs, .tab
+@use 'misc';        // utilities: .text-muted, code, .mt-2

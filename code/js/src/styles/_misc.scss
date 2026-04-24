@@ -1,0 +1,17 @@
+// ── Misc utilities ────────────────────────────────────────────────────────────
+@use 'variables' as *;
+
+.text-muted {
+  color: $text-muted;
+  font-size: 0.85rem;
+}
+
+.mt-2 { margin-top: 0.5rem; }
+
+code {
+  font-family: monospace;
+  background: $surface2;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  font-size: 0.85em;
+}

@@ -1,0 +1,122 @@
+// ── Layout ───────────────────────────────────────────────────────────────────
+@use 'variables' as *;
+
+.app-layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+// ── Sidebar ──────────────────────────────────────────────────────────────────
+.sidebar {
+  width: $sidebar-w;
+  background: $surface;
+  border-right: 1px solid $border;
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  height: 100vh;
+  padding: 1rem;
+
+  &-logo {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 700;
+    font-size: 1rem;
+    padding: 0.75rem 0 1.5rem;
+    color: $white;
+    text-decoration: none;
+
+    a {
+      color: $white;
+      text-decoration: none;
+
+      &:hover { opacity: 0.85; }
+    }
+  }
+
+  &-footer {
+    border-top: 1px solid $border;
+    padding-top: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+}
+
+.logo-icon { font-size: 1.25rem; }
+
+.nav-links {
+  list-style: none;
+  flex: 1;
+
+  li { margin-bottom: 0.25rem; }
+
+  a {
+    display: block;
+    padding: 0.6rem 0.75rem;
+    border-radius: $radius;
+    color: $text-muted;
+    text-decoration: none;
+    transition: background 0.15s, color 0.15s;
+
+    &:hover {
+      background: $surface2;
+      color: $text;
+    }
+  }
+}
+
+.user-info {
+  font-size: 0.8rem;
+  color: $text-muted;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+// ── Main content ─────────────────────────────────────────────────────────────
+.main-content {
+  margin-left: $sidebar-w;
+  padding: 2rem;
+  flex: 1;
+  max-width: 1100px;
+}
+
+// ── Page chrome ───────────────────────────────────────────────────────────────
+.page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+  gap: 1rem;
+  flex-wrap: wrap;
+
+  h1 { font-size: 1.5rem; }
+}
+
+.header-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 1.5rem 0 1rem;
+
+  h2 { font-size: 1.1rem; }
+}
+
+.back-link {
+  color: $text-muted;
+  text-decoration: none;
+  font-size: 0.85rem;
+  display: block;
+  margin-bottom: 0.25rem;
+
+  &:hover { color: $text; }
+}

@@ -1,0 +1,40 @@
+// ── Auth pages ────────────────────────────────────────────────────────────────
+@use 'variables' as *;
+
+.auth-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.auth-card {
+  background: $surface;
+  border: 1px solid $border;
+  border-radius: $radius;
+  padding: 2.5rem;
+  width: 100%;
+  max-width: 380px;
+
+  h1 {
+    font-size: 1.25rem;
+    color: $primary;
+    margin-bottom: 0.5rem;
+  }
+
+  h2 {
+    font-size: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+}
+
+.auth-link {
+  margin-top: 1rem;
+  text-align: center;
+  color: $text-muted;
+
+  a {
+    color: $primary;
+    text-decoration: none;
+  }
+}
