@@ -5,6 +5,12 @@ export interface WorkflowResponse {
   name: string
   ownerId: string
   ownerUsername: string
+  lastRunStatus?: string | null
+}
+
+export interface TaskOrderItem {
+  orderId: string
+  taskOrder: number
 }
 
 export const workflowApi = {
@@ -14,5 +20,13 @@ export const workflowApi = {
   update: (id: string, body: { name: string }) => api.put<WorkflowResponse>(`/workflows/${id}`, body),
   delete: (id: string) => api.delete<void>(`/workflows/${id}`),
   run: (id: string) => api.post<{ executionId: string; status: string }>(`/workflows/${id}/run`, {}),
+  reorderTasks: (id: string, items: TaskOrderItem[]) =>
+    api.patch<void>(`/workflows/${id}/task-order`, { items }),
+  updateRetryPolicy: (workflowId: string, taskId: string, retryPolicy: number) =>
+    api.patch<void>(`/workflows/${workflowId}/tasks/${taskId}/retry-policy`, { retryPolicy }),
+  linkTask: (workflowId: string, taskId: string) =>
+    api.post<void>(`/workflows/${workflowId}/link-task/${taskId}`, {}),
+  unlinkTask: (workflowId: string, taskId: string) =>
+    api.delete<void>(`/workflows/${workflowId}/link-task/${taskId}`),
 }
 

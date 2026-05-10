@@ -1,4 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom'
+import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { useAuth, usePermissions } from '../contexts/AuthContext'
 
@@ -6,6 +7,7 @@ export function Layout({ children }: { children: ReactNode }) {
   const { user, logout } = useAuth()
   const perms = usePermissions()
   const navigate = useNavigate()
+  const [menuOpen, setMenuOpen] = useState(false)
 
   async function handleLogout() {
     await logout()
@@ -14,16 +16,31 @@ export function Layout({ children }: { children: ReactNode }) {
 
   return (
     <div className="app-layout">
-      <nav className="sidebar">
+      {/* Mobile hamburger button */}
+      <button
+        className="hamburger-btn"
+        aria-label="Toggle navigation"
+        onClick={() => setMenuOpen(o => !o)}
+      >
+        {menuOpen ? '✕' : '☰'}
+      </button>
+
+      {/* Backdrop — closes menu on tap outside */}
+      {menuOpen && (
+        <div className="sidebar-backdrop" onClick={() => setMenuOpen(false)} />
+      )}
+
+      <nav className={`sidebar${menuOpen ? ' sidebar--open' : ''}`}>
         <div className="sidebar-logo">
           <span className="logo-icon">⚡</span>
-          <span className="logo"><Link to="/dashboard">Workflow Platform</Link></span>
+          <span className="logo"><Link to="/dashboard" onClick={() => setMenuOpen(false)}>Workflow Platform</Link></span>
         </div>
         <ul className="nav-links">
-          <li><Link to="/dashboard">🗂 Workflows</Link></li>
-          <li><Link to="/schedules">🕒 Schedules</Link></li>
-          <li><Link to="/profile">👤 Profile</Link></li>
-          {perms.canAccessAdmin && <li><Link to="/admin">🛡 Admin</Link></li>}
+          <li><Link to="/dashboard" onClick={() => setMenuOpen(false)}>🗂 Workflows</Link></li>
+          <li><Link to="/tasks" onClick={() => setMenuOpen(false)}>📋 Tasks</Link></li>
+          <li><Link to="/schedules" onClick={() => setMenuOpen(false)}>🕒 Schedules</Link></li>
+          <li><Link to="/profile" onClick={() => setMenuOpen(false)}>👤 Profile</Link></li>
+          {perms.canAccessAdmin && <li><Link to="/admin" onClick={() => setMenuOpen(false)}>🛡 Admin</Link></li>}
         </ul>
         <div className="sidebar-footer">
           <span className="user-info">

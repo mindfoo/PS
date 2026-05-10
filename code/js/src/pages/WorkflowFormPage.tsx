@@ -59,7 +59,7 @@ export function WorkflowFormPage() {
             <input value={name} onChange={e => setName(e.target.value)} placeholder="My Pipeline" required />
           </div>
           <div className="form-actions">
-            <button type="button" className="btn btn-ghost" onClick={() => navigate(isEdit ? `/workflows/${id}` : '/dashboard')}>
+            <button type="button" className="btn btn-ghost" onClick={() => navigate(isEdit ? `/workflows` : '/dashboard')}>
               Cancel
             </button>
             <button type="submit" className="btn btn-primary" disabled={loading}>

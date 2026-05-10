@@ -16,9 +16,15 @@
   flex-direction: column;
   gap: 0.75rem;
 
-  &-body h3 {
-    font-size: 1rem;
-    margin-bottom: 0.25rem;
+  &-body {
+    gap: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: .5rem;
+    h3 {
+      font-size: 1rem;
+    }
   }
 
   &-actions {

@@ -4,11 +4,22 @@ import { workflowApi, type WorkflowResponse } from '../api/workflows'
 import { usePermissions } from '../contexts/AuthContext'
 import { Layout } from '../components/Layout'
 
+function LastRunBadge({ status }: { status?: string | null }) {
+  if (!status) return null
+  const map: Record<string, { icon: string; cls: string }> = {
+    SUCCESS: { icon: '✅', cls: 'badge-status-success' },
+    ERROR:   { icon: '❌', cls: 'badge-status-error' },
+    RUNNING: { icon: '⏳', cls: 'badge-status-running' },
+    PENDING: { icon: '🕐', cls: 'badge-status-pending' },
+  }
+  const entry = map[status] ?? { icon: '•', cls: 'badge-muted' }
+  return <span className={`badge ${entry.cls}`} title={`Last run: ${status}`}>{entry.icon} {status}</span>
+}
+
 export function DashboardPage() {
   const [workflows, setWorkflows] = useState<WorkflowResponse[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [runMsg, setRunMsg] = useState('')
   const perms = usePermissions()
   const navigate = useNavigate()
 
@@ -36,9 +47,10 @@ export function DashboardPage() {
 
   async function handleRun(id: string) {
     try {
-      const res = await workflowApi.run(id)
-      setRunMsg(`Execution started: ${res.executionId} — ${res.status}`)
-      setTimeout(() => setRunMsg(''), 4000)
+      await workflowApi.run(id)
+      // Immediately reload to show RUNNING/PENDING status; reload again after a few seconds
+      await load()
+      setTimeout(() => load(), 4000)
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : 'Run failed')
     }
@@ -53,7 +65,6 @@ export function DashboardPage() {
         )}
       </div>
 
-      {runMsg && <div className="alert alert-success">{runMsg}</div>}
       {error && <div className="alert alert-error">{error}</div>}
 
       {loading ? (
@@ -70,6 +81,7 @@ export function DashboardPage() {
               <div className="card-body">
                 <h3>{w.name}</h3>
                 <p className="text-muted">Owner: {w.ownerUsername}</p>
+                <LastRunBadge status={w.lastRunStatus} />
               </div>
               <div className="card-actions">
                 <Link to={`/workflows/${w.id}`} className="btn btn-sm btn-secondary">View</Link>

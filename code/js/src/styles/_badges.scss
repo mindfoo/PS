@@ -12,6 +12,13 @@
 
   &-success { background: rgba($success, 0.15); color: $success; }
   &-muted   { background: $surface2; color: $text-muted; }
+
+  // Execution status variants
+  &-status-success  { background: rgba($success, 0.15); color: $success; }
+  &-status-error    { background: rgba($danger,  0.15); color: $danger;  }
+  &-status-running  { background: rgba($primary, 0.15); color: $primary; }
+  &-status-pending  { background: rgba(#f59e0b, 0.15);  color: #f59e0b;  }
+  &-status-canceled { background: rgba(#94a3b8, 0.15);  color: #94a3b8;  }
 }
 
 .role-badge {

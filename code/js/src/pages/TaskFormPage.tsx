@@ -4,7 +4,11 @@ import { taskApi } from '../api/tasks'
 import { Layout } from '../components/Layout'
 import { genericFormReducer } from '../utils/form'
 
-type TaskType = 'HTTP' | 'SCRIPT' | 'EMAIL' | 'DATABASE' | 'CUSTOM'
+export enum TaskType {
+  HTTP= 'HTTP',
+ SCRIPT= 'SCRIPT',
+  CUSTOM='CUSTOM'
+}
 
 export interface TaskFormInputs {
   name: string
@@ -16,14 +20,14 @@ export interface TaskFormInputs {
 }
 
 const DEFAULT_INPUTS: TaskFormInputs = {
-  name: '', type: 'HTTP',
+  name: '', type: TaskType.HTTP,
   url: '', method: 'GET',
   command: '', fileName: '', directory: '', args: '',
   to: '', subject: '', body: '',
   query: '',
 }
 
-function fromTask(t: { name: string; type: string; config: Record<string, unknown> }): TaskFormInputs {
+function fromTask(t: { name: string; type: TaskType; config: Record<string, unknown> }): TaskFormInputs {
   const c = t.config as Record<string, string>
   return {
     ...DEFAULT_INPUTS,
@@ -40,34 +44,32 @@ function fromTask(t: { name: string; type: string; config: Record<string, unknow
 
 function buildConfig(inputs: TaskFormInputs): Record<string, unknown> {
   switch (inputs.type) {
-    case 'HTTP':     return { url: inputs.url, method: inputs.method }
-    case 'SCRIPT': {
+    case TaskType.HTTP:     return { url: inputs.url, method: inputs.method }
+    case TaskType.SCRIPT: {
       const cfg: Record<string, unknown> = { command: inputs.command, fileName: inputs.fileName }
       if (inputs.directory) cfg.directory = inputs.directory
       if (inputs.args)      cfg.args = inputs.args.trim().split(/\s+/)
       return cfg
     }
-    case 'EMAIL':    return { to: inputs.to, subject: inputs.subject, body: inputs.body }
-    case 'DATABASE': return { query: inputs.query }
     default:         return {}
   }
 }
 
-// ── Parent: resolves initial data, then renders the form ─────────────────────
-
 export function TaskFormPage() {
   const { id, workflowId: routeWorkflowId } = useParams<{ id?: string; workflowId?: string }>()
+  const [searchParams] = [new URLSearchParams(window.location.search)]
+  const queryWorkflowId = searchParams.get('workflowId') ?? undefined
   const isEdit = !!id
 
   const [initialInputs, setInitialInputs] = useState<TaskFormInputs | null>(isEdit ? null : DEFAULT_INPUTS)
-  const [workflowId,    setWorkflowId]    = useState(routeWorkflowId ?? '')
-  const [error,         setError]         = useState('')
+  const [workflowId, setWorkflowId]       = useState(routeWorkflowId ?? queryWorkflowId ?? '')
+  const [error, setError]                 = useState('')
 
   useEffect(() => {
     if (!isEdit) return
     taskApi.getById(id!)
       .then(t => {
-        setWorkflowId(t.workflowId)
+        setWorkflowId(t.workflowId ?? '')
         setInitialInputs(fromTask(t))
       })
       .catch(err => setError(err instanceof Error ? err.message : 'Failed to load task'))
@@ -87,7 +89,7 @@ function TaskForm({ initialInputs, workflowId, taskId }: {
 }) {
   const isEdit = !!taskId
   const navigate = useNavigate()
-  const backUrl = workflowId ? `/workflows/${workflowId}` : '/dashboard'
+  const backUrl = workflowId ? `/workflows/${workflowId}` : '/tasks'
 
   const [state, dispatch] = useReducer(
     genericFormReducer<TaskFormInputs>,
@@ -104,7 +106,7 @@ function TaskForm({ initialInputs, workflowId, taskId }: {
       if (isEdit) {
         await taskApi.update(taskId!, { name, type, config })
       } else {
-        await taskApi.create({ name, type, workflowId, config })
+        await taskApi.create({ name, type, workflowId: workflowId || undefined, config })
       }
       dispatch({ type: 'success' })
     } catch (err: unknown) {
@@ -151,7 +153,6 @@ function TaskForm({ initialInputs, workflowId, taskId }: {
               <select value={inputs.type} onChange={field('type')}>
                 <option value="HTTP">HTTP</option>
                 <option value="SCRIPT">SCRIPT</option>
-                <option value="CUSTOM">CUSTOM</option>
               </select>
             </div>
 

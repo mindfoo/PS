@@ -11,6 +11,13 @@ interface AuthContextValue {
   refresh: () => Promise<void>
 }
 
+export enum RoleType {
+  ADMIN = 'ADMIN',
+  WRITER = 'WRITER',
+  READER = 'READER',
+  DEV = 'DEV',
+}
+
 const AuthContext = createContext<AuthContextValue | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -64,10 +71,10 @@ export function usePermissions() {
   const { user } = useAuth()
   const role = user?.role ?? ''
 
-  const isAdmin = role === 'ADMIN'
-  const isWrite = isAdmin || role === 'WRITE'
-  const isRead = isWrite || role === 'READ' || role === 'DEV'
-  const isDev = isAdmin || role === 'DEV'
+  const isAdmin = role === RoleType.ADMIN
+  const isWrite = isAdmin || role === RoleType.WRITER
+  const isRead = isWrite || role === RoleType.READER || role === RoleType.DEV
+  const isDev = isAdmin || role === RoleType.DEV
 
   return {
     canReadWorkflows: isRead,

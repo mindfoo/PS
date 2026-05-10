@@ -9,14 +9,15 @@ export interface ScheduleResponse {
   enabled: boolean
   nextRunAt: string
   lastRunAt: string | null
+  description: string | null
 }
 
 export const scheduleApi = {
   list: () => api.get<ScheduleResponse[]>('/schedules'),
   getById: (id: string) => api.get<ScheduleResponse>(`/schedules/${id}`),
-  create: (body: { workflowId: string; cronExpression: string; timezone?: string; enabled?: boolean }) =>
+  create: (body: { workflowId: string; cronExpression: string; timezone?: string; enabled?: boolean; description?: string }) =>
     api.post<ScheduleResponse>('/schedules', body),
-  update: (id: string, body: { cronExpression: string; timezone: string; enabled: boolean }) =>
+  update: (id: string, body: { cronExpression: string; timezone: string; enabled: boolean; description?: string }) =>
     api.put<ScheduleResponse>(`/schedules/${id}`, body),
   delete: (id: string) => api.delete<void>(`/schedules/${id}`),
 }
