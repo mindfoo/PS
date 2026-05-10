@@ -16,7 +16,7 @@ object Uris {
         const val REGISTER = "$PREFIX/auth/register"
         const val LOGIN = "$PREFIX/auth/login"
         const val LOGOUT = "$PREFIX/auth/logout"
-        const val ME = "$PREFIX/auth/me"
+        const val PROFILE = "$PREFIX/auth/profile"
     }
 
     object Users {

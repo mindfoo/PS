@@ -26,7 +26,7 @@ data class TokenResponse(
 )
 
 /** Authenticated user profile view exposed by the API. */
-data class MeResponse(
+data class ProfileResponse(
     val id: UUID?,
     val username: String,
     val role: String

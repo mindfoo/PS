@@ -4,7 +4,7 @@ import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.workflow.dto.LoginRequest
-import org.workflow.dto.MeResponse
+import org.workflow.dto.ProfileResponse
 import org.workflow.dto.RegisterRequest
 import org.workflow.dto.TokenResponse
 import org.workflow.entity.User
@@ -34,7 +34,7 @@ class AuthService(
     }
 
     @Transactional
-    fun register(request: RegisterRequest): Either<AuthError, MeResponse> {
+    fun register(request: RegisterRequest): Either<AuthError, ProfileResponse> {
         if (userRepository.findByUsername(request.username) != null) {
             return failure(AuthError.UsernameAlreadyTaken)
         }
@@ -50,7 +50,7 @@ class AuthService(
                 role = role
             )
         )
-        return success(MeResponse(id = saved.id, username = saved.username, role = saved.role.name))
+        return success(ProfileResponse(id = saved.id, username = saved.username, role = saved.role.name))
     }
 
     /**
@@ -93,10 +93,10 @@ class AuthService(
         userTokenRepository.deleteByTokenHash(TokenUtils.hashToken(rawToken))
     }
 
-    fun me(username: String): Either<AuthError, MeResponse> {
+    fun profile(username: String): Either<AuthError, ProfileResponse> {
         val user = userRepository.findByUsername(username)
             ?: return failure(AuthError.UserNotFound)
 
-        return success(MeResponse(id = user.id, username = user.username, role = user.role.name))
+        return success(ProfileResponse(id = user.id, username = user.username, role = user.role.name))
     }
 }

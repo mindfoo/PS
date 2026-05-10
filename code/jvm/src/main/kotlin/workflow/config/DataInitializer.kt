@@ -84,7 +84,7 @@ class DataInitializer(
             userRepository.save(
                 User(
                     username = "admin",
-                    passwordValidation = passwordEncoder.encode("admin123"),
+                    passwordValidation = passwordEncoder.encode("thisissafepassword"),
                     displayName = "System Administrator",
                     role = admin
                 )

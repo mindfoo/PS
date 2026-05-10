@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RestController
 import org.workflow.dto.LoginRequest
-import org.workflow.dto.MeResponse
+import org.workflow.dto.ProfileResponse
 import org.workflow.dto.RegisterRequest
 import org.workflow.service.AuthService
 import org.workflow.service.utils.AuthError
@@ -48,7 +48,7 @@ class AuthController(
     @Operation(summary = "Register user", description = "Create a new user account")
     @ApiResponses(
         ApiResponse(responseCode = "201", description = "User registered successfully",
-            content = [Content(schema = Schema(implementation = MeResponse::class))]),
+            content = [Content(schema = Schema(implementation = ProfileResponse::class))]),
         ApiResponse(responseCode = "409", description = "Username already taken",
             content = [Content(mediaType = Problem.MEDIA_TYPE)]),
         ApiResponse(responseCode = "400", description = "Role not found or invalid input",
@@ -139,16 +139,16 @@ class AuthController(
             .build()
     }
 
-    @GetMapping(Uris.Auth.ME)
+    @GetMapping(Uris.Auth.PROFILE)
     @Operation(summary = "Current profile", description = "Return authenticated user profile")
     @ApiResponses(
         ApiResponse(responseCode = "200", description = "Profile retrieved",
-            content = [Content(schema = Schema(implementation = MeResponse::class))]),
+            content = [Content(schema = Schema(implementation = ProfileResponse::class))]),
         ApiResponse(responseCode = "404", description = "User not found",
             content = [Content(mediaType = Problem.MEDIA_TYPE)])
     )
-    fun me(authentication: Authentication): ResponseEntity<Any> =
-        when (val result = authService.me(authentication.name)) {
+    fun profile(authentication: Authentication): ResponseEntity<Any> =
+        when (val result = authService.profile(authentication.name)) {
             is Success -> ResponseEntity.ok(result.value)
             is Failure -> when (result.value) {
                 AuthError.UserNotFound -> Problem.response(404, Problem.userNotFound)
