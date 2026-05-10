@@ -142,9 +142,13 @@ class ScheduleService(
     }
 
     private fun computeNextRun(cronExpression: String, timezone: String): LocalDateTime? {
-        val zone = ZoneId.of(timezone)
-        val cron = CronExpression.parse(cronExpression)
-        return cron.next(ZonedDateTime.now(zone))?.toLocalDateTime()
+        return try {
+            val zone = ZoneId.of(timezone)
+            val cron = CronExpression.parse(cronExpression)
+            cron.next(ZonedDateTime.now(zone))?.toLocalDateTime()
+        } catch (_: Exception) {
+            null
+        }
     }
 
     private fun findUser(username: String): User? =
