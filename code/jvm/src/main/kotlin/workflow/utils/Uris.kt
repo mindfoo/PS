@@ -27,13 +27,24 @@ object Uris {
         const val BASE = "$PREFIX/workflows"
         const val BY_ID = "$PREFIX/workflows/{id}"
         const val RUN = "$PREFIX/workflows/{id}/run"
+        const val TASK_ORDER = "$PREFIX/workflows/{id}/task-order"
+        const val TASK_RETRY_POLICY = "$PREFIX/workflows/{id}/tasks/{taskId}/retry-policy"
+        const val EXECUTIONS = "$PREFIX/workflows/{id}/executions"
+        const val LINK_TASK = "$PREFIX/workflows/{id}/link-task/{taskId}"
 
         fun byId(id: UUID): URI = UriTemplate(BY_ID).expand(id)
+    }
+
+    object Executions {
+        const val BASE = "$PREFIX/executions"
+        const val BY_ID = "$PREFIX/executions/{id}"
+        const val CANCEL = "$PREFIX/executions/{id}/cancel"
     }
 
     object Tasks {
         const val BASE = "$PREFIX/tasks"
         const val BY_ID = "$PREFIX/tasks/{id}"
+        const val RUN = "$PREFIX/tasks/{id}/run"
 
         fun byId(id: UUID): URI = UriTemplate(BY_ID).expand(id)
     }

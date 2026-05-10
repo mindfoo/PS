@@ -34,7 +34,7 @@ class Execution(
     @Column(nullable = false)
     var retryCount: Int = 0,
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "triggered_by", nullable = false)
     var triggeredBy: User,
 
@@ -45,5 +45,13 @@ class Execution(
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "workflow_id")
-    var workflow: Workflow? = null
+    var workflow: Workflow? = null,
+
+    /** ID of the parent workflow execution (populated on child task-level records). */
+    @Column(name = "parent_execution_id")
+    var parentExecutionId: UUID? = null,
+
+    /** Snapshot of the task name at execution time (useful after task renames/deletes). */
+    @Column(name = "task_name", length = 128)
+    var taskName: String? = null
 ) : Timestamp()

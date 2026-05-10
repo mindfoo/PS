@@ -74,7 +74,8 @@ class ScheduleService(
             timezone = request.timezone,
             enabled = request.enabled,
             nextRunAt = nextRun,
-            createdBy = user
+            createdBy = user,
+            description = request.description
         )
 
         return success(toResponse(scheduleRepository.save(schedule)))
@@ -102,6 +103,7 @@ class ScheduleService(
         schedule.timezone = request.timezone
         schedule.enabled = request.enabled
         schedule.nextRunAt = nextRun
+        schedule.description = request.description
 
         return success(toResponse(scheduleRepository.save(schedule)))
     }
@@ -160,6 +162,7 @@ class ScheduleService(
             timezone = schedule.timezone,
             enabled = schedule.enabled,
             nextRunAt = schedule.nextRunAt,
-            lastRunAt = schedule.lastRunAt
+            lastRunAt = schedule.lastRunAt,
+            description = schedule.description
         )
 }

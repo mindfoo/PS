@@ -7,7 +7,7 @@ import java.util.UUID
 
 @Entity
 @Table(name = "tasks")
-/** Task entity belonging to a workflow with JSONB execution config. */
+/** Standalone task entity. Linked to workflows via WorkflowTaskOrder (many-to-many). */
 class Task(
     @Id @GeneratedValue(strategy = GenerationType.UUID)
     var id: UUID? = null,
@@ -22,7 +22,13 @@ class Task(
     @Column(columnDefinition = "jsonb", nullable = false)
     var config: Map<String, Any> = mutableMapOf(),
 
+    /** Retained for backward compatibility; new tasks may have null here. */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "workflow_id", nullable = false)
-    var workflow_id: Workflow
+    @JoinColumn(name = "workflow_id", nullable = true)
+    var workflow_id: Workflow? = null,
+
+    /** User who created this task — used for ownership checks when workflow_id is null. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "created_by", nullable = true)
+    var createdBy: User? = null
 ) : Timestamp()

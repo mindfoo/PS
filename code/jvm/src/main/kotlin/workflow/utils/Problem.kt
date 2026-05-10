@@ -31,7 +31,8 @@ data class Problem(val title: String) {
 
         // ── Tasks ─────────────────────────────────────────────────────────────
         val taskNotFound = Problem("The requested task was not found.")
-
+        val taskAlreadyLinked = Problem("The task is already linked to this workflow.")
+        val taskNotLinked = Problem("The task is not linked to this workflow.")
         // ── Schedules ─────────────────────────────────────────────────────────
         val scheduleNotFound = Problem("The requested schedule was not found.")
         val invalidCronExpression = Problem("The provided cron expression is invalid.")
@@ -40,6 +41,7 @@ data class Problem(val title: String) {
         val invalidRequestContent = Problem("The request content is not valid.")
         val accessDenied = Problem("Access denied: insufficient permissions.")
         val internalError = Problem("An unexpected error occurred.")
+        val notCancelable = Problem("Execution cannot be canceled: it is already finished, not found, or not owned by you.")
     }
 }
 

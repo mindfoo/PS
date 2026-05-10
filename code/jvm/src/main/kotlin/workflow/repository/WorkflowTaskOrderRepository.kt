@@ -13,5 +13,14 @@ interface WorkflowTaskOrderRepository : JpaRepository<WorkflowTaskOrder, UUID> {
 
     @Query("select wto from WorkflowTaskOrder wto where wto.workflow.id = :workflowId order by wto.taskOrder asc")
     fun findAllByWorkflowIdOrderByTaskOrderAsc(@Param("workflowId") workflowId: UUID): List<WorkflowTaskOrder>
+
+    @Query("select wto from WorkflowTaskOrder wto where wto.task.id = :taskId")
+    fun findAllByTaskId(@Param("taskId") taskId: UUID): List<WorkflowTaskOrder>
+
+    @Query("select wto from WorkflowTaskOrder wto where wto.workflow.id = :workflowId and wto.task.id = :taskId")
+    fun findByWorkflowIdAndTaskId(
+        @Param("workflowId") workflowId: UUID,
+        @Param("taskId") taskId: UUID
+    ): List<WorkflowTaskOrder>
 }
 

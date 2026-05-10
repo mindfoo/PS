@@ -22,6 +22,10 @@ import org.springframework.web.bind.annotation.RestController
 import org.workflow.dto.TaskCreateRequest
 import org.workflow.dto.TaskResponse
 import org.workflow.dto.TaskUpdateRequest
+import org.workflow.dto.WorkflowTaskEntry
+import org.workflow.dto.ExecutionResponse
+import org.workflow.service.ExecutionService
+import org.workflow.service.utils.ExecutionError
 import org.workflow.service.utils.TaskError
 import org.workflow.service.TaskService
 import org.workflow.utils.Failure
@@ -34,28 +38,43 @@ import java.util.UUID
 @Tag(name = "Tasks", description = "Task CRUD endpoints")
 /** Exposes task CRUD endpoints scoped by workflow ownership and RBAC. */
 class TaskController(
-    private val taskService: TaskService
+    private val taskService: TaskService,
+    private val executionService: ExecutionService
 ) {
 
     @GetMapping(Uris.Tasks.BASE)
     @PreAuthorize("hasAuthority('task:read')")
-    @Operation(summary = "List tasks by workflow")
+    @Operation(summary = "List tasks", description = "If workflowId is provided returns ordered entries for that workflow; otherwise returns all tasks visible to the caller")
     @ApiResponses(
-        ApiResponse(responseCode = "200", description = "Task list returned",
-            content = [Content(schema = Schema(implementation = TaskResponse::class))]),
+        ApiResponse(responseCode = "200", description = "Task list returned"),
         ApiResponse(responseCode = "404", description = "Workflow not found",
             content = [Content(mediaType = Problem.MEDIA_TYPE)])
     )
-    fun listByWorkflow(
-        @RequestParam workflowId: UUID,
+    fun list(
+        @RequestParam(required = false) workflowId: UUID?,
         authentication: Authentication
     ): ResponseEntity<Any> =
-        when (val result = taskService.listByWorkflow(workflowId, authentication.name)) {
-            is Success -> ResponseEntity.ok(result.value)
-            is Failure -> when (result.value) {
-                TaskError.UserNotFound -> Problem.response(404, Problem.userNotFound)
-                TaskError.WorkflowNotFound -> Problem.response(404, Problem.workflowNotFound)
-                TaskError.TaskNotFound -> Problem.response(404, Problem.taskNotFound)
+        if (workflowId != null) {
+            when (val result = taskService.listByWorkflow(workflowId, authentication.name)) {
+                is Success -> ResponseEntity.ok(result.value)
+                is Failure -> when (result.value) {
+                    TaskError.UserNotFound -> Problem.response(404, Problem.userNotFound)
+                    TaskError.WorkflowNotFound -> Problem.response(404, Problem.workflowNotFound)
+                    TaskError.TaskNotFound -> Problem.response(404, Problem.taskNotFound)
+                    TaskError.AlreadyLinked -> Problem.response(409, Problem.taskAlreadyLinked)
+                    TaskError.NotLinked -> Problem.response(404, Problem.taskNotLinked)
+                }
+            }
+        } else {
+            when (val result = taskService.listAll(authentication.name)) {
+                is Success -> ResponseEntity.ok(result.value)
+                is Failure -> when (result.value) {
+                    TaskError.UserNotFound -> Problem.response(404, Problem.userNotFound)
+                    TaskError.WorkflowNotFound -> Problem.response(404, Problem.workflowNotFound)
+                    TaskError.TaskNotFound -> Problem.response(404, Problem.taskNotFound)
+                    TaskError.AlreadyLinked -> Problem.response(409, Problem.taskAlreadyLinked)
+                    TaskError.NotLinked -> Problem.response(404, Problem.taskNotLinked)
+                }
             }
         }
 
@@ -78,6 +97,8 @@ class TaskController(
                 TaskError.UserNotFound -> Problem.response(404, Problem.userNotFound)
                 TaskError.WorkflowNotFound -> Problem.response(404, Problem.workflowNotFound)
                 TaskError.TaskNotFound -> Problem.response(404, Problem.taskNotFound)
+                TaskError.AlreadyLinked -> Problem.response(409, Problem.taskAlreadyLinked)
+                TaskError.NotLinked -> Problem.response(404, Problem.taskNotLinked)
             }
         }
 
@@ -100,6 +121,8 @@ class TaskController(
                 TaskError.UserNotFound -> Problem.response(404, Problem.userNotFound)
                 TaskError.WorkflowNotFound -> Problem.response(404, Problem.workflowNotFound)
                 TaskError.TaskNotFound -> Problem.response(404, Problem.taskNotFound)
+                TaskError.AlreadyLinked -> Problem.response(409, Problem.taskAlreadyLinked)
+                TaskError.NotLinked -> Problem.response(404, Problem.taskNotLinked)
             }
         }
 
@@ -123,6 +146,8 @@ class TaskController(
                 TaskError.UserNotFound -> Problem.response(404, Problem.userNotFound)
                 TaskError.WorkflowNotFound -> Problem.response(404, Problem.workflowNotFound)
                 TaskError.TaskNotFound -> Problem.response(404, Problem.taskNotFound)
+                TaskError.AlreadyLinked -> Problem.response(409, Problem.taskAlreadyLinked)
+                TaskError.NotLinked -> Problem.response(404, Problem.taskNotLinked)
             }
         }
 
@@ -144,6 +169,30 @@ class TaskController(
                 TaskError.UserNotFound -> Problem.response(404, Problem.userNotFound)
                 TaskError.WorkflowNotFound -> Problem.response(404, Problem.workflowNotFound)
                 TaskError.TaskNotFound -> Problem.response(404, Problem.taskNotFound)
+                TaskError.AlreadyLinked -> Problem.response(409, Problem.taskAlreadyLinked)
+                TaskError.NotLinked -> Problem.response(404, Problem.taskNotLinked)
+            }
+        }
+
+    @PostMapping(Uris.Tasks.RUN)
+    @PreAuthorize("hasAuthority('workflow:execute')")
+    @Operation(summary = "Run a single task now", description = "Trigger a manual execution for a single task")
+    @ApiResponses(
+        ApiResponse(responseCode = "202", description = "Task execution started"),
+        ApiResponse(responseCode = "404", description = "Task not found",
+            content = [Content(mediaType = Problem.MEDIA_TYPE)])
+    )
+    fun runTask(
+        @PathVariable id: UUID,
+        authentication: Authentication
+    ): ResponseEntity<Any> =
+        when (val result = executionService.triggerManualTask(id, authentication.name)) {
+            is Success -> ResponseEntity.status(HttpStatus.ACCEPTED)
+                .body(ExecutionResponse(executionId = result.value.toString(), status = "STARTED"))
+            is Failure -> when (result.value) {
+                ExecutionError.UserNotFound     -> Problem.response(404, Problem.userNotFound)
+                ExecutionError.TaskNotFound     -> Problem.response(404, Problem.taskNotFound)
+                ExecutionError.WorkflowNotFound -> Problem.response(404, Problem.workflowNotFound)
             }
         }
 }

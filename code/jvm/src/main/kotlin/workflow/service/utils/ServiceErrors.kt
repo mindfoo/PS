@@ -32,6 +32,8 @@ sealed class TaskError {
     object TaskNotFound : TaskError()
     object WorkflowNotFound : TaskError()
     object UserNotFound : TaskError()
+    object AlreadyLinked : TaskError()
+    object NotLinked : TaskError()
 }
 
 // ── User ──────────────────────────────────────────────────────────────────────
@@ -55,4 +57,12 @@ sealed class ScheduleError {
     object InvalidCronExpression : ScheduleError()
 }
 
+// ── Execution ─────────────────────────────────────────────────────────────────
+
+/** All typed failure cases that [org.workflow.service.ExecutionService] can produce. */
+sealed class ExecutionError {
+    object TaskNotFound : ExecutionError()
+    object WorkflowNotFound : ExecutionError()
+    object UserNotFound : ExecutionError()
+}
 
