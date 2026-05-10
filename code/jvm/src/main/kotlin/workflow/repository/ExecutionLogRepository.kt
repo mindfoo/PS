@@ -1,6 +1,7 @@
 package org.workflow.repository
 
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import org.springframework.stereotype.Repository
 import org.workflow.entity.Execution
@@ -23,4 +24,9 @@ interface ExecutionLogRepository : JpaRepository<Execution, UUID> {
 
     /** All executions for a given task (single-task runs), most recent first. */
     fun findAllByTaskIdAndParentExecutionIdIsNullOrderByStartedAtDesc(taskId: UUID): List<Execution>
+
+    /** Delete all execution records (children first, then parents) for a workflow. */
+    @Modifying
+    @Query("delete from Execution e where e.workflow.id = :workflowId")
+    fun deleteAllByWorkflowId(workflowId: UUID)
 }

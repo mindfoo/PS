@@ -183,7 +183,7 @@ class TaskService(
         val workflow = findAccessibleWorkflow(workflowId, currentUser)
             ?: return failure(TaskError.WorkflowNotFound)
 
-        val existing = workflowTaskOrderRepository.findByWorkflowIdAndTaskId(workflow.id!!, task.id!!)
+        val existing = workflowTaskOrderRepository.findAllByWorkflowIdAndTaskId(workflow.id!!, task.id!!)
         if (existing.isNotEmpty()) return failure(TaskError.AlreadyLinked)
 
         val nextStage = workflowTaskOrderRepository
@@ -210,7 +210,7 @@ class TaskService(
         val workflow = findAccessibleWorkflow(workflowId, currentUser)
             ?: return failure(TaskError.WorkflowNotFound)
 
-        val rows = workflowTaskOrderRepository.findByWorkflowIdAndTaskId(workflow.id!!, task.id!!)
+        val rows = workflowTaskOrderRepository.findAllByWorkflowIdAndTaskId(workflow.id!!, task.id!!)
         if (rows.isEmpty()) return failure(TaskError.NotLinked)
 
         workflowTaskOrderRepository.deleteAll(rows)

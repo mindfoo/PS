@@ -11,7 +11,10 @@ import org.workflow.dto.WorkflowResponse
 import org.workflow.dto.WorkflowUpdateRequest
 import org.workflow.entity.User
 import org.workflow.entity.Workflow
+import org.workflow.repository.AlertRepository
 import org.workflow.repository.ExecutionLogRepository
+import org.workflow.repository.ScheduleRepository
+import org.workflow.repository.TaskRepository
 import org.workflow.repository.UserRepository
 import org.workflow.repository.WorkflowRepository
 import org.workflow.repository.WorkflowTaskOrderRepository
@@ -27,7 +30,10 @@ class WorkflowService(
     private val workflowRepository: WorkflowRepository,
     private val userRepository: UserRepository,
     private val workflowTaskOrderRepository: WorkflowTaskOrderRepository,
-    private val executionLogRepository: ExecutionLogRepository
+    private val executionLogRepository: ExecutionLogRepository,
+    private val scheduleRepository: ScheduleRepository,
+    private val taskRepository: TaskRepository,
+    private val alertRepository: AlertRepository
 ) {
 
     fun list(authenticationName: String): Either<WorkflowError, List<WorkflowResponse>> {
@@ -100,6 +106,14 @@ class WorkflowService(
         } else {
             workflowRepository.findByIdAndOwnerId(workflowId, currentUser.id!!)
         } ?: return failure(WorkflowError.WorkflowNotFound)
+
+        // Cascade-delete in FK dependency order:
+        // alerts → executions → schedules → workflow_tasks_order → tasks → workflow
+        alertRepository.deleteAllByWorkflowId(workflow.id!!)
+        executionLogRepository.deleteAllByWorkflowId(workflow.id!!)
+        scheduleRepository.deleteAllByWorkflowId(workflow.id!!)
+        workflowTaskOrderRepository.deleteAllByWorkflowId(workflow.id!!)
+        taskRepository.deleteAllByWorkflowId(workflow.id!!)
 
         workflowRepository.delete(workflow)
         return success(Unit)

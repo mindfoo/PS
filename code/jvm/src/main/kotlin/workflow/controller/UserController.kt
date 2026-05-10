@@ -6,12 +6,19 @@ import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.tags.Tag
+import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PatchMapping
+import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RestController
+import org.workflow.dto.RoleSummaryResponse
+import org.workflow.dto.UserAdminResponse
 import org.workflow.dto.UserCreateRequest
+import org.workflow.dto.UserRoleUpdateRequest
 import org.workflow.dto.UserResponse
 import org.workflow.service.utils.UserError
 import org.workflow.service.UserService
@@ -19,11 +26,57 @@ import org.workflow.utils.Failure
 import org.workflow.utils.Problem
 import org.workflow.utils.Success
 import org.workflow.utils.Uris
+import java.util.UUID
 
 @RestController
 @Tag(name = "Users", description = "Legacy user management endpoints")
 /** Legacy user controller kept for backwards compatibility. Prefer /api/auth/register. */
 class UserController(private val userService: UserService) {
+
+    @GetMapping(Uris.Users.BASE)
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "List users", description = "Admin-only endpoint to list all users with role and effective permissions")
+    @ApiResponses(
+        ApiResponse(responseCode = "200", description = "Users returned",
+            content = [Content(schema = Schema(implementation = UserAdminResponse::class))]),
+        ApiResponse(responseCode = "403", description = "Forbidden",
+            content = [Content(mediaType = Problem.MEDIA_TYPE)])
+    )
+    fun listUsers(): ResponseEntity<List<UserAdminResponse>> =
+        ResponseEntity.ok(userService.listUsers())
+
+    @GetMapping(Uris.Users.ROLES)
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "List roles", description = "Admin-only endpoint returning role catalog and permissions")
+    @ApiResponses(
+        ApiResponse(responseCode = "200", description = "Roles returned",
+            content = [Content(schema = Schema(implementation = RoleSummaryResponse::class))]),
+        ApiResponse(responseCode = "403", description = "Forbidden",
+            content = [Content(mediaType = Problem.MEDIA_TYPE)])
+    )
+    fun listRoles(): ResponseEntity<List<RoleSummaryResponse>> =
+        ResponseEntity.ok(userService.listRoles())
+
+    @PatchMapping(Uris.Users.UPDATE_ROLE)
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Update user role", description = "Admin-only endpoint to grant a different role to a user")
+    @ApiResponses(
+        ApiResponse(responseCode = "200", description = "Role updated",
+            content = [Content(schema = Schema(implementation = UserAdminResponse::class))]),
+        ApiResponse(responseCode = "400", description = "Role not found",
+            content = [Content(mediaType = Problem.MEDIA_TYPE)]),
+        ApiResponse(responseCode = "404", description = "User not found",
+            content = [Content(mediaType = Problem.MEDIA_TYPE)])
+    )
+    fun updateUserRole(@PathVariable("id") userId: UUID, @RequestBody request: UserRoleUpdateRequest): ResponseEntity<Any> =
+        when (val result = userService.updateUserRole(userId, request)) {
+            is Success -> ResponseEntity.ok(result.value)
+            is Failure -> when (result.value) {
+                UserError.RoleNotFound -> Problem.response(400, Problem.roleNotFound)
+                UserError.UserNotFound -> Problem.response(404, Problem.userNotFound)
+                UserError.UsernameAlreadyTaken -> Problem.response(409, Problem.usernameAlreadyTaken)
+            }
+        }
 
     @PostMapping(Uris.Users.REGISTER)
     @Operation(
@@ -44,6 +97,7 @@ class UserController(private val userService: UserService) {
             is Failure -> when (result.value) {
                 UserError.UsernameAlreadyTaken -> Problem.response(409, Problem.usernameAlreadyTaken)
                 UserError.RoleNotFound -> Problem.response(400, Problem.roleNotFound)
+                UserError.UserNotFound -> Problem.response(404, Problem.userNotFound)
             }
         }
 }

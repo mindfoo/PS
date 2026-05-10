@@ -3,6 +3,7 @@ package org.workflow.repository
 import jakarta.persistence.LockModeType
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Lock
+import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 import org.springframework.stereotype.Repository
@@ -26,5 +27,9 @@ interface ScheduleRepository : JpaRepository<Schedule, UUID> {
         @Param("scheduleId") scheduleId: UUID,
         @Param("userId") userId: UUID
     ): Schedule?
+
+    @Modifying
+    @Query("delete from Schedule s where s.workflow.id = :workflowId")
+    fun deleteAllByWorkflowId(@Param("workflowId") workflowId: UUID)
 }
 

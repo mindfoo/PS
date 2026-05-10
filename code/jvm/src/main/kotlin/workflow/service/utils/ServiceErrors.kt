@@ -45,6 +45,9 @@ sealed class UserError {
 
     /** The requested role does not exist in the database. */
     object RoleNotFound : UserError()
+
+    /** No user with the given id exists. */
+    object UserNotFound : UserError()
 }
 
 // ── Schedule ──────────────────────────────────────────────────────────────────

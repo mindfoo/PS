@@ -26,4 +26,20 @@ interface UserRepository : JpaRepository<User, UUID> {
         WHERE u.username = :username
     """)
     fun findByUsernameWithPermissions(@Param("username") username: String): User?
+
+    @Query("""
+        SELECT DISTINCT u FROM User u
+        JOIN FETCH u.role r
+        LEFT JOIN FETCH r.permissions
+        ORDER BY u.username ASC
+    """)
+    fun findAllWithRoleAndPermissions(): List<User>
+
+    @Query("""
+        SELECT DISTINCT u FROM User u
+        JOIN FETCH u.role r
+        LEFT JOIN FETCH r.permissions
+        WHERE u.id = :id
+    """)
+    fun findByIdWithRoleAndPermissions(@Param("id") id: UUID): User?
 }

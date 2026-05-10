@@ -1,6 +1,7 @@
 package org.workflow.repository
 
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 import org.springframework.stereotype.Repository
@@ -21,6 +22,16 @@ interface WorkflowTaskOrderRepository : JpaRepository<WorkflowTaskOrder, UUID> {
     fun findByWorkflowIdAndTaskId(
         @Param("workflowId") workflowId: UUID,
         @Param("taskId") taskId: UUID
+    ): WorkflowTaskOrder?
+
+    @Query("select wto from WorkflowTaskOrder wto where wto.workflow.id = :workflowId and wto.task.id = :taskId")
+    fun findAllByWorkflowIdAndTaskId(
+        @Param("workflowId") workflowId: UUID,
+        @Param("taskId") taskId: UUID
     ): List<WorkflowTaskOrder>
+
+    @Modifying
+    @Query("delete from WorkflowTaskOrder wto where wto.workflow.id = :workflowId")
+    fun deleteAllByWorkflowId(@Param("workflowId") workflowId: UUID)
 }
 

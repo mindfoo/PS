@@ -20,7 +20,10 @@ object Uris {
     }
 
     object Users {
+        const val BASE = "$PREFIX/users"
         const val REGISTER = "$PREFIX/users/register"
+        const val ROLES = "$PREFIX/users/roles"
+        const val UPDATE_ROLE = "$PREFIX/users/{id}/role"
     }
 
     object Workflows {
