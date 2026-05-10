@@ -5,8 +5,6 @@ import { workflowApi, type WorkflowResponse } from '../api/workflows'
 import { usePermissions } from '../contexts/AuthContext'
 import { Layout } from '../components/Layout'
 
-// ── Cron slot builder types & helpers ────────────────────────────────────────
-
 interface ScheduleSlot {
   everyDay: boolean
   days: number[]   // 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
@@ -132,8 +130,6 @@ function SlotRow({
     </div>
   )
 }
-
-// ── Main page ────────────────────────────────────────────────────────────────
 
 export function SchedulesPage() {
   const [schedules, setSchedules] = useState<ScheduleResponse[]>([])

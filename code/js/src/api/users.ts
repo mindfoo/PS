@@ -1,5 +1,5 @@
 import { api } from './client'
-import type { MeResponse } from './auth'
+import type { UserAuth } from './auth'
 
 export interface UserResponse {
   id: string
@@ -18,6 +18,6 @@ export const usersApi = {
   listRoles: () => api.get<RoleSummary[]>('/users/roles'),
   updateRole: (userId: string, roleName: string) =>
     api.patch<UserResponse>(`/users/${userId}/role`, { roleName }),
-  me: () => api.get<MeResponse>('/auth/me'),
+  userProfile: () => api.get<UserAuth>('/auth/profile'),
 }
 

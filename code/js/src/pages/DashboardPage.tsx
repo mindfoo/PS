@@ -3,16 +3,18 @@ import { Link, useNavigate } from 'react-router-dom'
 import { workflowApi, type WorkflowResponse } from '../api/workflows'
 import { usePermissions } from '../contexts/AuthContext'
 import { Layout } from '../components/Layout'
+import type {ExecutionStatus} from "../api/executions.ts";
 
 function LastRunBadge({ status }: { status?: string | null }) {
   if (!status) return null
-  const map: Record<string, { icon: string; cls: string }> = {
+  const map: Record<ExecutionStatus, { icon: string; cls: string }> = {
     SUCCESS: { icon: '✅', cls: 'badge-status-success' },
     ERROR:   { icon: '❌', cls: 'badge-status-error' },
     RUNNING: { icon: '⏳', cls: 'badge-status-running' },
     PENDING: { icon: '🕐', cls: 'badge-status-pending' },
+    CANCELED: { icon: '-', cls: 'badge-status-canceled' },
   }
-  const entry = map[status] ?? { icon: '•', cls: 'badge-muted' }
+  const entry = map[status as ExecutionStatus] ?? { icon: '•', cls: 'badge-muted' }
   return <span className={`badge ${entry.cls}`} title={`Last run: ${status}`}>{entry.icon} {status}</span>
 }
 
@@ -48,7 +50,6 @@ export function DashboardPage() {
   async function handleRun(id: string) {
     try {
       await workflowApi.run(id)
-      // Immediately reload to show RUNNING/PENDING status; reload again after a few seconds
       await load()
       setTimeout(() => load(), 4000)
     } catch (err: unknown) {

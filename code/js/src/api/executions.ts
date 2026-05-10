@@ -1,10 +1,14 @@
 import { api } from './client'
 
+type ExecutionType = 'WORKFLOW' | 'TASK'
+export type ExecutionStatus = 'ERROR' | 'SUCCESS' | 'CANCELED' | 'RUNNING' | 'PENDING'
+type ExecutionTriggerType = 'MANUAL' | 'SCHEDULED' | 'API'
+
 export interface TaskExecutionSummary {
   executionId: string
   taskId: string | null
   taskName: string | null
-  status: string
+  status: ExecutionStatus
   startedAt: string
   finishedAt: string | null
   output: Record<string, unknown> | null
@@ -12,9 +16,9 @@ export interface TaskExecutionSummary {
 
 export interface ExecutionSummaryResponse {
   id: string
-  triggeredType: string
-  type: string
-  status: string
+  triggeredType: ExecutionTriggerType
+  type: ExecutionType
+  status: ExecutionStatus
   startedAt: string
   finishedAt: string | null
   triggeredBy: string

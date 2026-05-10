@@ -25,7 +25,6 @@ export function Layout({ children }: { children: ReactNode }) {
         {menuOpen ? '✕' : '☰'}
       </button>
 
-      {/* Backdrop — closes menu on tap outside */}
       {menuOpen && (
         <div className="sidebar-backdrop" onClick={() => setMenuOpen(false)} />
       )}

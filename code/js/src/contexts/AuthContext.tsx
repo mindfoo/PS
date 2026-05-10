@@ -1,10 +1,10 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { authApi } from '../api/auth'
-import type { MeResponse } from '../api/auth'
+import type { UserAuth } from '../api/auth'
 
-interface AuthContextValue {
-  user: MeResponse | null
+interface AuthContext {
+  user: UserAuth | null
   loading: boolean
   login: (username: string, password: string) => Promise<void>
   logout: () => Promise<void>
@@ -18,16 +18,17 @@ export enum RoleType {
   DEV = 'DEV',
 }
 
-const AuthContext = createContext<AuthContextValue | null>(null)
+const AuthContext = createContext<AuthContext | null>(null)
 
+/** Provider for Authentication */
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<MeResponse | null>(null)
+  const [user, setUser] = useState<UserAuth | null>(null)
   const [loading, setLoading] = useState(true)
 
   async function refresh() {
     try {
-      const me = await authApi.me()
-      setUser(me)
+      const profile = await authApi.profile()
+      setUser(profile)
     } catch {
       setUser(null)
     }
@@ -54,19 +55,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 }
 
+/** Hook to access auth context and check if user is logged in */
 export function useAuth() {
-  const ctx = useContext(AuthContext)
-  if (!ctx) throw new Error('useAuth must be used within AuthProvider')
-  return ctx
+  const context = useContext(AuthContext)
+  if (!context) throw new Error('useAuth must be used within AuthProvider')
+  return context
 }
 
-/** Check if user has at least one of the given roles */
+/** Checks if user has any of the specified roles */
 export function useHasRole(...roles: string[]) {
   const { user } = useAuth()
   return user != null && roles.includes(user.role)
 }
 
-/** Authorities inferred from role */
+/** Authorities inferred from role, returns all possible permissions from roles */
 export function usePermissions() {
   const { user } = useAuth()
   const role = user?.role ?? ''

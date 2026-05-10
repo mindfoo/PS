@@ -1,0 +1,16 @@
+{
+  "name": "workflow-platform",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently --names \"JVM,JS\" --prefix-colors \"cyan,magenta\" \"npm run dev:jvm\" \"npm run dev:js\"",
+    "dev:jvm": "cd code/jvm && ./gradlew dev",
+    "dev:js":  "cd code/js  && npm run dev",
+    "test": "npm run test:jvm && npm run test:js",
+    "test:jvm": "cd code/jvm && ./gradlew test",
+    "test:js":  "cd code/js  && npm run test",
+    "test:coverage": "npm run test:jvm && cd code/js && npm run test:coverage"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

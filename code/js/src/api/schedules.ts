@@ -14,7 +14,6 @@ export interface ScheduleResponse {
 
 export const scheduleApi = {
   list: () => api.get<ScheduleResponse[]>('/schedules'),
-  getById: (id: string) => api.get<ScheduleResponse>(`/schedules/${id}`),
   create: (body: { workflowId: string; cronExpression: string; timezone?: string; enabled?: boolean; description?: string }) =>
     api.post<ScheduleResponse>('/schedules', body),
   update: (id: string, body: { cronExpression: string; timezone: string; enabled: boolean; description?: string }) =>

@@ -88,7 +88,6 @@ export function WorkflowDetailPage() {
   }
 
   // ── Drag-and-drop ─────────────────────────────────────────────────────────
-
   function onDragEnd(result: DropResult) {
     if (!result.destination) return
     const from = result.source.index
