@@ -93,9 +93,6 @@ class AuthController(
             }
             is Failure -> when (result.value) {
                 AuthError.InvalidCredentials -> Problem.response(401, Problem.invalidCredentials)
-                AuthError.UsernameAlreadyTaken -> Problem.response(409, Problem.usernameAlreadyTaken)
-                AuthError.RoleNotFound -> Problem.response(400, Problem.roleNotFound)
-                AuthError.UserNotFound -> Problem.response(404, Problem.userNotFound)
                 else -> Problem.response(500, Problem.internalError)
             }
         }

@@ -84,6 +84,14 @@ class AuthServiceTest {
         assertEquals(AuthError.RoleNotFound, (result as Failure).value)
     }
 
+    @Test
+    fun `register fails with InsecurePassword when password is weak`() {
+        val result = service.register(RegisterRequest("alice", "weakpass"))
+
+        assertTrue(result is Failure)
+        assertEquals(AuthError.InsecurePassword, (result as Failure).value)
+    }
+
     // ── login ─────────────────────────────────────────────────────────────────
 
     @Test
