@@ -112,9 +112,9 @@ class AuthControllerTest {
     fun `me returns 404 when user not found`() {
         val auth = mockk<Authentication>()
         every { auth.name } returns "ghost"
-        every { authService.me("ghost") } returns failure(AuthError.UserNotFound)
+        every { authService.profile("ghost") } returns failure(AuthError.UserNotFound)
 
-        val response = controller.me(auth)
+        val response = controller.profile(auth)
 
         assertEquals(404, response.statusCode.value())
     }

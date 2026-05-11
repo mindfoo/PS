@@ -89,7 +89,7 @@ class DataInitializer(
                     role = admin
                 )
             )
-            log.warn("DataInitializer: default admin created — change the password immediately! (admin / admin123)")
+            log.warn("DataInitializer: default admin created — change the password immediately! (admin / thisissafepassword)")
         }
 
         log.info("DataInitializer: seeding complete — roles: READER, WRITER, DEV, ADMIN.")

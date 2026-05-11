@@ -12,7 +12,7 @@ data class UserCreateRequest(
 /** User data returned by legacy user endpoints. */
 data class UserResponse(
     val id: UUID?,
-    val name: String,
+    val username: String,
     val role: String
 )
 

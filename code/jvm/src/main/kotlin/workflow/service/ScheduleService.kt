@@ -3,6 +3,7 @@ package org.workflow.service
 import org.springframework.scheduling.support.CronExpression
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.util.concurrent.CompletableFuture
 import org.workflow.dto.ScheduleCreateRequest
 import org.workflow.dto.ScheduleResponse
 import org.workflow.dto.ScheduleUpdateRequest
@@ -132,7 +133,7 @@ class ScheduleService(
             if (!schedule.enabled) return@forEach
 
             val executionId = executionService.createCronExecution(schedule.workflow, schedule.createdBy)
-            executionService.runExecution(executionId)
+            CompletableFuture.runAsync { executionService.runExecution(executionId) }
 
             schedule.lastRunAt = now
             schedule.nextRunAt = computeNextRun(schedule.cronExpression, schedule.timezone)

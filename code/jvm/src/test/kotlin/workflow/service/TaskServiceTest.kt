@@ -12,6 +12,7 @@ import org.workflow.entity.Roles
 import org.workflow.entity.Task
 import org.workflow.entity.User
 import org.workflow.entity.Workflow
+import org.workflow.entity.WorkflowTaskOrder
 import org.workflow.repository.TaskRepository
 import org.workflow.repository.UserRepository
 import org.workflow.repository.WorkflowRepository
@@ -199,5 +200,215 @@ class TaskServiceTest {
 
         assertTrue(result is Failure)
         assertEquals(TaskError.TaskNotFound, (result as Failure).value)
+    }
+
+    // ── listByWorkflow ────────────────────────────────────────────────────────
+
+    @Test
+    fun `listByWorkflow returns ordered task entries for workflow`() {
+        val alice = user()
+        val wf    = workflow(alice)
+        val t     = task(alice)
+        val wto   = WorkflowTaskOrder(id = UUID.randomUUID(), workflow = wf, task = t, taskOrder = 1)
+        every { userRepository.findByUsername("alice") } returns alice
+        every { workflowRepository.findByIdAndOwnerId(wf.id!!, alice.id!!) } returns wf
+        every { wtoRepository.findAllByWorkflowIdOrderByTaskOrderAsc(wf.id!!) } returns listOf(wto)
+        every { taskRepository.findAllByWorkflowId(wf.id!!) } returns emptyList()
+
+        val result = service.listByWorkflow(wf.id!!, "alice")
+
+        assertTrue(result is Success)
+        assertEquals(1, (result as Success).value.size)
+    }
+
+    @Test
+    fun `listByWorkflow returns UserNotFound when user missing`() {
+        every { userRepository.findByUsername("ghost") } returns null
+
+        val result = service.listByWorkflow(UUID.randomUUID(), "ghost")
+
+        assertTrue(result is Failure)
+        assertEquals(TaskError.UserNotFound, (result as Failure).value)
+    }
+
+    @Test
+    fun `listByWorkflow returns WorkflowNotFound when workflow missing`() {
+        val alice = user()
+        val id    = UUID.randomUUID()
+        every { userRepository.findByUsername("alice") } returns alice
+        every { workflowRepository.findByIdAndOwnerId(id, alice.id!!) } returns null
+
+        val result = service.listByWorkflow(id, "alice")
+
+        assertTrue(result is Failure)
+        assertEquals(TaskError.WorkflowNotFound, (result as Failure).value)
+    }
+
+    // ── create with workflowId ────────────────────────────────────────────────
+
+    @Test
+    fun `create with workflowId saves task and creates WorkflowTaskOrder`() {
+        val alice = user()
+        val wf    = workflow(alice)
+        val t     = task(alice)
+        every { userRepository.findByUsername("alice") } returns alice
+        every { workflowRepository.findByIdAndOwnerId(wf.id!!, alice.id!!) } returns wf
+        every { taskRepository.save(any()) } returns t
+        every { wtoRepository.findAllByWorkflowIdOrderByTaskOrderAsc(wf.id!!) } returns emptyList()
+        every { wtoRepository.save(any()) } returnsArgument 0
+
+        val result = service.create(TaskCreateRequest("T", "SCRIPT", workflowId = wf.id!!), "alice")
+
+        assertTrue(result is Success)
+        verify(exactly = 1) { wtoRepository.save(any()) }
+    }
+
+    // ── linkToWorkflow ────────────────────────────────────────────────────────
+
+    @Test
+    fun `linkToWorkflow returns success and saves WorkflowTaskOrder`() {
+        val alice = user()
+        val wf    = workflow(alice)
+        val t     = task(alice)
+        every { userRepository.findByUsername("alice") } returns alice
+        every { taskRepository.findByIdAndOwnerId(t.id!!, alice.id!!) } returns t
+        every { workflowRepository.findByIdAndOwnerId(wf.id!!, alice.id!!) } returns wf
+        every { wtoRepository.findAllByWorkflowIdAndTaskId(wf.id!!, t.id!!) } returns emptyList()
+        every { wtoRepository.findAllByWorkflowIdOrderByTaskOrderAsc(wf.id!!) } returns emptyList()
+        every { wtoRepository.save(any()) } returnsArgument 0
+
+        val result = service.linkToWorkflow(t.id!!, wf.id!!, "alice")
+
+        assertTrue(result is Success)
+        verify(exactly = 1) { wtoRepository.save(any()) }
+    }
+
+    @Test
+    fun `linkToWorkflow returns AlreadyLinked when task already linked`() {
+        val alice = user()
+        val wf    = workflow(alice)
+        val t     = task(alice)
+        val wto   = WorkflowTaskOrder(id = UUID.randomUUID(), workflow = wf, task = t, taskOrder = 1)
+        every { userRepository.findByUsername("alice") } returns alice
+        every { taskRepository.findByIdAndOwnerId(t.id!!, alice.id!!) } returns t
+        every { workflowRepository.findByIdAndOwnerId(wf.id!!, alice.id!!) } returns wf
+        every { wtoRepository.findAllByWorkflowIdAndTaskId(wf.id!!, t.id!!) } returns listOf(wto)
+
+        val result = service.linkToWorkflow(t.id!!, wf.id!!, "alice")
+
+        assertTrue(result is Failure)
+        assertEquals(TaskError.AlreadyLinked, (result as Failure).value)
+    }
+
+    @Test
+    fun `linkToWorkflow returns TaskNotFound when task missing`() {
+        val alice = user()
+        val id    = UUID.randomUUID()
+        every { userRepository.findByUsername("alice") } returns alice
+        every { taskRepository.findByIdAndOwnerId(id, alice.id!!) } returns null
+
+        val result = service.linkToWorkflow(id, UUID.randomUUID(), "alice")
+
+        assertTrue(result is Failure)
+        assertEquals(TaskError.TaskNotFound, (result as Failure).value)
+    }
+
+    @Test
+    fun `linkToWorkflow returns WorkflowNotFound when workflow missing`() {
+        val alice = user()
+        val t     = task(alice)
+        val wfId  = UUID.randomUUID()
+        every { userRepository.findByUsername("alice") } returns alice
+        every { taskRepository.findByIdAndOwnerId(t.id!!, alice.id!!) } returns t
+        every { workflowRepository.findByIdAndOwnerId(wfId, alice.id!!) } returns null
+
+        val result = service.linkToWorkflow(t.id!!, wfId, "alice")
+
+        assertTrue(result is Failure)
+        assertEquals(TaskError.WorkflowNotFound, (result as Failure).value)
+    }
+
+    @Test
+    fun `linkToWorkflow returns UserNotFound when user missing`() {
+        every { userRepository.findByUsername("ghost") } returns null
+
+        val result = service.linkToWorkflow(UUID.randomUUID(), UUID.randomUUID(), "ghost")
+
+        assertTrue(result is Failure)
+        assertEquals(TaskError.UserNotFound, (result as Failure).value)
+    }
+
+    // ── unlinkFromWorkflow ────────────────────────────────────────────────────
+
+    @Test
+    fun `unlinkFromWorkflow returns success and deletes link`() {
+        val alice = user()
+        val wf    = workflow(alice)
+        val t     = task(alice)
+        val wto   = WorkflowTaskOrder(id = UUID.randomUUID(), workflow = wf, task = t, taskOrder = 1)
+        every { userRepository.findByUsername("alice") } returns alice
+        every { taskRepository.findByIdAndOwnerId(t.id!!, alice.id!!) } returns t
+        every { workflowRepository.findByIdAndOwnerId(wf.id!!, alice.id!!) } returns wf
+        every { wtoRepository.findAllByWorkflowIdAndTaskId(wf.id!!, t.id!!) } returns listOf(wto)
+        every { wtoRepository.deleteAll(listOf(wto)) } returns Unit
+
+        val result = service.unlinkFromWorkflow(t.id!!, wf.id!!, "alice")
+
+        assertTrue(result is Success)
+        verify(exactly = 1) { wtoRepository.deleteAll(listOf(wto)) }
+    }
+
+    @Test
+    fun `unlinkFromWorkflow returns NotLinked when no link found`() {
+        val alice = user()
+        val wf    = workflow(alice)
+        val t     = task(alice)
+        every { userRepository.findByUsername("alice") } returns alice
+        every { taskRepository.findByIdAndOwnerId(t.id!!, alice.id!!) } returns t
+        every { workflowRepository.findByIdAndOwnerId(wf.id!!, alice.id!!) } returns wf
+        every { wtoRepository.findAllByWorkflowIdAndTaskId(wf.id!!, t.id!!) } returns emptyList()
+
+        val result = service.unlinkFromWorkflow(t.id!!, wf.id!!, "alice")
+
+        assertTrue(result is Failure)
+        assertEquals(TaskError.NotLinked, (result as Failure).value)
+    }
+
+    @Test
+    fun `unlinkFromWorkflow returns TaskNotFound when task missing`() {
+        val alice = user()
+        val id    = UUID.randomUUID()
+        every { userRepository.findByUsername("alice") } returns alice
+        every { taskRepository.findByIdAndOwnerId(id, alice.id!!) } returns null
+
+        val result = service.unlinkFromWorkflow(id, UUID.randomUUID(), "alice")
+
+        assertTrue(result is Failure)
+        assertEquals(TaskError.TaskNotFound, (result as Failure).value)
+    }
+
+    @Test
+    fun `unlinkFromWorkflow returns WorkflowNotFound when workflow missing`() {
+        val alice = user()
+        val t     = task(alice)
+        val wfId  = UUID.randomUUID()
+        every { userRepository.findByUsername("alice") } returns alice
+        every { taskRepository.findByIdAndOwnerId(t.id!!, alice.id!!) } returns t
+        every { workflowRepository.findByIdAndOwnerId(wfId, alice.id!!) } returns null
+
+        val result = service.unlinkFromWorkflow(t.id!!, wfId, "alice")
+
+        assertTrue(result is Failure)
+        assertEquals(TaskError.WorkflowNotFound, (result as Failure).value)
+    }
+
+    @Test
+    fun `unlinkFromWorkflow returns UserNotFound when user missing`() {
+        every { userRepository.findByUsername("ghost") } returns null
+
+        val result = service.unlinkFromWorkflow(UUID.randomUUID(), UUID.randomUUID(), "ghost")
+
+        assertTrue(result is Failure)
+        assertEquals(TaskError.UserNotFound, (result as Failure).value)
     }
 }

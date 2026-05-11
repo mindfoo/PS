@@ -8,10 +8,14 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.springframework.security.core.Authentication
 import org.workflow.controller.WorkflowController
 import org.workflow.dto.ExecutionSummaryResponse
+import org.workflow.dto.RetryPolicyUpdateRequest
+import org.workflow.dto.TaskOrderItem
+import org.workflow.dto.TaskReorderRequest
 import org.workflow.dto.WorkflowCreateRequest
 import org.workflow.dto.WorkflowResponse
 import org.workflow.dto.WorkflowUpdateRequest
 import org.workflow.service.ExecutionService
+import java.time.LocalDateTime
 import org.workflow.service.TaskService
 import org.workflow.service.WorkflowService
 import org.workflow.service.utils.WorkflowError
@@ -176,5 +180,54 @@ class WorkflowControllerTest {
     fun `cancelExecution returns 409 when execution is not cancelable`() {
         every { executionService.cancelExecution(execId, "alice") } returns false
         assertEquals(409, controller.cancelExecution(execId, auth).statusCode.value())
+    }
+
+    // ── reorderTasks ──────────────────────────────────────────────────────────
+
+    @Test
+    fun `reorderTasks returns 204 on success`() {
+        val request = TaskReorderRequest(items = listOf(TaskOrderItem(orderId = taskId, taskOrder = 2)))
+        every { workflowService.reorderTasks(wfId, request, "alice") } returns success(Unit)
+        assertEquals(204, controller.reorderTasks(wfId, request, auth).statusCode.value())
+    }
+
+    @Test
+    fun `reorderTasks returns 404 when workflow not found`() {
+        val request = TaskReorderRequest(items = emptyList())
+        every { workflowService.reorderTasks(wfId, request, "alice") } returns failure(WorkflowError.WorkflowNotFound)
+        assertEquals(404, controller.reorderTasks(wfId, request, auth).statusCode.value())
+    }
+
+    // ── updateRetryPolicy ─────────────────────────────────────────────────────
+
+    @Test
+    fun `updateRetryPolicy returns 204 on success`() {
+        val request = RetryPolicyUpdateRequest(retryPolicy = 3)
+        every { workflowService.updateRetryPolicy(wfId, taskId, request, "alice") } returns success(Unit)
+        assertEquals(204, controller.updateRetryPolicy(wfId, taskId, request, auth).statusCode.value())
+    }
+
+    @Test
+    fun `updateRetryPolicy returns 404 when not found`() {
+        val request = RetryPolicyUpdateRequest(retryPolicy = 3)
+        every { workflowService.updateRetryPolicy(wfId, taskId, request, "alice") } returns failure(WorkflowError.WorkflowNotFound)
+        assertEquals(404, controller.updateRetryPolicy(wfId, taskId, request, auth).statusCode.value())
+    }
+
+    // ── getExecution ──────────────────────────────────────────────────────────
+
+    @Test
+    fun `getExecution returns 200 with execution summary`() {
+        every { workflowService.getExecution(execId, "alice") } returns success(
+            ExecutionSummaryResponse(execId, "MANUAL", "WORKFLOW", "SUCCESS",
+                LocalDateTime.now(), null, "alice", 0, null, null)
+        )
+        assertEquals(200, controller.getExecution(execId, auth).statusCode.value())
+    }
+
+    @Test
+    fun `getExecution returns 404 when execution not found`() {
+        every { workflowService.getExecution(execId, "alice") } returns failure(WorkflowError.WorkflowNotFound)
+        assertEquals(404, controller.getExecution(execId, auth).statusCode.value())
     }
 }

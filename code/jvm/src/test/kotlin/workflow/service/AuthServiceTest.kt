@@ -156,9 +156,9 @@ class AuthServiceTest {
     fun `me returns UserNotFound when user does not exist`() {
         every { userRepository.findByUsername("ghost") } returns null
 
-        val result = service.me("ghost")
+        val result = service.profile("ghost")
 
         assertTrue(result is Failure)
-        assertEquals(AuthError.UserNotFound, (result as Failure).value)
+        assertEquals(AuthError.UserNotFound, (result as Failure<AuthError>).value)
     }
 }

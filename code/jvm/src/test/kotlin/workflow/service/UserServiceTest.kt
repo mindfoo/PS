@@ -119,7 +119,7 @@ class UserServiceTest {
         val result = service.createUser(UserCreateRequest("charlie", "pass", "READER"))
 
         assertTrue(result is Success)
-        assertEquals("charlie", (result as Success).value.name)
+        assertEquals("charlie", (result as Success).value.username)
     }
 
     @Test
