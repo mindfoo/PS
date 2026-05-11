@@ -9,7 +9,7 @@ import org.workflow.entity.WorkflowTaskOrder
 import java.util.UUID
 
 @Repository
-/** Data access operations for task ordering metadata inside workflows. */
+/** Data access operations for task ordering metadata inside workflows. -> wto - workflowTaskOrder */
 interface WorkflowTaskOrderRepository : JpaRepository<WorkflowTaskOrder, UUID> {
 
     @Query("select wto from WorkflowTaskOrder wto where wto.workflow.id = :workflowId order by wto.taskOrder asc")

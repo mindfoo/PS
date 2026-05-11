@@ -15,5 +15,5 @@ class Workflow(
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
-    var created_by: User
+    var createdBy: User
 ) : Timestamp()

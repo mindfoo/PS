@@ -11,7 +11,6 @@ import java.util.UUID
 /** Data access operations for users. */
 interface UserRepository : JpaRepository<User, UUID> {
 
-    /** Basic lookup — no eager loading of permissions. */
     fun findByUsername(username: String): User?
 
     /**

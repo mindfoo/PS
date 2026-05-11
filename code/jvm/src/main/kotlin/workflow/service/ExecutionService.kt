@@ -35,11 +35,12 @@ class ExecutionService(
     private val workflowRepository: WorkflowRepository,
     private val workflowTaskOrderRepository: WorkflowTaskOrderRepository,
     private val taskRepository: TaskRepository,
-    private val userRepository: UserRepository
+    private val userRepository: UserRepository,
+    private val restTemplate: RestTemplate,
+    private val helpers: ServiceHelpers
 ) {
 
     private val log = LoggerFactory.getLogger(javaClass)
-    private val restTemplate = RestTemplate()
     /** Execution IDs that have been requested to cancel. Checked between stages and retry loops. */
     private val cancelRequests: MutableSet<UUID> = Collections.newSetFromMap(ConcurrentHashMap())
 
@@ -455,14 +456,11 @@ class ExecutionService(
         )
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
-    private fun findUser(username: String): User =
-        userRepository.findByUsername(username)
-            ?: throw NoSuchElementException("User '$username' not found")
+    private fun findUser(username: String): User = helpers.requireUser(username)
+    private fun isAdmin(user: User) = helpers.isAdmin(user)
 
     private fun findAccessibleWorkflow(workflowId: UUID, user: User): Workflow =
-        if (isAdmin(user)) {
+        if (helpers.isAdmin(user)) {
             workflowRepository.findById(workflowId).orElseThrow {
                 NoSuchElementException("Workflow '$workflowId' not found")
             }
@@ -470,8 +468,5 @@ class ExecutionService(
             workflowRepository.findByIdAndOwnerId(workflowId, user.id!!)
                 ?: throw NoSuchElementException("Workflow '$workflowId' not found")
         }
-
-    private fun isAdmin(user: User): Boolean =
-        user.role.name.equals("ADMIN", ignoreCase = true)
 }
 

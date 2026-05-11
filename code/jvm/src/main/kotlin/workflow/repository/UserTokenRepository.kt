@@ -13,8 +13,7 @@ import java.util.UUID
 interface UserTokenRepository : JpaRepository<UserToken, UUID> {
 
     /**
-     * Loads the token together with user → role → permissions in one query to avoid
-     * LazyInitializationException when the security filter accesses authorities.
+     * Loads the token together with user → role → permissions in one query
      */
     @Query("""
         SELECT t FROM UserToken t

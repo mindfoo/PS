@@ -35,14 +35,6 @@ import org.workflow.security.pipeline.AuthenticationInterceptor.Companion.USERNA
 class AuthController(
     private val authService: AuthService
 ) {
-    companion object {
-        /**
-         * Set to `true` in production (requires HTTPS).
-         * The cookie is sent over plain HTTP during local development.
-         * When running behind HTTPS (production/staging), change this to `true`.
-         */
-        private const val SECURE_COOKIES = false
-    }
 
     @PostMapping(Uris.Auth.REGISTER)
     @Operation(summary = "Register user", description = "Create a new user account")
@@ -76,16 +68,16 @@ class AuthController(
         when (val result = authService.login(request)) {
             is Success -> {
                 val tokenCookie = ResponseCookie.from(COOKIE_NAME, result.value.accessToken)
-                    .httpOnly(true)          // not accessible via JS — protects against XSS
-                    .secure(SECURE_COOKIES)  // false = HTTP (dev); true = HTTPS only (prod)
-                    .sameSite("Strict")      // not sent on cross-site requests — protects against CSRF
+                    .httpOnly(true)
+                    .secure(true)
+                    .sameSite("Strict")
                     .maxAge(AuthService.TOKEN_TTL_HOURS * 3600)
                     .path("/")
                     .build()
 
                 val usernameCookie = ResponseCookie.from(USERNAME_COOKIE_NAME, request.username)
-                    .httpOnly(false)         // readable by JS for display purposes (no sensitive data)
-                    .secure(SECURE_COOKIES)
+                    .httpOnly(false)
+                    .secure(true)
                     .sameSite("Strict")
                     .maxAge(AuthService.TOKEN_TTL_HOURS * 3600)
                     .path("/")
@@ -111,7 +103,7 @@ class AuthController(
         ApiResponse(responseCode = "401", description = "Not authenticated",
             content = [Content(mediaType = Problem.MEDIA_TYPE)])
     )
-    fun logout(request: HttpServletRequest): ResponseEntity<Void> {
+    fun logout(request: HttpServletRequest): ResponseEntity<Any> {
         val tokenValue = request.cookies?.find { it.name == COOKIE_NAME }?.value
         if (!tokenValue.isNullOrBlank()) {
             authService.logout(tokenValue)
@@ -119,7 +111,7 @@ class AuthController(
 
         val expiredToken = ResponseCookie.from(COOKIE_NAME, "")
             .httpOnly(true)
-            .secure(SECURE_COOKIES)
+            .secure(true)
             .sameSite("Strict")
             .maxAge(0)
             .path("/")
@@ -127,7 +119,7 @@ class AuthController(
 
         val expiredUsername = ResponseCookie.from(USERNAME_COOKIE_NAME, "")
             .httpOnly(false)
-            .secure(SECURE_COOKIES)
+            .secure(true)
             .sameSite("Strict")
             .maxAge(0)
             .path("/")
@@ -136,7 +128,7 @@ class AuthController(
         return ResponseEntity.noContent()
             .header(HttpHeaders.SET_COOKIE, expiredToken.toString())
             .header(HttpHeaders.SET_COOKIE, expiredUsername.toString())
-            .build()
+            .build<Any>()
     }
 
     @GetMapping(Uris.Auth.PROFILE)

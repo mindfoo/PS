@@ -1,7 +1,6 @@
 package org.workflow.dto
 
 import jakarta.validation.constraints.NotBlank
-import jakarta.validation.constraints.NotNull
 import java.time.LocalDateTime
 import java.util.UUID
 
@@ -39,14 +38,12 @@ data class TaskResponse(
  * Returned by GET /tasks?workflowId=... so the UI can render order and parallel stages.
  */
 data class WorkflowTaskEntry(
-    // Task identity
     val taskId: UUID?,
     val name: String,
     val type: String,
     val config: Map<String, Any>,
-    // WorkflowTaskOrder fields (workflow-scoped)
     val orderId: UUID?,       // WorkflowTaskOrder.id — used as key in PATCH reorder
-    val taskOrder: Int,       // Stage index; tasks sharing the same value run in parallel
+    val taskOrder: Int,
     val retryPolicy: Int,
     val dependsOnTaskId: UUID?
 )
@@ -95,7 +92,6 @@ data class ExecutionSummaryResponse(
     val triggeredBy: String,
     val retryCount: Int,
     val output: Map<String, Any>?,
-    /** Populated only for WORKFLOW-type executions; one entry per task. */
     val taskExecutions: List<TaskExecutionSummary>? = null
 )
 

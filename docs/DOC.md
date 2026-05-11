@@ -27,6 +27,7 @@ The Workflow Platform is a REST API developed in Kotlin with Spring Boot 3.2.3, 
 | Acrónimo | Significado |
 |---|---|
 | AOP | Aspect-Oriented Programming |
+| CGLIB | Code Generation Library |
 | API | Application Programming Interface |
 | CRUD | Create, Read, Update, Delete |
 | DTO | Data Transfer Object |
@@ -45,6 +46,7 @@ The Workflow Platform is a REST API developed in Kotlin with Spring Boot 3.2.3, 
 | SQL | Structured Query Language |
 | SRP | Single Responsibility Principle |
 | SSE | Server-Sent Events |
+| TTL | Time To Live |
 | URI | Uniform Resource Identifier |
 | UUID | Universally Unique Identifier |
 
@@ -58,6 +60,7 @@ The Workflow Platform is a REST API developed in Kotlin with Spring Boot 3.2.3, 
 4. [Camada de Persistência — JPA e Hibernate](#4-camada-de-persistência--jpa-e-hibernate)
 5. [Modelo de Domínio em Detalhe](#5-modelo-de-domínio-em-detalhe)
 6. [Segurança e RBAC](#6-segurança-e-rbac)
+   - [6.7 `@PreAuthorize` — Mecanismo Técnico Detalhado](#67-preauthorize--mecanismo-técnico-detalhado)
 7. [Lógica de Negócio — Camada de Serviço](#7-lógica-de-negócio--camada-de-serviço)
 8. [Camada de Apresentação — Controllers e DTOs](#8-camada-de-apresentação--controllers-e-dtos)
 9. [Frontend — React e TypeScript](#9-frontend--react-e-typescript)
@@ -613,9 +616,9 @@ Este mecanismo permite que os controllers acedam ao utilizador autenticado de fo
 
 ```kotlin
 // Controller — sem acesso direto ao SecurityContextHolder
-@GetMapping("/me")
-fun getProfile(@AuthenticatedUser user: AuthenticatedUser): ResponseEntity<MeResponse> =
-    ResponseEntity.ok(authService.me(user.username))
+@GetMapping("/profile")
+fun profile(@AuthenticatedUser user: AuthenticatedUser): ResponseEntity<ProfileResponse> =
+    ResponseEntity.ok(authService.profile(user.username))
 ```
 
 ### 6.6 Fluxo Completo de Registo e Login
@@ -625,7 +628,7 @@ fun getProfile(@AuthenticatedUser user: AuthenticatedUser): ResponseEntity<MeRes
 2. Resolve o role: usa o enviado no body ou `"READER"` por omissão — garantindo que novos utilizadores têm acesso de leitura imediato, enquanto o admin pode promovê-los posteriormente.
 3. Codifica a password com BCrypt.
 4. Persiste o utilizador.
-5. Retorna `MeResponse { id, username, role }`.
+5. Retorna `ProfileResponse { id, username, role }`.
 
 **Login** (`POST /api/auth/login`):
 1. Carrega o utilizador por username.
@@ -635,10 +638,184 @@ fun getProfile(@AuthenticatedUser user: AuthenticatedUser): ResponseEntity<MeRes
 5. Define cookie HttpOnly `token` com o valor bruto (não o hash).
 6. Define cookie de username (não HttpOnly) para uso pelo frontend na UI.
 
+Ambos os cookies usam `.secure(true)` — browsers concedem uma excepção a `localhost`, pelo que os cookies `Secure` são aceites em HTTP durante o desenvolvimento local.
+
+### 6.7 `@PreAuthorize` — Mecanismo Técnico Detalhado
+
+#### 6.7.1 Activação e Infraestrutura AOP
+
+A anotação `@PreAuthorize` é parte do módulo `spring-security-aspects` e é ativada declarando `@EnableMethodSecurity` na classe de configuração:
+
 ```kotlin
-// Configuração do cookie — SecurityConfiguration.kt
-private const val SECURE_COOKIES = false
-// false = HTTP (desenvolvimento local); true = HTTPS (produção)
+@Configuration
+@EnableWebSecurity
+@EnableMethodSecurity   // ← ativa o proxy AOP para @PreAuthorize, @PostAuthorize, etc.
+class SecurityConfig(...) : WebMvcConfigurer { ... }
+```
+
+**AOP — Aspect-Oriented Programming** é um paradigma de programação que permite adicionar comportamento transversal (logging, segurança, transações) a objetos sem modificar o seu código. Em vez de modificar cada método, define-se um *aspect* — um módulo que encapsula esse comportamento — e um conjunto de *pointcuts* que descrevem em que pontos do código o aspect deve ser aplicado.
+
+**CGLIB — Code Generation Library** é uma biblioteca de geração de bytecode JVM usada pelo Spring para criar *proxies* dinâmicos em tempo de execução. Quando o Spring arranca, para cada bean que contém métodos com `@PreAuthorize`, cria uma subclasse gerada em bytecode (um *proxy CGLIB*) que interceta as chamadas aos métodos anotados. Esta subclasse gerada dinamicamente é o que é injetado como dependência nos outros beans — nunca a classe original diretamente.
+
+O ciclo de vida ao arranque do Spring é:
+1. Spring analisa todos os beans registados.
+2. Para cada bean com métodos anotados com `@PreAuthorize`, compila a expressão SpEL associada a cada método em tempo de arranque (o objeto `Expression` resultante é cacheado — não há parsing em tempo de pedido).
+3. Gera uma subclasse CGLIB do bean (o proxy) que wraps cada método anotado numa chamada ao `AuthorizationManagerMethodInterceptor`.
+4. Regista o proxy CGLIB em substituição do bean original no contexto de aplicação.
+
+#### 6.7.2 A Cadeia de Chamada em Tempo de Pedido
+
+Quando um pedido HTTP chega a um método anotado, a cadeia de execução completa é:
+
+```
+HTTP request chega ao DispatcherServlet
+  │
+  ▼
+CGLIB Proxy de WorkflowController (gerado em tempo de arranque)
+  │  Interceta a chamada antes de a delegar ao método real
+  ▼
+AuthorizationManagerMethodInterceptor  (AOP advice)
+  │  Implementa org.aopalliance.intercept.MethodInterceptor
+  ▼
+PreAuthorizeAuthorizationManager
+  │  Obtém a Expression compilada para este método (cache)
+  │  Cria um MethodSecurityEvaluationContext (EvaluationContext SpEL)
+  │  Resolve authentication = SecurityContextHolder.getContext().getAuthentication()
+  ▼
+MethodSecurityExpressionEvaluator  (avalia a expressão SpEL)
+  │
+  ├── resultado = true  →  delega ao método real do controller
+  │
+  └── resultado = false →  lança AccessDeniedException
+                                │
+                                ▼
+                         ExceptionTranslationFilter
+                                │
+                                ▼
+                         HTTP 403 Forbidden
+```
+
+#### 6.7.3 O Argumento de `@PreAuthorize` — SpEL
+
+O argumento da anotação é uma **expressão SpEL** (Spring Expression Language), uma linguagem de expressão interpretada pelo Spring com suporte a chamadas de métodos, propriedades, operadores lógicos, e acesso a variáveis do contexto de avaliação.
+
+O objeto raiz do contexto de avaliação é um `MethodSecurityExpressionRoot`, que expõe os seguintes métodos e propriedades:
+
+| Expressão SpEL | O que verifica |
+|---|---|
+| `hasRole('ADMIN')` | Se `authentication.authorities` contém `ROLE_ADMIN` (prefixo `ROLE_` adicionado automaticamente) |
+| `hasAnyRole('ADMIN','WRITER')` | Se qualquer um dos roles listados está presente |
+| `hasAuthority('workflow:read')` | Se `authentication.authorities` contém a string exata `workflow:read` (sem prefixo automático) |
+| `hasAnyAuthority('workflow:read','task:write')` | Se qualquer das autoridades listadas está presente |
+| `isAuthenticated()` | Se `authentication != null && !authentication.isAnonymous()` |
+| `permitAll()` | Sempre `true` |
+| `denyAll()` | Sempre `false` |
+| `authentication` | O objeto `Authentication` completo — acessível para expressões customizadas |
+| `principal` | Atalho para `authentication.principal` (o objeto `UserDetails`) |
+| `#paramName` | Valor de um parâmetro do método pelo nome (requer flag `-parameters` no compilador Kotlin/Java) |
+| `returnObject` | (apenas `@PostAuthorize`) O valor retornado pelo método |
+
+**Distinção crítica — `hasRole` vs `hasAuthority`:**
+
+- `hasRole('ADMIN')` verifica a presença de `ROLE_ADMIN` nas autoridades. O prefixo `ROLE_` é uma convenção interna do Spring Security, aplicada automaticamente.
+- `hasAuthority('workflow:read')` verifica a string exata — sem prefixo. É usado para as permissões atómicas do catálogo de permissões.
+
+No projeto ambos são usados, conforme a granularidade necessária:
+
+```kotlin
+// UserController — verificação coarse-grained por role
+@PreAuthorize("hasRole('ADMIN')")
+fun listUsers(): ResponseEntity<List<UserResponse>>
+
+// WorkflowController — verificação fine-grained por permissão atómica
+@PreAuthorize("hasAuthority('workflow:read')")
+fun listWorkflows(user: AuthenticatedUser): ResponseEntity<List<WorkflowResponse>>
+```
+
+#### 6.7.4 O Objeto `Authentication` da Java Security
+
+`Authentication` é a interface central do Spring Security, definida no pacote `org.springframework.security.core`:
+
+```java
+public interface Authentication extends Principal, Serializable {
+    // Autoridades concedidas ao principal — usadas por @PreAuthorize
+    Collection<? extends GrantedAuthority> getAuthorities();
+
+    // Credenciais (password/token). Tipicamente null após autenticação bem-sucedida
+    // para não manter informação sensível em memória mais tempo do que o necessário
+    Object getCredentials();
+
+    // Detalhes adicionais do pedido (IP de origem, session id, etc.)
+    Object getDetails();
+
+    // O principal autenticado — neste projeto, o objeto UserDetails com username + authorities
+    Object getPrincipal();
+
+    boolean isAuthenticated();
+    void setAuthenticated(boolean isAuthenticated) throws IllegalArgumentException;
+}
+```
+
+A implementação concreta usada neste projeto é `UsernamePasswordAuthenticationToken` — apesar do nome, é o token de autenticação de propósito geral do Spring Security, usado para qualquer esquema de autenticação (não exclusivamente username/password):
+
+```kotlin
+// CookieAuthenticationFilter.kt — construção do token de autenticação
+val authToken = UsernamePasswordAuthenticationToken(
+    userDetails,              // principal: UserDetails com username + authorities
+    null,                     // credentials: null (token já validado; não retido em memória)
+    userDetails.authorities   // authorities: determina o que @PreAuthorize vai avaliar
+)
+// O construtor de 3 argumentos marca o token como autenticado (isAuthenticated() = true)
+// O construtor de 2 argumentos deixa-o como não autenticado
+authToken.details = WebAuthenticationDetailsSource().buildDetails(request)
+SecurityContextHolder.getContext().authentication = authToken
+```
+
+#### 6.7.5 `SecurityContextHolder` e Modelo de Threading
+
+`SecurityContextHolder` é o mecanismo de armazenamento do contexto de segurança. Por omissão usa `MODE_THREADLOCAL` — o objeto `Authentication` é armazenado numa `ThreadLocal<SecurityContext>`, tornando-o disponível em qualquer ponto do código que corra na mesma thread, sem passar o objeto explicitamente.
+
+**TTL — Time To Live** do contexto por pedido: no final de cada pedido HTTP, o `SecurityContextPersistenceFilter` (ou `SecurityContextHolderFilter` no Spring Security 6) limpa o `SecurityContextHolder`, garantindo que não há vazamento do contexto entre pedidos distintos servidos pela mesma thread (comportamento crítico em servidores com pool de threads como o Tomcat).
+
+Como o sistema é **stateless** (`SessionCreationPolicy.STATELESS`), o Spring nunca persiste o `SecurityContext` numa `HttpSession`. Isto significa que o cookie `token` é revalidado na base de dados em **cada pedido HTTP** — intencionalmente, para garantir que tokens revogados (via logout) são imediatamente rejeitados sem esperar pela expiração de uma sessão.
+
+#### 6.7.6 Fluxo Completo de Autenticação e Autorização no Projeto
+
+```
+Browser envia cookie: token=<valor_opaco>
+  │
+  ▼ CookieAuthenticationFilter (OncePerRequestFilter)
+  │  1. Extrai valor do cookie 'token'
+  │  2. Calcula SHA-256(valor)
+  │  3. Consulta user_tokens WHERE hash = SHA-256(valor) AND expiry > NOW()
+  │  4. Obtém username do registo encontrado
+  │
+  ▼ CustomUserDetailsService (UserDetailsService)
+  │  SELECT user JOIN role JOIN permissions (JOIN FETCH — uma query SQL)
+  │  Constrói lista de autoridades:
+  │    - ROLE_ADMIN              ← role.name com prefixo ROLE_
+  │    - workflow:read           ┐
+  │    - workflow:write          ├ permission.slug (fine-grained)
+  │    - task:read               ┘
+  │
+  ▼ SecurityContextHolder (ThreadLocal)
+  │  Armazena UsernamePasswordAuthenticationToken(userDetails, null, authorities)
+  │  Marcado como autenticado (construtor de 3 args)
+  │
+  ▼ SecurityFilterChain.authorizeHttpRequests
+  │  hasAnyRole("ADMIN","WRITER",...) — verifica ROLE_* nas autoridades
+  │  Se falhar → 403 antes de chegar ao controller
+  │
+  ▼ CGLIB Proxy do Controller
+  │  Interceta a chamada ao método anotado
+  │
+  ▼ PreAuthorizeAuthorizationManager
+  │  Avalia SpEL: hasAuthority('workflow:read')
+  │  SecurityContextHolder.getContext().getAuthentication().getAuthorities()
+  │    .contains(SimpleGrantedAuthority("workflow:read"))
+  │
+  ├── true  → método real executa
+  └── false → AccessDeniedException → 403 Forbidden
 ```
 
 ---
@@ -651,7 +828,7 @@ Os serviços utilizam um tipo `Either<Failure, Success>` para comunicar erros se
 
 ```kotlin
 // AuthService.kt
-fun register(request: RegisterRequest): Either<AuthError, MeResponse> {
+fun register(request: RegisterRequest): Either<AuthError, ProfileResponse> {
     if (userRepository.findByUsername(request.username) != null)
         return failure(AuthError.UsernameAlreadyTaken)
 
@@ -660,7 +837,7 @@ fun register(request: RegisterRequest): Either<AuthError, MeResponse> {
         ?: return failure(AuthError.RoleNotFound)
 
     val saved = userRepository.save(User(...))
-    return success(MeResponse(id = saved.id, username = saved.username, role = saved.role.name))
+    return success(ProfileResponse(id = saved.id, username = saved.username, role = saved.role.name))
 }
 ```
 
@@ -844,16 +1021,16 @@ O frontend é uma Single Page Application construída com React 18, TypeScript e
 O `AuthContext` é um React Context que disponibiliza o estado de autenticação globalmente a toda a árvore de componentes, evitando *prop drilling*:
 
 ```typescript
-interface AuthContextValue {
-  user: MeResponse | null  // null = não autenticado
-  loading: boolean         // true durante verificação inicial de sessão
+interface AuthContext {
+  user: UserAuth | null  // null = não autenticado
+  loading: boolean       // true durante verificação inicial de sessão
   login:   (username: string, password: string) => Promise<void>
   logout:  () => Promise<void>
   refresh: () => Promise<void>
 }
 ```
 
-Na inicialização da SPA, é chamado `authApi.me()` para verificar se existe um cookie de sessão válido. Se a resposta for 200, o utilizador é considerado autenticado sem necessidade de nova credencial — o estado de autenticação persiste após refresh da página porque o cookie HttpOnly é enviado automaticamente pelo browser.
+Na inicialização da SPA, é chamado `authApi.profile()` para verificar se existe um cookie de sessão válido. Se a resposta for 200, o utilizador é considerado autenticado sem necessidade de nova credencial — o estado de autenticação persiste após refresh da página porque o cookie HttpOnly é enviado automaticamente pelo browser.
 
 ### 9.3 RBAC no Frontend — `usePermissions()`
 

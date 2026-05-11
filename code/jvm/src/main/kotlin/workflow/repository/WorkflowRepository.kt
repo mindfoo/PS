@@ -11,10 +11,10 @@ import java.util.UUID
 /** Data access operations for workflows with ownership filters. */
 interface WorkflowRepository : JpaRepository<Workflow, UUID> {
 
-    @Query("select w from Workflow w where w.created_by.id = :userId")
+    @Query("select w from Workflow w where w.createdBy.id = :userId")
     fun findAllByOwnerId(@Param("userId") userId: UUID): List<Workflow>
 
-    @Query("select w from Workflow w where w.id = :workflowId and w.created_by.id = :userId")
+    @Query("select w from Workflow w where w.id = :workflowId and w.createdBy.id = :userId")
     fun findByIdAndOwnerId(
         @Param("workflowId") workflowId: UUID,
         @Param("userId") userId: UUID

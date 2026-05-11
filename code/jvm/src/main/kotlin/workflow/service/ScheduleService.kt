@@ -27,9 +27,11 @@ class ScheduleService(
     private val scheduleRepository: ScheduleRepository,
     private val workflowRepository: WorkflowRepository,
     private val userRepository: UserRepository,
-    private val executionService: ExecutionService
+    private val executionService: ExecutionService,
+    private val helpers: ServiceHelpers
 ) {
 
+    @Transactional(readOnly = true)
     fun list(authenticationName: String): Either<ScheduleError, List<ScheduleResponse>> {
         val user = findUser(authenticationName)
             ?: return failure(ScheduleError.UserNotFound)
@@ -42,6 +44,7 @@ class ScheduleService(
         return success(schedules.map { toResponse(it) })
     }
 
+    @Transactional(readOnly = true)
     fun getById(scheduleId: UUID, authenticationName: String): Either<ScheduleError, ScheduleResponse> {
         val user = findUser(authenticationName)
             ?: return failure(ScheduleError.UserNotFound)
@@ -152,11 +155,8 @@ class ScheduleService(
         }
     }
 
-    private fun findUser(username: String): User? =
-        userRepository.findByUsername(username)
-
-    private fun isAdmin(user: User): Boolean =
-        user.role.name.equals("ADMIN", ignoreCase = true)
+    private fun findUser(username: String) = helpers.findUser(username)
+    private fun isAdmin(user: User) = helpers.isAdmin(user)
 
     private fun toResponse(schedule: Schedule): ScheduleResponse =
         ScheduleResponse(

@@ -7,7 +7,6 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.*
 import org.springframework.security.crypto.password.PasswordEncoder
-import org.workflow.dto.UserCreateRequest
 import org.workflow.dto.UserRoleUpdateRequest
 import org.workflow.entity.Roles
 import org.workflow.entity.User
@@ -99,45 +98,6 @@ class UserServiceTest {
         every { roleRepository.findByNameWithPermissions("GHOST") } returns null
 
         val result = service.updateUserRole(userId, UserRoleUpdateRequest("GHOST"))
-
-        assertTrue(result is Failure)
-        assertEquals(UserError.RoleNotFound, (result as Failure).value)
-    }
-
-    // ── createUser (legacy) ───────────────────────────────────────────────────
-
-    @Test
-    fun `createUser succeeds when username is free`() {
-        val r = role()
-        every { userRepository.findByUsername("charlie") } returns null
-        every { roleRepository.findByName("READER") } returns r
-        every { passwordEncoder.encode(any()) } returns "hashed"
-        every { userRepository.save(any()) } returns User(
-            id = UUID.randomUUID(), username = "charlie", passwordValidation = "hashed", role = r
-        )
-
-        val result = service.createUser(UserCreateRequest("charlie", "pass", "READER"))
-
-        assertTrue(result is Success)
-        assertEquals("charlie", (result as Success).value.username)
-    }
-
-    @Test
-    fun `createUser fails with UsernameAlreadyTaken`() {
-        every { userRepository.findByUsername("alice") } returns user()
-
-        val result = service.createUser(UserCreateRequest("alice", "pass", "READER"))
-
-        assertTrue(result is Failure)
-        assertEquals(UserError.UsernameAlreadyTaken, (result as Failure).value)
-    }
-
-    @Test
-    fun `createUser fails with RoleNotFound when role is invalid`() {
-        every { userRepository.findByUsername("new") } returns null
-        every { roleRepository.findByName("GHOST") } returns null
-
-        val result = service.createUser(UserCreateRequest("new", "pass", "GHOST"))
 
         assertTrue(result is Failure)
         assertEquals(UserError.RoleNotFound, (result as Failure).value)

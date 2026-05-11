@@ -34,8 +34,8 @@ class AuthControllerTest {
 
     @Test
     fun `register returns 201 when user is created successfully`() {
-        val meResponse = ProfileResponse(id = UUID.randomUUID(), username = "alice", role = "READER")
-        every { authService.register(any()) } returns success(meResponse)
+        val profileResponse = ProfileResponse(id = UUID.randomUUID(), username = "alice", role = "READER")
+        every { authService.register(any()) } returns success(profileResponse)
 
         val response = controller.register(RegisterRequest(username = "alice", password = "Secret1!"))
 

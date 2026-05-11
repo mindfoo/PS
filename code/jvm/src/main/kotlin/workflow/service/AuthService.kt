@@ -93,6 +93,7 @@ class AuthService(
         userTokenRepository.deleteByTokenHash(TokenUtils.hashToken(rawToken))
     }
 
+    @Transactional(readOnly = true)
     fun profile(username: String): Either<AuthError, ProfileResponse> {
         val user = userRepository.findByUsername(username)
             ?: return failure(AuthError.UserNotFound)

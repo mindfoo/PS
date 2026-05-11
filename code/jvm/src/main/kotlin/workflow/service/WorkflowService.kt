@@ -33,9 +33,11 @@ class WorkflowService(
     private val executionLogRepository: ExecutionLogRepository,
     private val scheduleRepository: ScheduleRepository,
     private val taskRepository: TaskRepository,
-    private val alertRepository: AlertRepository
+    private val alertRepository: AlertRepository,
+    private val helpers: ServiceHelpers
 ) {
 
+    @Transactional(readOnly = true)
     fun list(authenticationName: String): Either<WorkflowError, List<WorkflowResponse>> {
         val currentUser = findCurrentUser(authenticationName)
             ?: return failure(WorkflowError.UserNotFound)
@@ -49,6 +51,7 @@ class WorkflowService(
         return success(workflows.map { toResponse(it) })
     }
 
+    @Transactional(readOnly = true)
     fun getById(workflowId: UUID, authenticationName: String): Either<WorkflowError, WorkflowResponse> {
         val currentUser = findCurrentUser(authenticationName)
             ?: return failure(WorkflowError.UserNotFound)
@@ -70,7 +73,7 @@ class WorkflowService(
         val saved = workflowRepository.save(
             Workflow(
                 name = request.name,
-                created_by = currentUser
+                createdBy = currentUser
             )
         )
 
@@ -171,6 +174,7 @@ class WorkflowService(
         return success(Unit)
     }
 
+    @Transactional(readOnly = true)
     fun getExecution(executionId: UUID, authenticationName: String): Either<WorkflowError, ExecutionSummaryResponse> {
         // Any authenticated user who can read workflows can poll execution status
         findCurrentUser(authenticationName) ?: return failure(WorkflowError.UserNotFound)
@@ -208,6 +212,7 @@ class WorkflowService(
         )
     }
 
+    @Transactional(readOnly = true)
     fun listExecutions(workflowId: UUID, authenticationName: String): Either<WorkflowError, List<ExecutionSummaryResponse>> {
         val currentUser = findCurrentUser(authenticationName)
             ?: return failure(WorkflowError.UserNotFound)
@@ -250,19 +255,16 @@ class WorkflowService(
         return success(executions)
     }
 
-    private fun findCurrentUser(username: String): User? =
-        userRepository.findByUsername(username)
-
-    private fun isAdmin(user: User): Boolean =
-        user.role.name.equals("ADMIN", ignoreCase = true)
+    private fun findCurrentUser(username: String) = helpers.findUser(username)
+    private fun isAdmin(user: org.workflow.entity.User) = helpers.isAdmin(user)
 
     private fun toResponse(workflow: Workflow): WorkflowResponse {
         val lastStatus = executionLogRepository.findLatestByWorkflowId(workflow.id!!)?.status
         return WorkflowResponse(
             id = workflow.id,
             name = workflow.name,
-            ownerId = workflow.created_by.id,
-            ownerUsername = workflow.created_by.username,
+            ownerId = workflow.createdBy.id,
+            ownerUsername = workflow.createdBy.username,
             lastRunStatus = lastStatus
         )
     }

@@ -17,6 +17,7 @@ import org.workflow.repository.UserRepository
 import org.workflow.repository.WorkflowRepository
 import org.workflow.service.ExecutionService
 import org.workflow.service.ScheduleService
+import org.workflow.service.ServiceHelpers
 import org.workflow.service.utils.ScheduleError
 import org.workflow.utils.Failure
 import org.workflow.utils.Success
@@ -29,6 +30,7 @@ class ScheduleServiceTest {
     private lateinit var workflowRepository: WorkflowRepository
     private lateinit var userRepository: UserRepository
     private lateinit var executionService: ExecutionService
+    private lateinit var helpers: ServiceHelpers
     private lateinit var service: ScheduleService
 
     private val wfId         = UUID.randomUUID()
@@ -38,7 +40,7 @@ class ScheduleServiceTest {
 
     private fun role() = Roles(id = UUID.randomUUID(), name = "WRITER")
     private fun user() = User(id = UUID.randomUUID(), username = "alice", passwordValidation = "h", role = role())
-    private fun workflow(owner: User) = Workflow(id = wfId, name = "WF", created_by = owner)
+    private fun workflow(owner: User) = Workflow(id = wfId, name = "WF", createdBy = owner)
     private fun schedule(owner: User, wf: Workflow) = Schedule(
         id = scheduleId, workflow = wf, cronExpression = validCron, timezone = "UTC",
         enabled = true, nextRunAt = LocalDateTime.now().plusDays(1), createdBy = owner
@@ -50,7 +52,9 @@ class ScheduleServiceTest {
         workflowRepository = mockk()
         userRepository     = mockk()
         executionService   = mockk()
-        service = ScheduleService(scheduleRepository, workflowRepository, userRepository, executionService)
+        helpers            = mockk()
+        every { helpers.isAdmin(any()) } answers { firstArg<User>().role.name.equals("ADMIN", ignoreCase = true) }
+        service = ScheduleService(scheduleRepository, workflowRepository, userRepository, executionService, helpers)
     }
 
     // ── list ──────────────────────────────────────────────────────────────────
@@ -59,7 +63,7 @@ class ScheduleServiceTest {
     fun `list returns all schedules for admin`() {
         val admin = User(id = UUID.randomUUID(), username = "admin", passwordValidation = "h",
             role = Roles(id = UUID.randomUUID(), name = "ADMIN"))
-        every { userRepository.findByUsername("admin") } returns admin
+        every { helpers.findUser("admin") } returns admin
         every { scheduleRepository.findAll() } returns listOf(schedule(admin, workflow(admin)))
 
         val result = service.list("admin")
@@ -71,7 +75,7 @@ class ScheduleServiceTest {
     @Test
     fun `list returns owned schedules for non-admin`() {
         val alice = user()
-        every { userRepository.findByUsername("alice") } returns alice
+        every { helpers.findUser("alice") } returns alice
         every { scheduleRepository.findAllByOwnerId(alice.id!!) } returns listOf(schedule(alice, workflow(alice)))
 
         val result = service.list("alice")
@@ -81,7 +85,7 @@ class ScheduleServiceTest {
 
     @Test
     fun `list returns UserNotFound when user does not exist`() {
-        every { userRepository.findByUsername("ghost") } returns null
+        every { helpers.findUser("ghost") } returns null
 
         val result = service.list("ghost")
 
@@ -95,7 +99,7 @@ class ScheduleServiceTest {
     fun `getById returns schedule when found`() {
         val alice = user()
         val s     = schedule(alice, workflow(alice))
-        every { userRepository.findByUsername("alice") } returns alice
+        every { helpers.findUser("alice") } returns alice
         every { scheduleRepository.findByIdAndOwnerId(scheduleId, alice.id!!) } returns s
 
         val result = service.getById(scheduleId, "alice")
@@ -106,7 +110,7 @@ class ScheduleServiceTest {
     @Test
     fun `getById returns ScheduleNotFound when missing`() {
         val alice = user()
-        every { userRepository.findByUsername("alice") } returns alice
+        every { helpers.findUser("alice") } returns alice
         every { scheduleRepository.findByIdAndOwnerId(scheduleId, alice.id!!) } returns null
 
         val result = service.getById(scheduleId, "alice")
@@ -122,7 +126,7 @@ class ScheduleServiceTest {
         val alice = user()
         val wf    = workflow(alice)
         val s     = schedule(alice, wf)
-        every { userRepository.findByUsername("alice") } returns alice
+        every { helpers.findUser("alice") } returns alice
         every { workflowRepository.findByIdAndOwnerId(wfId, alice.id!!) } returns wf
         every { scheduleRepository.save(any()) } returns s
 
@@ -136,7 +140,7 @@ class ScheduleServiceTest {
     fun `create returns InvalidCronExpression for bad cron`() {
         val alice = user()
         val wf    = workflow(alice)
-        every { userRepository.findByUsername("alice") } returns alice
+        every { helpers.findUser("alice") } returns alice
         every { workflowRepository.findByIdAndOwnerId(wfId, alice.id!!) } returns wf
 
         val result = service.create(ScheduleCreateRequest(wfId, invalidCron, "UTC"), "alice")
@@ -148,7 +152,7 @@ class ScheduleServiceTest {
     @Test
     fun `create returns WorkflowNotFound when workflow not found`() {
         val alice = user()
-        every { userRepository.findByUsername("alice") } returns alice
+        every { helpers.findUser("alice") } returns alice
         every { workflowRepository.findByIdAndOwnerId(wfId, alice.id!!) } returns null
 
         val result = service.create(ScheduleCreateRequest(wfId, validCron, "UTC"), "alice")
@@ -163,7 +167,7 @@ class ScheduleServiceTest {
     fun `update returns updated schedule on success`() {
         val alice = user()
         val s     = schedule(alice, workflow(alice))
-        every { userRepository.findByUsername("alice") } returns alice
+        every { helpers.findUser("alice") } returns alice
         every { scheduleRepository.findByIdAndOwnerId(scheduleId, alice.id!!) } returns s
         every { scheduleRepository.save(s) } returns s
 
@@ -177,7 +181,7 @@ class ScheduleServiceTest {
     fun `update returns InvalidCronExpression for bad cron`() {
         val alice = user()
         val s     = schedule(alice, workflow(alice))
-        every { userRepository.findByUsername("alice") } returns alice
+        every { helpers.findUser("alice") } returns alice
         every { scheduleRepository.findByIdAndOwnerId(scheduleId, alice.id!!) } returns s
 
         val result = service.update(scheduleId,
@@ -193,7 +197,7 @@ class ScheduleServiceTest {
     fun `delete removes schedule on success`() {
         val alice = user()
         val s     = schedule(alice, workflow(alice))
-        every { userRepository.findByUsername("alice") } returns alice
+        every { helpers.findUser("alice") } returns alice
         every { scheduleRepository.findByIdAndOwnerId(scheduleId, alice.id!!) } returns s
         every { scheduleRepository.delete(s) } returns Unit
 
@@ -206,7 +210,7 @@ class ScheduleServiceTest {
     @Test
     fun `delete returns ScheduleNotFound when missing`() {
         val alice = user()
-        every { userRepository.findByUsername("alice") } returns alice
+        every { helpers.findUser("alice") } returns alice
         every { scheduleRepository.findByIdAndOwnerId(scheduleId, alice.id!!) } returns null
 
         val result = service.delete(scheduleId, "alice")

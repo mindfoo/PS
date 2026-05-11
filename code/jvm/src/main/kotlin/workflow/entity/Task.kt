@@ -22,12 +22,12 @@ class Task(
     @Column(columnDefinition = "jsonb", nullable = false)
     var config: Map<String, Any> = mutableMapOf(),
 
-    /** Retained for backward compatibility; new tasks may have null here. */
+    /** Direct workflow scope — set when a task is created inside a workflow context; null for standalone tasks. */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "workflow_id", nullable = true)
-    var workflow_id: Workflow? = null,
+    var workflow: Workflow? = null,
 
-    /** User who created this task — used for ownership checks when workflow_id is null. */
+    /** User who created this task — used for ownership checks when workflow is null. */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by", nullable = true)
     var createdBy: User? = null

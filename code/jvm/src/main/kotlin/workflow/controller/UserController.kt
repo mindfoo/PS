@@ -12,14 +12,11 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
-import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RestController
 import org.workflow.dto.RoleSummaryResponse
 import org.workflow.dto.UserAdminResponse
-import org.workflow.dto.UserCreateRequest
 import org.workflow.dto.UserRoleUpdateRequest
-import org.workflow.dto.UserResponse
 import org.workflow.service.utils.UserError
 import org.workflow.service.UserService
 import org.workflow.utils.Failure
@@ -29,8 +26,7 @@ import org.workflow.utils.Uris
 import java.util.UUID
 
 @RestController
-@Tag(name = "Users", description = "Legacy user management endpoints")
-/** Legacy user controller kept for backwards compatibility. Prefer /api/auth/register. */
+@Tag(name = "Users", description = "User management endpoints")
 class UserController(private val userService: UserService) {
 
     @GetMapping(Uris.Users.BASE)
@@ -75,29 +71,6 @@ class UserController(private val userService: UserService) {
                 UserError.RoleNotFound -> Problem.response(400, Problem.roleNotFound)
                 UserError.UserNotFound -> Problem.response(404, Problem.userNotFound)
                 UserError.UsernameAlreadyTaken -> Problem.response(409, Problem.usernameAlreadyTaken)
-            }
-        }
-
-    @PostMapping(Uris.Users.REGISTER)
-    @Operation(
-        summary = "Legacy register endpoint",
-        description = "Prefer /api/auth/register for the full JWT auth flow"
-    )
-    @ApiResponses(
-        ApiResponse(responseCode = "201", description = "User created",
-            content = [Content(schema = Schema(implementation = UserResponse::class))]),
-        ApiResponse(responseCode = "409", description = "Username already taken",
-            content = [Content(mediaType = Problem.MEDIA_TYPE)]),
-        ApiResponse(responseCode = "400", description = "Role not found",
-            content = [Content(mediaType = Problem.MEDIA_TYPE)])
-    )
-    fun registerUser(@RequestBody request: UserCreateRequest): ResponseEntity<Any> =
-        when (val result = userService.createUser(request)) {
-            is Success -> ResponseEntity.status(HttpStatus.CREATED).body(result.value)
-            is Failure -> when (result.value) {
-                UserError.UsernameAlreadyTaken -> Problem.response(409, Problem.usernameAlreadyTaken)
-                UserError.RoleNotFound -> Problem.response(400, Problem.roleNotFound)
-                UserError.UserNotFound -> Problem.response(404, Problem.userNotFound)
             }
         }
 }

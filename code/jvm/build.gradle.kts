@@ -23,7 +23,6 @@ dependencies {
     // Security (RBAC)
     implementation("org.springframework.boot:spring-boot-starter-security")
 
-
     // OpenAPI / Swagger UI
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.8")
 

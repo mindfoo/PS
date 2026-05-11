@@ -25,6 +25,7 @@ import org.workflow.repository.TaskRepository
 import org.workflow.repository.UserRepository
 import org.workflow.repository.WorkflowRepository
 import org.workflow.repository.WorkflowTaskOrderRepository
+import org.workflow.service.ServiceHelpers
 import org.workflow.service.WorkflowService
 import org.workflow.service.utils.WorkflowError
 import org.workflow.utils.Failure
@@ -41,6 +42,7 @@ class WorkflowServiceTest {
     private lateinit var scheduleRepository: ScheduleRepository
     private lateinit var taskRepository: TaskRepository
     private lateinit var alertRepository: AlertRepository
+    private lateinit var helpers: ServiceHelpers
     private lateinit var service: WorkflowService
 
     private fun readerRole() = Roles(id = UUID.randomUUID(), name = "READER")
@@ -48,7 +50,7 @@ class WorkflowServiceTest {
     private fun user(role: Roles = readerRole(), name: String = "alice") =
         User(id = UUID.randomUUID(), username = name, passwordValidation = "h", role = role)
     private fun workflow(owner: User) =
-        Workflow(id = UUID.randomUUID(), name = "My WF", created_by = owner)
+        Workflow(id = UUID.randomUUID(), name = "My WF", createdBy = owner)
 
     @BeforeEach
     fun setup() {
@@ -59,9 +61,11 @@ class WorkflowServiceTest {
         scheduleRepository    = mockk()
         taskRepository        = mockk()
         alertRepository       = mockk()
+        helpers              = mockk()
+        every { helpers.isAdmin(any()) } answers { firstArg<User>().role.name.equals("ADMIN", ignoreCase = true) }
         service = WorkflowService(
             workflowRepository, userRepository, wtoRepository,
-            executionLogRepository, scheduleRepository, taskRepository, alertRepository
+            executionLogRepository, scheduleRepository, taskRepository, alertRepository, helpers
         )
     }
 
@@ -71,7 +75,7 @@ class WorkflowServiceTest {
     fun `list returns all workflows for admin`() {
         val admin = user(adminRole(), "admin")
         val wf    = workflow(admin)
-        every { userRepository.findByUsername("admin") } returns admin
+        every { helpers.findUser("admin") } returns admin
         every { workflowRepository.findAll() } returns listOf(wf)
         every { executionLogRepository.findLatestByWorkflowId(any()) } returns null
 
@@ -85,7 +89,7 @@ class WorkflowServiceTest {
     fun `list returns only owned workflows for non-admin`() {
         val alice = user()
         val wf    = workflow(alice)
-        every { userRepository.findByUsername("alice") } returns alice
+        every { helpers.findUser("alice") } returns alice
         every { workflowRepository.findAllByOwnerId(alice.id!!) } returns listOf(wf)
         every { executionLogRepository.findLatestByWorkflowId(any()) } returns null
 
@@ -97,7 +101,7 @@ class WorkflowServiceTest {
 
     @Test
     fun `list returns UserNotFound when user does not exist`() {
-        every { userRepository.findByUsername("ghost") } returns null
+        every { helpers.findUser("ghost") } returns null
 
         val result = service.list("ghost")
 
@@ -111,7 +115,7 @@ class WorkflowServiceTest {
     fun `getById returns workflow for owner`() {
         val alice = user()
         val wf    = workflow(alice)
-        every { userRepository.findByUsername("alice") } returns alice
+        every { helpers.findUser("alice") } returns alice
         every { workflowRepository.findByIdAndOwnerId(wf.id!!, alice.id!!) } returns wf
         every { executionLogRepository.findLatestByWorkflowId(wf.id!!) } returns null
 
@@ -125,7 +129,7 @@ class WorkflowServiceTest {
     fun `getById returns WorkflowNotFound when id not found`() {
         val alice = user()
         val id    = UUID.randomUUID()
-        every { userRepository.findByUsername("alice") } returns alice
+        every { helpers.findUser("alice") } returns alice
         every { workflowRepository.findByIdAndOwnerId(id, alice.id!!) } returns null
 
         val result = service.getById(id, "alice")
@@ -140,7 +144,7 @@ class WorkflowServiceTest {
     fun `create saves and returns a new workflow`() {
         val alice = user()
         val wf    = workflow(alice)
-        every { userRepository.findByUsername("alice") } returns alice
+        every { helpers.findUser("alice") } returns alice
         every { workflowRepository.save(any()) } returns wf
         every { executionLogRepository.findLatestByWorkflowId(any()) } returns null
 
@@ -156,7 +160,7 @@ class WorkflowServiceTest {
     fun `update saves updated name`() {
         val alice = user()
         val wf    = workflow(alice)
-        every { userRepository.findByUsername("alice") } returns alice
+        every { helpers.findUser("alice") } returns alice
         every { workflowRepository.findByIdAndOwnerId(wf.id!!, alice.id!!) } returns wf
         every { workflowRepository.save(wf) } returns wf.apply { name = "New Name" }
         every { executionLogRepository.findLatestByWorkflowId(any()) } returns null
@@ -172,7 +176,7 @@ class WorkflowServiceTest {
     fun `delete cascades and deletes workflow`() {
         val alice = user()
         val wf    = workflow(alice)
-        every { userRepository.findByUsername("alice") } returns alice
+        every { helpers.findUser("alice") } returns alice
         every { workflowRepository.findByIdAndOwnerId(wf.id!!, alice.id!!) } returns wf
         every { alertRepository.deleteAllByWorkflowId(wf.id!!) } returns Unit
         every { executionLogRepository.deleteAllByWorkflowId(wf.id!!) } returns Unit
@@ -191,7 +195,7 @@ class WorkflowServiceTest {
     fun `delete returns WorkflowNotFound when workflow not found`() {
         val alice = user()
         val id    = UUID.randomUUID()
-        every { userRepository.findByUsername("alice") } returns alice
+        every { helpers.findUser("alice") } returns alice
         every { workflowRepository.findByIdAndOwnerId(id, alice.id!!) } returns null
 
         val result = service.delete(id, "alice")
@@ -206,7 +210,7 @@ class WorkflowServiceTest {
     fun `getById returns workflow for admin using findById`() {
         val admin = user(adminRole(), "admin")
         val wf    = workflow(admin)
-        every { userRepository.findByUsername("admin") } returns admin
+        every { helpers.findUser("admin") } returns admin
         every { workflowRepository.findById(wf.id!!) } returns Optional.of(wf)
         every { executionLogRepository.findLatestByWorkflowId(wf.id!!) } returns null
 
@@ -219,7 +223,7 @@ class WorkflowServiceTest {
 
     @Test
     fun `create returns UserNotFound when user does not exist`() {
-        every { userRepository.findByUsername("ghost") } returns null
+        every { helpers.findUser("ghost") } returns null
 
         val result = service.create(WorkflowCreateRequest("WF"), "ghost")
 
@@ -231,7 +235,7 @@ class WorkflowServiceTest {
 
     @Test
     fun `update returns UserNotFound when user does not exist`() {
-        every { userRepository.findByUsername("ghost") } returns null
+        every { helpers.findUser("ghost") } returns null
 
         val result = service.update(UUID.randomUUID(), WorkflowUpdateRequest("New"), "ghost")
 
@@ -243,7 +247,7 @@ class WorkflowServiceTest {
     fun `update returns WorkflowNotFound when workflow missing for non-admin`() {
         val alice = user()
         val id    = UUID.randomUUID()
-        every { userRepository.findByUsername("alice") } returns alice
+        every { helpers.findUser("alice") } returns alice
         every { workflowRepository.findByIdAndOwnerId(id, alice.id!!) } returns null
 
         val result = service.update(id, WorkflowUpdateRequest("New"), "alice")
@@ -256,7 +260,7 @@ class WorkflowServiceTest {
 
     @Test
     fun `delete returns UserNotFound when user does not exist`() {
-        every { userRepository.findByUsername("ghost") } returns null
+        every { helpers.findUser("ghost") } returns null
 
         val result = service.delete(UUID.randomUUID(), "ghost")
 
@@ -275,7 +279,7 @@ class WorkflowServiceTest {
             status = "SUCCESS", triggeredBy = alice, workflow = wf,
             startedAt = LocalDateTime.now()
         )
-        every { userRepository.findByUsername("alice") } returns alice
+        every { helpers.findUser("alice") } returns alice
         every { workflowRepository.findByIdAndOwnerId(wf.id!!, alice.id!!) } returns wf
         every { executionLogRepository.findTopLevelByWorkflowIdOrderByStartedAtDesc(wf.id!!) } returns listOf(exec)
         every { executionLogRepository.findAllByParentExecutionIdOrderByStartedAtAsc(exec.id!!) } returns emptyList()
@@ -288,7 +292,7 @@ class WorkflowServiceTest {
 
     @Test
     fun `listExecutions returns UserNotFound when user missing`() {
-        every { userRepository.findByUsername("ghost") } returns null
+        every { helpers.findUser("ghost") } returns null
 
         val result = service.listExecutions(UUID.randomUUID(), "ghost")
 
@@ -300,7 +304,7 @@ class WorkflowServiceTest {
     fun `listExecutions returns WorkflowNotFound when workflow missing`() {
         val alice = user()
         val id    = UUID.randomUUID()
-        every { userRepository.findByUsername("alice") } returns alice
+        every { helpers.findUser("alice") } returns alice
         every { workflowRepository.findByIdAndOwnerId(id, alice.id!!) } returns null
 
         val result = service.listExecutions(id, "alice")
@@ -321,7 +325,7 @@ class WorkflowServiceTest {
             status = "SUCCESS", triggeredBy = alice, workflow = wf,
             startedAt = LocalDateTime.now()
         )
-        every { userRepository.findByUsername("alice") } returns alice
+        every { helpers.findUser("alice") } returns alice
         every { executionLogRepository.findById(execId) } returns Optional.of(exec)
         every { executionLogRepository.findAllByParentExecutionIdOrderByStartedAtAsc(execId) } returns emptyList()
 
@@ -333,7 +337,7 @@ class WorkflowServiceTest {
 
     @Test
     fun `getExecution returns UserNotFound when user missing`() {
-        every { userRepository.findByUsername("ghost") } returns null
+        every { helpers.findUser("ghost") } returns null
 
         val result = service.getExecution(UUID.randomUUID(), "ghost")
 
@@ -345,7 +349,7 @@ class WorkflowServiceTest {
     fun `getExecution returns WorkflowNotFound when execution does not exist`() {
         val alice  = user()
         val execId = UUID.randomUUID()
-        every { userRepository.findByUsername("alice") } returns alice
+        every { helpers.findUser("alice") } returns alice
         every { executionLogRepository.findById(execId) } returns Optional.empty()
 
         val result = service.getExecution(execId, "alice")
@@ -360,11 +364,11 @@ class WorkflowServiceTest {
     fun `reorderTasks updates taskOrder and returns success`() {
         val alice   = user()
         val wf      = workflow(alice)
-        val t       = Task(id = UUID.randomUUID(), name = "T", type = "SCRIPT", config = emptyMap(), workflow_id = wf, createdBy = alice)
+        val t       = Task(id = UUID.randomUUID(), name = "T", type = "SCRIPT", config = emptyMap(), workflow = wf, createdBy = alice)
         val orderId = UUID.randomUUID()
         val wto     = WorkflowTaskOrder(id = orderId, workflow = wf, task = t, taskOrder = 1)
         val request = TaskReorderRequest(items = listOf(TaskOrderItem(orderId = orderId, taskOrder = 2)))
-        every { userRepository.findByUsername("alice") } returns alice
+        every { helpers.findUser("alice") } returns alice
         every { workflowRepository.findByIdAndOwnerId(wf.id!!, alice.id!!) } returns wf
         every { wtoRepository.findAllByWorkflowIdOrderByTaskOrderAsc(wf.id!!) } returns listOf(wto)
         every { wtoRepository.saveAll(any<Iterable<WorkflowTaskOrder>>()) } returns mutableListOf(wto)
@@ -377,7 +381,7 @@ class WorkflowServiceTest {
 
     @Test
     fun `reorderTasks returns UserNotFound when user missing`() {
-        every { userRepository.findByUsername("ghost") } returns null
+        every { helpers.findUser("ghost") } returns null
 
         val result = service.reorderTasks(UUID.randomUUID(), TaskReorderRequest(emptyList()), "ghost")
 
@@ -389,7 +393,7 @@ class WorkflowServiceTest {
     fun `reorderTasks returns WorkflowNotFound when workflow missing`() {
         val alice   = user()
         val id      = UUID.randomUUID()
-        every { userRepository.findByUsername("alice") } returns alice
+        every { helpers.findUser("alice") } returns alice
         every { workflowRepository.findByIdAndOwnerId(id, alice.id!!) } returns null
 
         val result = service.reorderTasks(id, TaskReorderRequest(emptyList()), "alice")
@@ -404,10 +408,10 @@ class WorkflowServiceTest {
     fun `updateRetryPolicy updates retry count and returns success`() {
         val alice   = user()
         val wf      = workflow(alice)
-        val t       = Task(id = UUID.randomUUID(), name = "T", type = "SCRIPT", config = emptyMap(), workflow_id = wf, createdBy = alice)
+        val t       = Task(id = UUID.randomUUID(), name = "T", type = "SCRIPT", config = emptyMap(), workflow = wf, createdBy = alice)
         val wto     = WorkflowTaskOrder(id = UUID.randomUUID(), workflow = wf, task = t, taskOrder = 1, retryPolicy = 0)
         val request = RetryPolicyUpdateRequest(retryPolicy = 3)
-        every { userRepository.findByUsername("alice") } returns alice
+        every { helpers.findUser("alice") } returns alice
         every { workflowRepository.findByIdAndOwnerId(wf.id!!, alice.id!!) } returns wf
         every { wtoRepository.findByWorkflowIdAndTaskId(wf.id!!, t.id!!) } returns wto
         every { wtoRepository.save(wto) } returns wto
@@ -420,7 +424,7 @@ class WorkflowServiceTest {
 
     @Test
     fun `updateRetryPolicy returns UserNotFound when user missing`() {
-        every { userRepository.findByUsername("ghost") } returns null
+        every { helpers.findUser("ghost") } returns null
 
         val result = service.updateRetryPolicy(UUID.randomUUID(), UUID.randomUUID(), RetryPolicyUpdateRequest(1), "ghost")
 
@@ -433,7 +437,7 @@ class WorkflowServiceTest {
         val alice  = user()
         val wf     = workflow(alice)
         val taskId = UUID.randomUUID()
-        every { userRepository.findByUsername("alice") } returns alice
+        every { helpers.findUser("alice") } returns alice
         every { workflowRepository.findByIdAndOwnerId(wf.id!!, alice.id!!) } returns wf
         every { wtoRepository.findByWorkflowIdAndTaskId(wf.id!!, taskId) } returns null
 

@@ -25,11 +25,13 @@ class TaskService(
     private val taskRepository: TaskRepository,
     private val workflowRepository: WorkflowRepository,
     private val userRepository: UserRepository,
-    private val workflowTaskOrderRepository: WorkflowTaskOrderRepository
+    private val workflowTaskOrderRepository: WorkflowTaskOrderRepository,
+    private val helpers: ServiceHelpers
 ) {
 
     // ── List ─────────────────────────────────────────────────────────────────
 
+    @Transactional(readOnly = true)
     fun listAll(authenticationName: String): Either<TaskError, List<TaskResponse>> {
         val currentUser = findCurrentUser(authenticationName)
             ?: return failure(TaskError.UserNotFound)
@@ -42,6 +44,7 @@ class TaskService(
         return success(tasks.map { toResponse(it) })
     }
 
+    @Transactional(readOnly = true)
     fun listByWorkflow(workflowId: UUID, authenticationName: String): Either<TaskError, List<WorkflowTaskEntry>> {
         val currentUser = findCurrentUser(authenticationName)
             ?: return failure(TaskError.UserNotFound)
@@ -64,7 +67,7 @@ class TaskService(
             )
         }
 
-        // Include tasks still linked via legacy workflow_id FK but without an order row
+        // Include tasks linked via direct workflow FK that have no WorkflowTaskOrder row yet
         val orderedTaskIds = orderRows.map { it.task.id }.toSet()
         val nextStage = (orderRows.maxOfOrNull { it.taskOrder } ?: 0) + 1
         val unordered = taskRepository.findAllByWorkflowId(workflow.id!!)
@@ -87,6 +90,7 @@ class TaskService(
 
     // ── CRUD ─────────────────────────────────────────────────────────────────
 
+    @Transactional(readOnly = true)
     fun getById(taskId: UUID, authenticationName: String): Either<TaskError, TaskResponse> {
         val currentUser = findCurrentUser(authenticationName)
             ?: return failure(TaskError.UserNotFound)
@@ -115,7 +119,7 @@ class TaskService(
                 name = request.name,
                 type = request.type,
                 config = request.config,
-                workflow_id = workflow,
+                workflow = workflow,
                 createdBy = currentUser
             )
         )
@@ -226,11 +230,8 @@ class TaskService(
             workflowRepository.findByIdAndOwnerId(workflowId, user.id!!)
         }
 
-    private fun findCurrentUser(username: String): User? =
-        userRepository.findByUsername(username)
-
-    private fun isAdmin(user: User): Boolean =
-        user.role.name.equals("ADMIN", ignoreCase = true)
+    private fun findCurrentUser(username: String) = helpers.findUser(username)
+    private fun isAdmin(user: User) = helpers.isAdmin(user)
 
     private fun toResponse(task: Task): TaskResponse =
         TaskResponse(
@@ -238,6 +239,6 @@ class TaskService(
             name = task.name,
             type = task.type,
             config = task.config,
-            workflowId = task.workflow_id?.id
+            workflowId = task.workflow?.id
         )
 }

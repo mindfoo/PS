@@ -17,7 +17,6 @@ import org.workflow.repository.UserRepository
 
 /**
  * Seeds the database with default roles, permissions and a default admin account on first startup.
- * Idempotent — exits early if the ADMIN role already exists.
  */
 @Component
 class DataInitializer(
@@ -38,29 +37,30 @@ class DataInitializer(
 
         log.info("DataInitializer: seeding permissions, roles and default admin...")
 
-        // ── 1. Persist all permission records first ──────────────────────────
+        // Persist all permission-resource associations so that the bd is populated with that info
         fun save(r: ResourceType, a: ActionType): Permission =
             permissionRepository.save(Permission(resource = r, action = a))
 
+        // w - workflows
         val wRead    = save(ResourceType.WORKFLOW,  ActionType.READ)
         val wWrite   = save(ResourceType.WORKFLOW,  ActionType.WRITE)
         val wDelete  = save(ResourceType.WORKFLOW,  ActionType.DELETE)
         val wExecute = save(ResourceType.WORKFLOW,  ActionType.EXECUTE)
-
+        // t - tasks
         val tRead    = save(ResourceType.TASK,      ActionType.READ)
         val tWrite   = save(ResourceType.TASK,      ActionType.WRITE)
         val tDelete  = save(ResourceType.TASK,      ActionType.DELETE)
         val tExecute = save(ResourceType.TASK,      ActionType.EXECUTE)
-
+        // s - schedules
         val sRead    = save(ResourceType.SCHEDULE,  ActionType.READ)
         val sWrite   = save(ResourceType.SCHEDULE,  ActionType.WRITE)
         val sDelete  = save(ResourceType.SCHEDULE,  ActionType.DELETE)
-
+        // e - executions
         val eRead    = save(ResourceType.EXECUTION, ActionType.READ)
-
+        // u - users
         val uManage  = save(ResourceType.USER,      ActionType.MANAGE)
 
-        // ── 2. Build roles and link the managed permission entities ──────────
+        // Build role-permission association
         val reader = Roles(name = "READER").also {
             it.permissions.addAll(setOf(wRead, tRead, sRead, eRead))
         }
@@ -79,19 +79,18 @@ class DataInitializer(
 
         roleRepository.saveAll(listOf(reader, writer, dev, admin))
 
-        // ── 3. Default admin account (change password on first login!) ───────
+        // Default admin account as first user
         if (userRepository.findByUsername("admin") == null) {
             userRepository.save(
                 User(
                     username = "admin",
                     passwordValidation = passwordEncoder.encode("thisissafepassword"),
-                    displayName = "System Administrator",
                     role = admin
                 )
             )
-            log.warn("DataInitializer: default admin created — change the password immediately! (admin / thisissafepassword)")
+            log.warn("DataInitializer: default admin created (admin / thisissafepassword)")
         }
 
-        log.info("DataInitializer: seeding complete — roles: READER, WRITER, DEV, ADMIN.")
+        log.info("DataInitializer: seeding complete — roles and its permissions.")
     }
 }

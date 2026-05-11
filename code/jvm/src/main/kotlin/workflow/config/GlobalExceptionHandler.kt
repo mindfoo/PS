@@ -13,7 +13,6 @@ import org.workflow.utils.Problem
  * Prevents raw stack traces from leaking into API clients.
  */
 @RestControllerAdvice
-@Suppress("unused")
 class GlobalExceptionHandler {
 
     private val log = LoggerFactory.getLogger(javaClass)

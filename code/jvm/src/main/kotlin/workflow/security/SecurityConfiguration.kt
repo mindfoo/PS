@@ -2,6 +2,7 @@ package org.workflow.security
 
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity
@@ -14,6 +15,7 @@ import org.springframework.web.method.support.HandlerMethodArgumentResolver
 import org.springframework.web.servlet.config.annotation.CorsRegistry
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer
+import org.springframework.web.client.RestTemplate
 import org.workflow.security.pipeline.AuthenticatedUserArgumentResolver
 import org.workflow.security.pipeline.AuthenticationInterceptor
 import org.workflow.security.pipeline.RequestTokenProcessor
@@ -33,12 +35,17 @@ class SecurityConfig(
     private val requestTokenProcessor: RequestTokenProcessor,
     private val customUserDetailsService: CustomUserDetailsService,
     private val authenticationInterceptor: AuthenticationInterceptor,
-    private val authenticatedUserArgumentResolver: AuthenticatedUserArgumentResolver
+    private val authenticatedUserArgumentResolver: AuthenticatedUserArgumentResolver,
+    @Value("\${app.cors.allowed-origins:http://localhost:5173}") private val allowedOrigins: String
 ) : WebMvcConfigurer {
 
     /** Exposed as a bean so [org.workflow.service.AuthService] can inject it for BCrypt hashing. */
     @Bean
     fun passwordEncoder(): PasswordEncoder = BCryptPasswordEncoder()
+
+    /** Exposed as a bean so [org.workflow.service.ExecutionService] can be tested with a mock. */
+    @Bean
+    fun restTemplate(): RestTemplate = RestTemplate()
 
     @Bean
     fun cookieAuthenticationFilter(): CookieAuthenticationFilter =
@@ -58,7 +65,6 @@ class SecurityConfig(
             .authorizeHttpRequests { auth ->
                 auth.requestMatchers(
                     "/api/auth/**",
-                    "/api/users/register",
                     "/swagger-ui/**",
                     "/v3/api-docs/**"
                 ).permitAll()
@@ -84,7 +90,7 @@ class SecurityConfig(
 
     override fun addCorsMappings(registry: CorsRegistry) {
         registry.addMapping("/api/**")
-            .allowedOrigins("http://localhost:5173")
+            .allowedOrigins(allowedOrigins)
             .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
             .allowedHeaders("*")
             .allowCredentials(true)

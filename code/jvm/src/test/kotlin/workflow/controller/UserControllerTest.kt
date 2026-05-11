@@ -7,7 +7,6 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.workflow.controller.UserController
 import org.workflow.dto.UserAdminResponse
-import org.workflow.dto.UserCreateRequest
 import org.workflow.dto.UserRoleUpdateRequest
 import org.workflow.dto.RoleSummaryResponse
 import org.workflow.service.UserService
@@ -100,27 +99,5 @@ class UserControllerTest {
         val response = controller.updateUserRole(userId, UserRoleUpdateRequest("GHOST"))
 
         assertEquals(400, response.statusCode.value())
-    }
-
-    // ── registerUser (legacy) ─────────────────────────────────────────────────
-
-    @Test
-    fun `registerUser returns 201 when created`() {
-        every { userService.createUser(any()) } returns success(
-            org.workflow.dto.UserResponse(UUID.randomUUID(), "charlie", "READER")
-        )
-
-        val response = controller.registerUser(UserCreateRequest("charlie", "Secret1!", "READER"))
-
-        assertEquals(201, response.statusCode.value())
-    }
-
-    @Test
-    fun `registerUser returns 409 when username taken`() {
-        every { userService.createUser(any()) } returns failure(UserError.UsernameAlreadyTaken)
-
-        val response = controller.registerUser(UserCreateRequest("alice", "Secret1!", "READER"))
-
-        assertEquals(409, response.statusCode.value())
     }
 }
