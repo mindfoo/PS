@@ -8,12 +8,14 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.client.RestTemplate
 import org.workflow.entity.Execution
+import org.workflow.entity.ExecutionStatus
+import org.workflow.entity.ExecutionTriggerType
+import org.workflow.entity.ExecutionType
 import org.workflow.entity.Task
 import org.workflow.entity.User
 import org.workflow.entity.Workflow
 import org.workflow.repository.ExecutionLogRepository
 import org.workflow.repository.TaskRepository
-import org.workflow.repository.UserRepository
 import org.workflow.repository.WorkflowRepository
 import org.workflow.repository.WorkflowTaskOrderRepository
 import org.workflow.service.utils.ExecutionError
@@ -35,7 +37,6 @@ class ExecutionService(
     private val workflowRepository: WorkflowRepository,
     private val workflowTaskOrderRepository: WorkflowTaskOrderRepository,
     private val taskRepository: TaskRepository,
-    private val userRepository: UserRepository,
     private val restTemplate: RestTemplate,
     private val helpers: ServiceHelpers
 ) {
@@ -52,8 +53,7 @@ class ExecutionService(
 
     @Transactional
     fun cancelExecution(executionId: UUID, authenticationName: String): Boolean {
-        val user = userRepository.findByUsername(authenticationName)
-            ?: return false
+        val user = helpers.findUser(authenticationName) ?: return false
 
         val execution = executionLogRepository.findById(executionId).orElse(null)
             ?: return false
@@ -61,18 +61,18 @@ class ExecutionService(
         // Non-admins may only cancel their own executions
         if (!isAdmin(user) && execution.triggeredBy.id != user.id) return false
 
-        if (execution.status !in listOf("PENDING", "RUNNING")) return false
+        if (execution.status !in listOf(ExecutionStatus.PENDING, ExecutionStatus.RUNNING)) return false
 
         cancelRequests.add(executionId)
         // Also cancel all pending child executions immediately
         executionLogRepository.findAllByParentExecutionIdOrderByStartedAtAsc(executionId)
-            .filter { it.status in listOf("PENDING", "RUNNING") }
+            .filter { it.status in listOf(ExecutionStatus.PENDING, ExecutionStatus.RUNNING) }
             .forEach { child ->
-                child.status = "CANCELED"
+                child.status = ExecutionStatus.CANCELED
                 child.finishedAt = LocalDateTime.now()
                 executionLogRepository.save(child)
             }
-        execution.status = "CANCELED"
+        execution.status = ExecutionStatus.CANCELED
         execution.finishedAt = LocalDateTime.now()
         execution.output = mapOf("info" to "Canceled by user")
         executionLogRepository.save(execution)
@@ -88,9 +88,9 @@ class ExecutionService(
 
         val execution = executionLogRepository.save(
             Execution(
-                triggeredType = "MANUAL",
-                type = "WORKFLOW",
-                status = "PENDING",
+                triggeredType = ExecutionTriggerType.MANUAL,
+                type = ExecutionType.WORKFLOW,
+                status = ExecutionStatus.PENDING,
                 startedAt = LocalDateTime.now(),
                 triggeredBy = user,
                 workflow = workflow
@@ -105,9 +105,9 @@ class ExecutionService(
     fun createCronExecution(workflow: Workflow, triggeredBy: User): UUID {
         val execution = executionLogRepository.save(
             Execution(
-                triggeredType = "CRON",
-                type = "WORKFLOW",
-                status = "PENDING",
+                triggeredType = ExecutionTriggerType.CRON,
+                type = ExecutionType.WORKFLOW,
+                status = ExecutionStatus.PENDING,
                 startedAt = LocalDateTime.now(),
                 triggeredBy = triggeredBy,
                 workflow = workflow
@@ -124,7 +124,7 @@ class ExecutionService(
         }
 
         if (execution.workflow == null) {
-            execution.status = "ERROR"
+            execution.status = ExecutionStatus.ERROR
             execution.finishedAt = LocalDateTime.now()
             execution.output = mapOf("error" to "Missing workflow for execution")
             executionLogRepository.save(execution)
@@ -132,7 +132,7 @@ class ExecutionService(
         }
 
         val workflow = execution.workflow!!
-        execution.status = "RUNNING"
+        execution.status = ExecutionStatus.RUNNING
         execution.startedAt = LocalDateTime.now()
         executionLogRepository.save(execution)
 
@@ -166,8 +166,8 @@ class ExecutionService(
                 if (cancelRequests.remove(executionId)) {
                     // Mark remaining PENDING children as CANCELED
                     executionLogRepository.findAllByParentExecutionIdOrderByStartedAtAsc(executionId)
-                        .filter { it.status == "PENDING" }
-                        .forEach { c -> c.status = "CANCELED"; c.finishedAt = LocalDateTime.now(); executionLogRepository.save(c) }
+                        .filter { it.status == ExecutionStatus.PENDING }
+                        .forEach { c -> c.status = ExecutionStatus.CANCELED; c.finishedAt = LocalDateTime.now(); executionLogRepository.save(c) }
                     throw CancellationException("Execution canceled")
                 }
                 logLines += "[${LocalDateTime.now()}] Stage $stage — ${tasksInStage.size} task(s)"
@@ -195,7 +195,7 @@ class ExecutionService(
                 }
             }
 
-            execution.status = "SUCCESS"
+            execution.status = ExecutionStatus.SUCCESS
             execution.finishedAt = LocalDateTime.now()
             execution.output = mapOf(
                 "workflowId" to workflow.id.toString(),
@@ -203,15 +203,15 @@ class ExecutionService(
                 "taskOutputs" to taskOutputs
             )
         } catch (ex: CancellationException) {
-            if (execution.status != "CANCELED") {
-                execution.status = "CANCELED"
+            if (execution.status != ExecutionStatus.CANCELED) {
+                execution.status = ExecutionStatus.CANCELED
                 execution.finishedAt = LocalDateTime.now()
                 execution.output = mapOf("info" to "Canceled by user")
             }
             logLines += "[${LocalDateTime.now()}] CANCELED"
             log.info("Execution {} was canceled", executionId)
         } catch (ex: Exception) {
-            execution.status = "ERROR"
+            execution.status = ExecutionStatus.ERROR
             execution.retryCount += 1
             execution.finishedAt = LocalDateTime.now()
             execution.output = mapOf(
@@ -231,7 +231,7 @@ class ExecutionService(
     // ── Single-task execution ─────────────────────────────────────────────────
 
     fun triggerManualTask(taskId: UUID, authenticationName: String): Either<ExecutionError, UUID> {
-        val user = userRepository.findByUsername(authenticationName)
+        val user = helpers.findUser(authenticationName)
             ?: return failure(ExecutionError.UserNotFound)
 
         val task = if (isAdmin(user)) {
@@ -242,9 +242,9 @@ class ExecutionService(
 
         val execution = executionLogRepository.save(
             Execution(
-                triggeredType = "MANUAL",
-                type = "TASK",
-                status = "PENDING",
+                triggeredType = ExecutionTriggerType.MANUAL,
+                type = ExecutionType.TASK,
+                status = ExecutionStatus.PENDING,
                 startedAt = LocalDateTime.now(),
                 triggeredBy = user,
                 task = task,
@@ -256,8 +256,8 @@ class ExecutionService(
         CompletableFuture.runAsync {
             val execRecord = executionLogRepository.findById(execution.id!!).get()
             // Respect cancellation requested before async block started
-            if (execRecord.status == "CANCELED") return@runAsync
-            execRecord.status = "RUNNING"
+            if (execRecord.status == ExecutionStatus.CANCELED) return@runAsync
+            execRecord.status = ExecutionStatus.RUNNING
             execRecord.startedAt = LocalDateTime.now()
             executionLogRepository.save(execRecord)
 
@@ -267,7 +267,7 @@ class ExecutionService(
                 output = runTask(task)
             } catch (ex: Exception) {
                 enforceMinRunTime(started)
-                execRecord.status = "ERROR"
+                execRecord.status = ExecutionStatus.ERROR
                 execRecord.finishedAt = LocalDateTime.now()
                 execRecord.output = mapOf("error" to (ex.message ?: "Unexpected error"))
                 executionLogRepository.save(execRecord)
@@ -275,7 +275,7 @@ class ExecutionService(
             }
             enforceMinRunTime(started)
             val success = (output["exitCode"] as? Int ?: output["statusCode"] as? Int ?: 0) == 0
-            execRecord.status = if (success) "SUCCESS" else "ERROR"
+            execRecord.status = if (success) ExecutionStatus.SUCCESS else ExecutionStatus.ERROR
             execRecord.finishedAt = LocalDateTime.now()
             execRecord.output = output
             executionLogRepository.save(execRecord)
@@ -296,8 +296,8 @@ class ExecutionService(
         val child = executionLogRepository.save(
             Execution(
                 triggeredType = parent.triggeredType,
-                type = "TASK",
-                status = "PENDING",
+                type = ExecutionType.TASK,
+                status = ExecutionStatus.PENDING,
                 startedAt = LocalDateTime.now(),
                 triggeredBy = parent.triggeredBy,
                 task = task,
@@ -311,7 +311,7 @@ class ExecutionService(
 
     private fun runTaskWithTracking(task: Task, childExecutionId: UUID, retryPolicy: Int = 0): Map<String, Any> {
         val child = executionLogRepository.findById(childExecutionId).get()
-        child.status = "RUNNING"
+        child.status = ExecutionStatus.RUNNING
         child.startedAt = LocalDateTime.now()
         executionLogRepository.save(child)
 
@@ -335,18 +335,18 @@ class ExecutionService(
                 lastOutput = mapOf(
                     "taskId" to task.id.toString(),
                     "taskName" to task.name,
-                    "status" to "ERROR",
+                    "status" to ExecutionStatus.ERROR,
                     "error" to (ex.message ?: "Unexpected error")
                 )
                 attempt++
                 continue
             }
             enforceMinRunTime(started)
-            success = (lastOutput["status"] as? String) == "SUCCESS"
+            success = (lastOutput["status"] as? String) == ExecutionStatus.SUCCESS
             attempt++
         }
 
-        child.status = if (success) "SUCCESS" else "ERROR"
+        child.status = if (success) ExecutionStatus.SUCCESS else ExecutionStatus.ERROR
         child.retryCount = attempt - 1
         child.finishedAt = LocalDateTime.now()
         child.output = lastOutput
@@ -421,7 +421,7 @@ class ExecutionService(
             "command"  to cmd.joinToString(" "),
             "exitCode" to exitCode,
             "stdout"   to stdout,
-            "status"   to if (exitCode == 0) "SUCCESS" else "ERROR"
+            "status"   to if (exitCode == 0) ExecutionStatus.SUCCESS else ExecutionStatus.ERROR
         )
     }
 
@@ -452,7 +452,7 @@ class ExecutionService(
             "method"     to method,
             "statusCode" to response.statusCode.value(),
             "body"       to (response.body ?: ""),
-            "status"     to if (response.statusCode.is2xxSuccessful) "SUCCESS" else "ERROR"
+            "status"     to if (response.statusCode.is2xxSuccessful) ExecutionStatus.SUCCESS else ExecutionStatus.ERROR
         )
     }
 

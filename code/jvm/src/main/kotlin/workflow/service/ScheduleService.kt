@@ -10,7 +10,6 @@ import org.workflow.dto.ScheduleUpdateRequest
 import org.workflow.entity.Schedule
 import org.workflow.entity.User
 import org.workflow.repository.ScheduleRepository
-import org.workflow.repository.UserRepository
 import org.workflow.repository.WorkflowRepository
 import org.workflow.service.utils.ScheduleError
 import org.workflow.utils.Either
@@ -26,7 +25,6 @@ import java.util.UUID
 class ScheduleService(
     private val scheduleRepository: ScheduleRepository,
     private val workflowRepository: WorkflowRepository,
-    private val userRepository: UserRepository,
     private val executionService: ExecutionService,
     private val helpers: ServiceHelpers
 ) {

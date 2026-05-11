@@ -28,10 +28,10 @@ class CustomUserDetailsService(
         val role = user.role
         val roleName = role.name.uppercase()
 
-        // Coarse-grained authority: ROLE_ADMIN, ROLE_WRITER, ROLE_READER, ROLE_DEV
+        // authority: ROLE_ADMIN, ROLE_WRITER, ROLE_READER, ROLE_DEV
         val roleAuthority = SimpleGrantedAuthority("ROLE_$roleName")
 
-        // Fine-grained authorities from the permission catalogue: workflow:read, task:write, etc.
+        // authorities from the permission catalogue: workflow:read, task:write, etc.
         val permissionAuthorities = role.permissions.map { SimpleGrantedAuthority(it.slug) }
 
         return User.builder()

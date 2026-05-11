@@ -10,6 +10,7 @@ import jakarta.servlet.http.HttpServletRequest
 import jakarta.validation.Valid
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
+import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.http.ResponseCookie
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.Authentication
@@ -26,8 +27,8 @@ import org.workflow.utils.Failure
 import org.workflow.utils.Problem
 import org.workflow.utils.Success
 import org.workflow.utils.Uris
-import org.workflow.security.pipeline.AuthenticationInterceptor.Companion.COOKIE_NAME
-import org.workflow.security.pipeline.AuthenticationInterceptor.Companion.USERNAME_COOKIE_NAME
+import org.workflow.security.CookieAuthenticationFilter.Companion.COOKIE_NAME
+import org.workflow.security.CookieAuthenticationFilter.Companion.USERNAME_COOKIE_NAME
 
 @RestController
 @Tag(name = "Auth", description = "Registration, login, logout and profile endpoints")
@@ -43,17 +44,19 @@ class AuthController(
             content = [Content(schema = Schema(implementation = ProfileResponse::class))]),
         ApiResponse(responseCode = "409", description = "Username already taken",
             content = [Content(mediaType = Problem.MEDIA_TYPE)]),
-        ApiResponse(responseCode = "400", description = "Role not found or invalid input",
+        ApiResponse(responseCode = "400", description = "Insecure password, role not found, or invalid input",
             content = [Content(mediaType = Problem.MEDIA_TYPE)])
     )
     fun register(@Valid @RequestBody request: RegisterRequest): ResponseEntity<Any> =
         when (val result = authService.register(request)) {
-            is Success -> ResponseEntity.status(HttpStatus.CREATED).body(result.value)
+            is Success -> ResponseEntity.status(HttpStatus.CREATED)
+                .header("Location", "${Uris.Auth.PROFILE}")
+                .body(result.value)
             is Failure -> when (result.value) {
                 AuthError.UsernameAlreadyTaken -> Problem.response(409, Problem.usernameAlreadyTaken)
                 AuthError.RoleNotFound -> Problem.response(400, Problem.roleNotFound)
-                AuthError.UserNotFound -> Problem.response(404, Problem.userNotFound)
-                AuthError.InvalidCredentials -> Problem.response(401, Problem.invalidCredentials)
+                AuthError.InsecurePassword -> Problem.response(400, Problem.insecurePassword)
+                else -> Problem.response(500, Problem.internalError)
             }
         }
 
@@ -93,10 +96,12 @@ class AuthController(
                 AuthError.UsernameAlreadyTaken -> Problem.response(409, Problem.usernameAlreadyTaken)
                 AuthError.RoleNotFound -> Problem.response(400, Problem.roleNotFound)
                 AuthError.UserNotFound -> Problem.response(404, Problem.userNotFound)
+                else -> Problem.response(500, Problem.internalError)
             }
         }
 
     @PostMapping(Uris.Auth.LOGOUT)
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Logout", description = "Revoke the current session token and clear cookies")
     @ApiResponses(
         ApiResponse(responseCode = "204", description = "Logged out — cookies cleared"),
@@ -142,11 +147,6 @@ class AuthController(
     fun profile(authentication: Authentication): ResponseEntity<Any> =
         when (val result = authService.profile(authentication.name)) {
             is Success -> ResponseEntity.ok(result.value)
-            is Failure -> when (result.value) {
-                AuthError.UserNotFound -> Problem.response(404, Problem.userNotFound)
-                AuthError.UsernameAlreadyTaken -> Problem.response(409, Problem.usernameAlreadyTaken)
-                AuthError.RoleNotFound -> Problem.response(400, Problem.roleNotFound)
-                AuthError.InvalidCredentials -> Problem.response(401, Problem.invalidCredentials)
-            }
+            is Failure -> Problem.response(404, Problem.userNotFound)
         }
 }

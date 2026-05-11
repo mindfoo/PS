@@ -57,7 +57,7 @@ class AuthServiceTest {
         every { passwordEncoder.encode(any()) } returns "hashed"
         every { userRepository.save(any()) } returns u
 
-        val result = service.register(RegisterRequest("alice", "Secret1!"))
+        val result = service.register(RegisterRequest("alice", "Secret1!Aa"))
 
         assertTrue(result is Success)
         assertEquals("alice", (result as Success).value.username)
@@ -67,7 +67,7 @@ class AuthServiceTest {
     fun `register fails with UsernameAlreadyTaken when username exists`() {
         every { userRepository.findByUsername("alice") } returns user()
 
-        val result = service.register(RegisterRequest("alice", "Secret1!"))
+        val result = service.register(RegisterRequest("alice", "Secret1!Aa"))
 
         assertTrue(result is Failure)
         assertEquals(AuthError.UsernameAlreadyTaken, (result as Failure).value)
@@ -78,7 +78,7 @@ class AuthServiceTest {
         every { userRepository.findByUsername("new") } returns null
         every { roleRepository.findByName("GHOST") } returns null
 
-        val result = service.register(RegisterRequest("new", "Secret1!", roleName = "GHOST"))
+        val result = service.register(RegisterRequest("new", "Secret1!Aa", roleName = "GHOST"))
 
         assertTrue(result is Failure)
         assertEquals(AuthError.RoleNotFound, (result as Failure).value)
@@ -90,10 +90,10 @@ class AuthServiceTest {
     fun `login succeeds and returns token`() {
         val u = user()
         every { userRepository.findByUsername("alice") } returns u
-        every { passwordEncoder.matches("Secret1!", "hashed") } returns true
+        every { passwordEncoder.matches("Secret1!Aa", "hashed") } returns true
         every { tokenRepository.save(any()) } returnsArgument 0
 
-        val result = service.login(LoginRequest("alice", "Secret1!"))
+        val result = service.login(LoginRequest("alice", "Secret1!Aa"))
 
         assertTrue(result is Success)
         assertNotNull((result as Success).value.accessToken)
@@ -123,7 +123,7 @@ class AuthServiceTest {
 
     @Test
     fun `login fails with InvalidCredentials when username is blank`() {
-        val result = service.login(LoginRequest("", "Secret1!"))
+        val result = service.login(LoginRequest("", "Secret1!Aa"))
 
         assertTrue(result is Failure)
         assertEquals(AuthError.InvalidCredentials, (result as Failure).value)

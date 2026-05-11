@@ -35,6 +35,10 @@ class AuthService(
 
     @Transactional
     fun register(request: RegisterRequest): Either<AuthError, ProfileResponse> {
+        if (!isSafePassword(request.password)) {
+            return failure(AuthError.InsecurePassword)
+        }
+
         if (userRepository.findByUsername(request.username) != null) {
             return failure(AuthError.UsernameAlreadyTaken)
         }
@@ -100,4 +104,9 @@ class AuthService(
 
         return success(ProfileResponse(id = user.id, username = user.username, role = user.role.name))
     }
+
+    private fun isSafePassword(password: String): Boolean =
+        password.length > 9 &&
+            password.any { it.isDigit() } &&
+            password.any { it.isLowerCase() } 
 }

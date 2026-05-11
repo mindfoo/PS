@@ -1,8 +1,9 @@
 package org.workflow.security
 
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
-import org.springframework.beans.factory.annotation.Value
+import org.springframework.context.annotation.Lazy
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity
@@ -11,31 +12,22 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.security.web.SecurityFilterChain
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter
-import org.springframework.web.method.support.HandlerMethodArgumentResolver
-import org.springframework.web.servlet.config.annotation.CorsRegistry
-import org.springframework.web.servlet.config.annotation.InterceptorRegistry
-import org.springframework.web.servlet.config.annotation.WebMvcConfigurer
 import org.springframework.web.client.RestTemplate
-import org.workflow.security.pipeline.AuthenticatedUserArgumentResolver
-import org.workflow.security.pipeline.AuthenticationInterceptor
+import org.springframework.web.servlet.config.annotation.CorsRegistry
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer
 import org.workflow.security.pipeline.RequestTokenProcessor
 
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
 /**
- *
- * - Password is validated
- *   directly in [org.workflow.service.AuthService] with [PasswordEncoder.matches].
- * - Authentication is enforced by [CookieAuthenticationFilter] (populates Spring Security
- *   context so [@PreAuthorize] works) and [AuthenticationInterceptor] (injects
- *   [org.workflow.security.pipeline.AuthenticatedUser] into controller parameters).
+ * Single authentication strategy: [CookieAuthenticationFilter] reads the `token` cookie on every
+ * request, validates it against the database and populates the Spring Security [SecurityContextHolder]
+ * so [@PreAuthorize] annotations work on all controllers.
  */
 class SecurityConfig(
-    private val requestTokenProcessor: RequestTokenProcessor,
-    private val customUserDetailsService: CustomUserDetailsService,
-    private val authenticationInterceptor: AuthenticationInterceptor,
-    private val authenticatedUserArgumentResolver: AuthenticatedUserArgumentResolver,
+    @Lazy private val requestTokenProcessor: RequestTokenProcessor,
+    @Lazy private val customUserDetailsService: CustomUserDetailsService,
     @Value("\${app.cors.allowed-origins:http://localhost:5173}") private val allowedOrigins: String
 ) : WebMvcConfigurer {
 
@@ -58,9 +50,6 @@ class SecurityConfig(
             .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
             .httpBasic { it.disable() }
             .formLogin { it.disable() }
-            // Cookie filter runs before the standard username/password filter.
-            // It reads the 'token' cookie, validates against the DB and populates
-            // the SecurityContext so @PreAuthorize annotations keep working.
             .addFilterBefore(cookieAuthenticationFilter(), UsernamePasswordAuthenticationFilter::class.java)
             .authorizeHttpRequests { auth ->
                 auth.requestMatchers(
@@ -80,18 +69,10 @@ class SecurityConfig(
         return http.build()
     }
 
-    override fun addInterceptors(registry: InterceptorRegistry) {
-        registry.addInterceptor(authenticationInterceptor)
-    }
-
-    override fun addArgumentResolvers(resolvers: MutableList<HandlerMethodArgumentResolver>) {
-        resolvers.add(authenticatedUserArgumentResolver)
-    }
-
     override fun addCorsMappings(registry: CorsRegistry) {
         registry.addMapping("/api/**")
             .allowedOrigins(allowedOrigins)
-            .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
+            .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD")
             .allowedHeaders("*")
             .allowCredentials(true)
     }

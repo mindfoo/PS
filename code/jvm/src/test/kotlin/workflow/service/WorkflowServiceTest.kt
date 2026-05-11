@@ -22,7 +22,6 @@ import org.workflow.repository.AlertRepository
 import org.workflow.repository.ExecutionLogRepository
 import org.workflow.repository.ScheduleRepository
 import org.workflow.repository.TaskRepository
-import org.workflow.repository.UserRepository
 import org.workflow.repository.WorkflowRepository
 import org.workflow.repository.WorkflowTaskOrderRepository
 import org.workflow.service.ServiceHelpers
@@ -36,7 +35,6 @@ import java.util.UUID
 class WorkflowServiceTest {
 
     private lateinit var workflowRepository: WorkflowRepository
-    private lateinit var userRepository: UserRepository
     private lateinit var wtoRepository: WorkflowTaskOrderRepository
     private lateinit var executionLogRepository: ExecutionLogRepository
     private lateinit var scheduleRepository: ScheduleRepository
@@ -55,7 +53,6 @@ class WorkflowServiceTest {
     @BeforeEach
     fun setup() {
         workflowRepository    = mockk()
-        userRepository        = mockk()
         wtoRepository         = mockk()
         executionLogRepository = mockk()
         scheduleRepository    = mockk()
@@ -64,7 +61,7 @@ class WorkflowServiceTest {
         helpers              = mockk()
         every { helpers.isAdmin(any()) } answers { firstArg<User>().role.name.equals("ADMIN", ignoreCase = true) }
         service = WorkflowService(
-            workflowRepository, userRepository, wtoRepository,
+            workflowRepository, wtoRepository,
             executionLogRepository, scheduleRepository, taskRepository, alertRepository, helpers
         )
     }

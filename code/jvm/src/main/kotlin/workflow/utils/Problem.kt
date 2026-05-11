@@ -25,6 +25,7 @@ data class Problem(val title: String) {
         val roleNotFound = Problem("The specified role does not exist.")
         val invalidCredentials = Problem("The provided credentials are invalid.")
         val userNotFound = Problem("The requested user was not found.")
+        val insecurePassword = Problem("Password must be at least 10 characters and include uppercase, lowercase, digit, and symbol.")
 
         // ── Workflows ─────────────────────────────────────────────────────────
         val workflowNotFound = Problem("The requested workflow was not found.")

@@ -10,7 +10,6 @@ import org.workflow.entity.Task
 import org.workflow.entity.User
 import org.workflow.entity.WorkflowTaskOrder
 import org.workflow.repository.TaskRepository
-import org.workflow.repository.UserRepository
 import org.workflow.repository.WorkflowRepository
 import org.workflow.repository.WorkflowTaskOrderRepository
 import org.workflow.service.utils.TaskError
@@ -24,7 +23,6 @@ import java.util.UUID
 class TaskService(
     private val taskRepository: TaskRepository,
     private val workflowRepository: WorkflowRepository,
-    private val userRepository: UserRepository,
     private val workflowTaskOrderRepository: WorkflowTaskOrderRepository,
     private val helpers: ServiceHelpers
 ) {

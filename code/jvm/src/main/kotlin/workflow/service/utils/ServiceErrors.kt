@@ -15,6 +15,9 @@ sealed class AuthError {
 
     /** No user with the given username exists. */
     object UserNotFound : AuthError()
+
+    /** The password does not meet the minimum security requirements. */
+    object InsecurePassword : AuthError()
 }
 
 // ── Workflow ──────────────────────────────────────────────────────────────────

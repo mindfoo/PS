@@ -15,7 +15,6 @@ import org.workflow.repository.AlertRepository
 import org.workflow.repository.ExecutionLogRepository
 import org.workflow.repository.ScheduleRepository
 import org.workflow.repository.TaskRepository
-import org.workflow.repository.UserRepository
 import org.workflow.repository.WorkflowRepository
 import org.workflow.repository.WorkflowTaskOrderRepository
 import org.workflow.service.utils.WorkflowError
@@ -28,7 +27,6 @@ import java.util.UUID
 /** Implements workflow CRUD operations with ownership and admin visibility rules. */
 class WorkflowService(
     private val workflowRepository: WorkflowRepository,
-    private val userRepository: UserRepository,
     private val workflowTaskOrderRepository: WorkflowTaskOrderRepository,
     private val executionLogRepository: ExecutionLogRepository,
     private val scheduleRepository: ScheduleRepository,

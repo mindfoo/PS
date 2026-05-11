@@ -14,7 +14,6 @@ import org.workflow.entity.User
 import org.workflow.entity.Workflow
 import org.workflow.entity.WorkflowTaskOrder
 import org.workflow.repository.TaskRepository
-import org.workflow.repository.UserRepository
 import org.workflow.repository.WorkflowRepository
 import org.workflow.repository.WorkflowTaskOrderRepository
 import org.workflow.service.ServiceHelpers
@@ -29,7 +28,6 @@ class TaskServiceTest {
 
     private lateinit var taskRepository: TaskRepository
     private lateinit var workflowRepository: WorkflowRepository
-    private lateinit var userRepository: UserRepository
     private lateinit var wtoRepository: WorkflowTaskOrderRepository
     private lateinit var helpers: ServiceHelpers
     private lateinit var service: TaskService
@@ -46,11 +44,10 @@ class TaskServiceTest {
     fun setup() {
         taskRepository     = mockk()
         workflowRepository = mockk()
-        userRepository     = mockk()
         wtoRepository      = mockk()
         helpers            = mockk()
         every { helpers.isAdmin(any()) } answers { firstArg<User>().role.name.equals("ADMIN", ignoreCase = true) }
-        service = TaskService(taskRepository, workflowRepository, userRepository, wtoRepository, helpers)
+        service = TaskService(taskRepository, workflowRepository, wtoRepository, helpers)
     }
 
     // ── listAll ───────────────────────────────────────────────────────────────

@@ -53,30 +53,22 @@ class TaskController(
     fun list(
         @RequestParam(required = false) workflowId: UUID?,
         authentication: Authentication
-    ): ResponseEntity<Any> =
-        if (workflowId != null) {
-            when (val result = taskService.listByWorkflow(workflowId, authentication.name)) {
-                is Success -> ResponseEntity.ok(result.value)
-                is Failure -> when (result.value) {
-                    TaskError.UserNotFound -> Problem.response(404, Problem.userNotFound)
-                    TaskError.WorkflowNotFound -> Problem.response(404, Problem.workflowNotFound)
-                    TaskError.TaskNotFound -> Problem.response(404, Problem.taskNotFound)
-                    TaskError.AlreadyLinked -> Problem.response(409, Problem.taskAlreadyLinked)
-                    TaskError.NotLinked -> Problem.response(404, Problem.taskNotLinked)
-                }
-            }
-        } else {
-            when (val result = taskService.listAll(authentication.name)) {
-                is Success -> ResponseEntity.ok(result.value)
-                is Failure -> when (result.value) {
-                    TaskError.UserNotFound -> Problem.response(404, Problem.userNotFound)
-                    TaskError.WorkflowNotFound -> Problem.response(404, Problem.workflowNotFound)
-                    TaskError.TaskNotFound -> Problem.response(404, Problem.taskNotFound)
-                    TaskError.AlreadyLinked -> Problem.response(409, Problem.taskAlreadyLinked)
-                    TaskError.NotLinked -> Problem.response(404, Problem.taskNotLinked)
-                }
+    ): ResponseEntity<Any> {
+        val result = if (workflowId != null)
+            taskService.listByWorkflow(workflowId, authentication.name)
+        else
+            taskService.listAll(authentication.name)
+        return when (result) {
+            is Success -> ResponseEntity.ok(result.value)
+            is Failure -> when (result.value) {
+                TaskError.UserNotFound    -> Problem.response(404, Problem.userNotFound)
+                TaskError.WorkflowNotFound -> Problem.response(404, Problem.workflowNotFound)
+                TaskError.TaskNotFound    -> Problem.response(404, Problem.taskNotFound)
+                TaskError.AlreadyLinked   -> Problem.response(409, Problem.taskAlreadyLinked)
+                TaskError.NotLinked       -> Problem.response(404, Problem.taskNotLinked)
             }
         }
+    }
 
     @GetMapping(Uris.Tasks.BY_ID)
     @PreAuthorize("hasAuthority('task:read')")

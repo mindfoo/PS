@@ -13,7 +13,6 @@ import org.workflow.entity.Schedule
 import org.workflow.entity.User
 import org.workflow.entity.Workflow
 import org.workflow.repository.ScheduleRepository
-import org.workflow.repository.UserRepository
 import org.workflow.repository.WorkflowRepository
 import org.workflow.service.ExecutionService
 import org.workflow.service.ScheduleService
@@ -28,7 +27,6 @@ class ScheduleServiceTest {
 
     private lateinit var scheduleRepository: ScheduleRepository
     private lateinit var workflowRepository: WorkflowRepository
-    private lateinit var userRepository: UserRepository
     private lateinit var executionService: ExecutionService
     private lateinit var helpers: ServiceHelpers
     private lateinit var service: ScheduleService
@@ -50,11 +48,10 @@ class ScheduleServiceTest {
     fun setup() {
         scheduleRepository = mockk()
         workflowRepository = mockk()
-        userRepository     = mockk()
         executionService   = mockk()
         helpers            = mockk()
         every { helpers.isAdmin(any()) } answers { firstArg<User>().role.name.equals("ADMIN", ignoreCase = true) }
-        service = ScheduleService(scheduleRepository, workflowRepository, userRepository, executionService, helpers)
+        service = ScheduleService(scheduleRepository, workflowRepository, executionService, helpers)
     }
 
     // ── list ──────────────────────────────────────────────────────────────────
