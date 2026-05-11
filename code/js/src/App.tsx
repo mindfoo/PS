@@ -24,12 +24,12 @@ export default function App() {
           {/* Protected — all roles */}
           <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
           <Route path="/tasks" element={<ProtectedRoute><TasksPage /></ProtectedRoute>} />
-          <Route path="/tasks/new" element={<ProtectedRoute roles={['ADMIN','WRITE']}><TaskFormPage /></ProtectedRoute>} />
-          <Route path="/tasks/:id/edit" element={<ProtectedRoute roles={['ADMIN','WRITE']}><TaskFormPage /></ProtectedRoute>} />
-          <Route path="/workflows/new" element={<ProtectedRoute roles={['ADMIN','WRITE']}><WorkflowFormPage /></ProtectedRoute>} />
+          <Route path="/tasks/new" element={<ProtectedRoute roles={['ADMIN','WRITER']}><TaskFormPage /></ProtectedRoute>} />
+          <Route path="/tasks/:id/edit" element={<ProtectedRoute roles={['ADMIN','WRITER']}><TaskFormPage /></ProtectedRoute>} />
+          <Route path="/workflows/new" element={<ProtectedRoute roles={['ADMIN','WRITER']}><WorkflowFormPage /></ProtectedRoute>} />
           <Route path="/workflows/:id" element={<ProtectedRoute><WorkflowDetailPage /></ProtectedRoute>} />
-          <Route path="/workflows/:id/edit" element={<ProtectedRoute roles={['ADMIN','WRITE']}><WorkflowFormPage /></ProtectedRoute>} />
-          <Route path="/workflows/:workflowId/tasks/new" element={<ProtectedRoute roles={['ADMIN','WRITE']}><TaskFormPage /></ProtectedRoute>} />
+          <Route path="/workflows/:id/edit" element={<ProtectedRoute roles={['ADMIN','WRITER']}><WorkflowFormPage /></ProtectedRoute>} />
+          <Route path="/workflows/:workflowId/tasks/new" element={<ProtectedRoute roles={['ADMIN','WRITER']}><TaskFormPage /></ProtectedRoute>} />
           <Route path="/schedules" element={<ProtectedRoute><SchedulesPage /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
 

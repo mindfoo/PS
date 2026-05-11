@@ -27,9 +27,7 @@ async function request<T>(
 
   if (res.status === 204) return undefined as T
 
-  const data = await res.json().catch(() =>
-      console.error('Failed to parse JSON response'),
-  )
+  const data = await res.json().catch(() => undefined)
 
   if (!res.ok) {
     const message = data?.message ?? data?.detail ?? res.statusText

@@ -2,7 +2,7 @@ import { api } from './client'
 
 type ExecutionType = 'WORKFLOW' | 'TASK'
 export type ExecutionStatus = 'ERROR' | 'SUCCESS' | 'CANCELED' | 'RUNNING' | 'PENDING'
-type ExecutionTriggerType = 'MANUAL' | 'SCHEDULED' | 'API'
+type ExecutionTriggerType = 'MANUAL' | 'CRON' | 'EVENT'
 
 export interface TaskExecutionSummary {
   executionId: string
