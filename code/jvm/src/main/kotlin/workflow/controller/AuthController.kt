@@ -134,10 +134,13 @@ class AuthController(
     }
 
     @GetMapping(Uris.Auth.PROFILE)
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Current profile", description = "Return authenticated user profile")
     @ApiResponses(
         ApiResponse(responseCode = "200", description = "Profile retrieved",
             content = [Content(schema = Schema(implementation = ProfileResponse::class))]),
+        ApiResponse(responseCode = "401", description = "Not authenticated",
+            content = [Content(mediaType = Problem.MEDIA_TYPE)]),
         ApiResponse(responseCode = "404", description = "User not found",
             content = [Content(mediaType = Problem.MEDIA_TYPE)])
     )

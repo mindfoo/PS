@@ -30,7 +30,7 @@ async function request<T>(
   const data = await res.json().catch(() => undefined)
 
   if (!res.ok) {
-    const message = data?.message ?? data?.detail ?? res.statusText
+    const message = data?.message ?? data?.detail ?? data?.title ?? res.statusText
     throw new Error(message)
   }
 
