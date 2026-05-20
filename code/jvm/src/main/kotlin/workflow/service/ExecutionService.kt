@@ -42,14 +42,14 @@ class ExecutionService(
 ) {
 
     private val log = LoggerFactory.getLogger(javaClass)
-    /** Execution IDs that have been requested to cancel. Checked between stages and retry loops. */
+
     private val cancelRequests: MutableSet<UUID> = Collections.newSetFromMap(ConcurrentHashMap())
 
     companion object {
         private const val MIN_TASK_RUNNING_MS = 2_000L
     }
 
-    // ── Cancellation ──────────────────────────────────────────────────────────
+    /* Execution cancelation */
 
     @Transactional
     fun cancelExecution(executionId: UUID, authenticationName: String): Boolean {
@@ -58,7 +58,7 @@ class ExecutionService(
         val execution = executionLogRepository.findById(executionId).orElse(null)
             ?: return false
 
-        // Non-admins may only cancel their own executions
+        // Non-admins only cancel their own executions
         if (!isAdmin(user) && execution.triggeredBy.id != user.id) return false
 
         if (execution.status !in listOf(ExecutionStatus.PENDING, ExecutionStatus.RUNNING)) return false
@@ -79,9 +79,9 @@ class ExecutionService(
         return true
     }
 
-    // ── Workflow execution ────────────────────────────────────────────────────
+    /* Execution of Workflow manual */
 
-    /** Saves a top-level PENDING execution and dispatches async processing. Returns immediately. */
+    /** Saves a top-level PENDING execution and dispatches async processing. Returns. */
     fun triggerManualWorkflow(workflowId: UUID, authenticationName: String): UUID {
         val user = findUser(authenticationName)
         val workflow = findAccessibleWorkflow(workflowId, user)
@@ -101,6 +101,8 @@ class ExecutionService(
         return execution.id!!
     }
 
+    /* Execution of Workflow schedule -> creates execution */
+
     @Transactional
     fun createCronExecution(workflow: Workflow, triggeredBy: User): UUID {
         val execution = executionLogRepository.save(
@@ -116,7 +118,7 @@ class ExecutionService(
         return execution.id!!
     }
 
-    // ── Core workflow runner (called async) ───────────────────────────────────
+    /* Execution run */
 
     fun runExecution(executionId: UUID) {
         val execution = executionLogRepository.findById(executionId).orElseThrow {
@@ -228,7 +230,7 @@ class ExecutionService(
         writeLogFile("execution-$executionId", logLines)
     }
 
-    // ── Single-task execution ─────────────────────────────────────────────────
+    /* Execution of Task manual */
 
     fun triggerManualTask(taskId: UUID, authenticationName: String): Either<ExecutionError, UUID> {
         val user = helpers.findUser(authenticationName)
@@ -290,7 +292,7 @@ class ExecutionService(
         return success(execution.id!!)
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
+    // Utils for executions
 
     private fun createPendingTaskExecution(parent: Execution, task: Task): UUID {
         val child = executionLogRepository.save(
@@ -372,7 +374,7 @@ class ExecutionService(
         }
     }
 
-    // ── Task dispatch (SCRIPT / HTTP) ─────────────────────────────────────────
+    // Task dispatch (SCRIPT / HTTP)
 
     private fun runTask(task: Task): Map<String, Any> {
         return when (task.type.uppercase()) {

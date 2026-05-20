@@ -3,8 +3,8 @@ import { Layout } from '../components/Layout'
 
 const ROLE_DESCRIPTIONS: Record<string, string> = {
   ADMIN: 'Full access — manage users, roles, all workflows and tasks.',
-  WRITE: 'Writer — create, edit and delete own workflows and tasks.',
-  READ: 'Reader — read-only access to workflows and execution logs.',
+  WRITER: 'Writer — create, edit and delete own workflows and tasks.',
+  READER: 'Reader — read-only access to workflows and execution logs.',
   DEV: 'Developer — debug/dev access to logs and schedules.',
 }
 
