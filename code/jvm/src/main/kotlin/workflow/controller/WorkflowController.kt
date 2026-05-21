@@ -37,9 +37,9 @@ import org.workflow.utils.Success
 import org.workflow.utils.Uris
 import java.util.UUID
 
+/** Handles workflow CRUD operations, manual execution triggers, and task linking. */
 @RestController
 @Tag(name = "Workflows", description = "Workflow CRUD and manual run")
-/** Handles workflow CRUD operations, manual execution triggers, and task linking. */
 class WorkflowController(
     private val workflowService: WorkflowService,
     private val executionService: ExecutionService,
@@ -61,6 +61,7 @@ class WorkflowController(
             is Failure -> when (result.value) {
                 WorkflowError.UserNotFound -> Problem.response(404, Problem.userNotFound)
                 WorkflowError.WorkflowNotFound -> Problem.response(404, Problem.workflowNotFound)
+                WorkflowError.AccessDenied -> Problem.response(403, Problem.accessDenied)
             }
         }
 
@@ -82,6 +83,7 @@ class WorkflowController(
             is Failure -> when (result.value) {
                 WorkflowError.UserNotFound -> Problem.response(404, Problem.userNotFound)
                 WorkflowError.WorkflowNotFound -> Problem.response(404, Problem.workflowNotFound)
+                WorkflowError.AccessDenied -> Problem.response(403, Problem.accessDenied)
             }
         }
 
@@ -103,6 +105,7 @@ class WorkflowController(
             is Failure -> when (result.value) {
                 WorkflowError.UserNotFound -> Problem.response(404, Problem.userNotFound)
                 WorkflowError.WorkflowNotFound -> Problem.response(404, Problem.workflowNotFound)
+                WorkflowError.AccessDenied -> Problem.response(403, Problem.accessDenied)
             }
         }
 
@@ -125,6 +128,7 @@ class WorkflowController(
             is Failure -> when (result.value) {
                 WorkflowError.UserNotFound -> Problem.response(404, Problem.userNotFound)
                 WorkflowError.WorkflowNotFound -> Problem.response(404, Problem.workflowNotFound)
+                WorkflowError.AccessDenied -> Problem.response(403, Problem.accessDenied)
             }
         }
 
@@ -145,6 +149,7 @@ class WorkflowController(
             is Failure -> when (result.value) {
                 WorkflowError.UserNotFound -> Problem.response(404, Problem.userNotFound)
                 WorkflowError.WorkflowNotFound -> Problem.response(404, Problem.workflowNotFound)
+                WorkflowError.AccessDenied -> Problem.response(403, Problem.accessDenied)
             }
         }
 
@@ -184,6 +189,7 @@ class WorkflowController(
             is Failure -> when (result.value) {
                 WorkflowError.UserNotFound -> Problem.response(404, Problem.userNotFound)
                 WorkflowError.WorkflowNotFound -> Problem.response(404, Problem.workflowNotFound)
+                WorkflowError.AccessDenied -> Problem.response(403, Problem.accessDenied)
             }
         }
 
@@ -205,6 +211,7 @@ class WorkflowController(
             is Failure -> when (result.value) {
                 WorkflowError.UserNotFound -> Problem.response(404, Problem.userNotFound)
                 WorkflowError.WorkflowNotFound -> Problem.response(404, Problem.workflowNotFound)
+                WorkflowError.AccessDenied -> Problem.response(403, Problem.accessDenied)
             }
         }
 
@@ -231,6 +238,7 @@ class WorkflowController(
                 TaskError.TaskNotFound -> Problem.response(404, Problem.taskNotFound)
                 TaskError.AlreadyLinked -> Problem.response(409, Problem.taskAlreadyLinked)
                 TaskError.NotLinked -> Problem.response(404, Problem.taskNotLinked)
+                TaskError.AccessDenied -> Problem.response(403, Problem.accessDenied)
             }
         }
 
@@ -253,6 +261,7 @@ class WorkflowController(
             is Failure -> when (result.value) {
                 WorkflowError.UserNotFound -> Problem.response(404, Problem.userNotFound)
                 WorkflowError.WorkflowNotFound -> Problem.response(404, Problem.workflowNotFound)
+                WorkflowError.AccessDenied -> Problem.response(403, Problem.accessDenied)
             }
         }
 
@@ -277,6 +286,7 @@ class WorkflowController(
                 TaskError.TaskNotFound -> Problem.response(404, Problem.taskNotFound)
                 TaskError.AlreadyLinked -> Problem.response(409, Problem.taskAlreadyLinked)
                 TaskError.NotLinked -> Problem.response(404, Problem.taskNotLinked)
+                TaskError.AccessDenied -> Problem.response(403, Problem.accessDenied)
             }
         }
 
@@ -298,6 +308,7 @@ class WorkflowController(
             is Failure -> when (result.value) {
                 WorkflowError.UserNotFound -> Problem.response(404, Problem.userNotFound)
                 WorkflowError.WorkflowNotFound -> Problem.response(404, Problem.workflowNotFound)
+                WorkflowError.AccessDenied -> Problem.response(403, Problem.accessDenied)
             }
         }
 

@@ -11,8 +11,8 @@ import org.workflow.entity.Schedule
 import java.time.LocalDateTime
 import java.util.UUID
 
-@Repository
 /** Data access operations for workflow schedules and dispatch queries. */
+@Repository
 interface ScheduleRepository : JpaRepository<Schedule, UUID> {
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

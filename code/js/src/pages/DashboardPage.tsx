@@ -3,20 +3,10 @@ import { Link, useNavigate } from 'react-router-dom'
 import { workflowApi, type WorkflowResponse } from '../api/workflows'
 import { usePermissions } from '../contexts/AuthContext'
 import { Layout } from '../components/Layout'
-import type {ExecutionStatus} from "../api/executions.ts";
-
-function LastRunBadge({ status }: { status?: string | null }) {
-  if (!status) return null
-  const map: Record<ExecutionStatus, { icon: string; cls: string }> = {
-    SUCCESS: { icon: '✅', cls: 'badge-status-success' },
-    ERROR:   { icon: '❌', cls: 'badge-status-error' },
-    RUNNING: { icon: '⏳', cls: 'badge-status-running' },
-    PENDING: { icon: '🕐', cls: 'badge-status-pending' },
-    CANCELED: { icon: '-', cls: 'badge-status-canceled' },
-  }
-  const entry = map[status as ExecutionStatus] ?? { icon: '•', cls: 'badge-muted' }
-  return <span className={`badge ${entry.cls}`} title={`Last run: ${status}`}>{entry.icon} {status}</span>
-}
+import { PageHeader } from '../components/PageHeader'
+import { StatusBadge } from '../components/StatusBadge'
+import { EmptyState } from '../components/EmptyState'
+import { LoadingSpinner } from '../components/LoadingSpinner'
 
 export function DashboardPage() {
   const [workflows, setWorkflows] = useState<WorkflowResponse[]>([])
@@ -35,7 +25,14 @@ export function DashboardPage() {
     }
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    let cancelled = false
+    workflowApi.list()
+      .then(data => { if (!cancelled) setWorkflows(data) })
+      .catch(err => { if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load workflows') })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [])
 
   async function handleDelete(id: string) {
     if (!confirm('Delete this workflow?')) return
@@ -59,22 +56,26 @@ export function DashboardPage() {
 
   return (
     <Layout>
-      <div className="page-header">
-        <h1>Workflows</h1>
-        {perms.canWriteWorkflows && (
-          <button className="btn btn-primary" onClick={() => navigate('/workflows/new')}>+ New Workflow</button>
-        )}
-      </div>
+      <PageHeader
+        title="Workflows"
+        actions={perms.canWriteWorkflows
+          ? <button className="btn btn-primary" onClick={() => navigate('/workflows/new')}>+ New Workflow</button>
+          : undefined
+        }
+      />
 
       {error && <div className="alert alert-error">{error}</div>}
 
       {loading ? (
-        <div className="loading">Loading…</div>
+        <LoadingSpinner />
       ) : workflows.length === 0 ? (
-        <div className="empty-state">
-          <p>No workflows yet.</p>
-          {perms.canWriteWorkflows && <button className="btn btn-primary" onClick={() => navigate('/workflows/new')}>Create your first workflow</button>}
-        </div>
+        <EmptyState
+          message="No workflows yet."
+          action={perms.canWriteWorkflows
+            ? <button className="btn btn-primary" onClick={() => navigate('/workflows/new')}>Create your first workflow</button>
+            : undefined
+          }
+        />
       ) : (
         <div className="card-grid">
           {workflows.map(w => (
@@ -82,7 +83,8 @@ export function DashboardPage() {
               <div className="card-body">
                 <h3>{w.name}</h3>
                 <p className="text-muted">Owner: {w.ownerUsername}</p>
-                <LastRunBadge status={w.lastRunStatus} />
+                {w.isPrivate && <span className="badge badge-private">🔒 Private</span>}
+                {w.lastRunStatus && <StatusBadge status={w.lastRunStatus} showIcon />}
               </div>
               <div className="card-actions">
                 <Link to={`/workflows/${w.id}`} className="btn btn-sm btn-secondary">View</Link>
@@ -103,4 +105,3 @@ export function DashboardPage() {
     </Layout>
   )
 }
-

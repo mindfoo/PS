@@ -8,8 +8,8 @@ import org.springframework.stereotype.Repository
 import org.workflow.entity.WorkflowTaskOrder
 import java.util.UUID
 
+/** Data access operations for WorkflowTaskOrder records — encodes stage, dependency, and retry policy for tasks within a workflow. */
 @Repository
-/** Data access operations for task ordering metadata inside workflows. -> wto - workflowTaskOrder */
 interface WorkflowTaskOrderRepository : JpaRepository<WorkflowTaskOrder, UUID> {
 
     @Query("select wto from WorkflowTaskOrder wto where wto.workflow.id = :workflowId order by wto.taskOrder asc")
@@ -29,6 +29,9 @@ interface WorkflowTaskOrderRepository : JpaRepository<WorkflowTaskOrder, UUID> {
         @Param("workflowId") workflowId: UUID,
         @Param("taskId") taskId: UUID
     ): List<WorkflowTaskOrder>
+
+    @Query("select wto from WorkflowTaskOrder wto where wto.task.id in :taskIds")
+    fun findAllByTaskIdIn(@Param("taskIds") taskIds: Collection<UUID>): List<WorkflowTaskOrder>
 
     @Modifying
     @Query("delete from WorkflowTaskOrder wto where wto.workflow.id = :workflowId")

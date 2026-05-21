@@ -27,6 +27,13 @@ export interface ExecutionSummaryResponse {
   taskExecutions: TaskExecutionSummary[] | null
 }
 
+export interface ExecutionEvent {
+  executionId: string
+  status: ExecutionStatus
+  taskStatuses: Record<string, string>
+  terminal: boolean
+}
+
 export const executionApi = {
   listByWorkflow: (workflowId: string) =>
     api.get<ExecutionSummaryResponse[]>(`/workflows/${workflowId}/executions`),
@@ -34,4 +41,23 @@ export const executionApi = {
     api.get<ExecutionSummaryResponse>(`/executions/${executionId}`),
   cancel: (executionId: string) =>
     api.post<void>(`/executions/${executionId}/cancel`, {}),
+
+  /**
+   * Opens an SSE connection for live execution status updates.
+   * Returns an unsubscribe function that closes the EventSource.
+   */
+  subscribeToExecution: (
+    executionId: string,
+    onEvent: (event: ExecutionEvent) => void,
+    onError?: (err: Event) => void
+  ): (() => void) => {
+    const es = new EventSource(`/api/executions/${executionId}/events`, { withCredentials: true })
+    es.addEventListener('execution', (e: MessageEvent) => {
+      try {
+        onEvent(JSON.parse(e.data as string) as ExecutionEvent)
+      } catch { /* ignore parse errors */ }
+    })
+    if (onError) es.onerror = onError
+    return () => es.close()
+  },
 }

@@ -1,6 +1,8 @@
 // ── Misc utilities ────────────────────────────────────────────────────────────
 @use 'variables' as *;
 
+* {box-sizing: border-box; margin: 0; padding: 0; }
+
 .text-muted {
   color: $text-muted;
   font-size: 0.85rem;

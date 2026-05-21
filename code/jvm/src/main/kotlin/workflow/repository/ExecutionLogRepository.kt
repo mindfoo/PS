@@ -7,8 +7,8 @@ import org.springframework.stereotype.Repository
 import org.workflow.entity.Execution
 import java.util.UUID
 
-@Repository
 /** Data access operations for workflow execution logs. */
+@Repository
 interface ExecutionLogRepository : JpaRepository<Execution, UUID> {
 
     /** Top-level workflow executions (not child task records), most recent first. */

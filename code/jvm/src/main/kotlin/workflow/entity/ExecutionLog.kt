@@ -38,7 +38,7 @@ class Execution(
     @JoinColumn(name = "triggered_by", nullable = false)
     var triggeredBy: User,
 
-    // Nullable (Se for tipo TASK preenche isto, se for WORKFLOW preenche o debaixo)
+    /** Set on task-level execution records; null on top-level workflow executions. */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "task_id")
     var task: Task? = null,

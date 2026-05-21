@@ -30,5 +30,9 @@ class Task(
     /** User who created this task — used for ownership checks when workflow is null. */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by", nullable = true)
-    var createdBy: User? = null
+    var createdBy: User? = null,
+
+    /** When true, only the creator and admins can view this task. */
+    @Column(nullable = false)
+    var isPrivate: Boolean = false
 ) : Timestamp()

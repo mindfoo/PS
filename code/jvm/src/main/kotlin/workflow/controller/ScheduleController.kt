@@ -29,9 +29,9 @@ import org.workflow.utils.Success
 import org.workflow.utils.Uris
 import java.util.UUID
 
+/** Exposes schedule CRUD endpoints used to manage cron execution settings. */
 @RestController
 @Tag(name = "Schedules", description = "Schedule creation and update for workflow executions")
-/** Exposes schedule CRUD endpoints used to manage cron execution settings. */
 class ScheduleController(
     private val scheduleService: ScheduleService
 ) {

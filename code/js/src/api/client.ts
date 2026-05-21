@@ -1,6 +1,4 @@
-/**
- * Base for API requests
- * **/
+/** Thin fetch wrapper — all API calls must go through this module, never call fetch() directly. */
 
 const BASE = '/api'
 
@@ -27,7 +25,7 @@ async function request<T>(
 
   if (res.status === 204) return undefined as T
 
-  const data = await res.json().catch(() => undefined)
+  const data = await res.json().catch(() => undefined) as Record<string, string> | undefined
 
   if (!res.ok) {
     const message = data?.message ?? data?.detail ?? data?.title ?? res.statusText

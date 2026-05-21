@@ -7,8 +7,8 @@ import org.springframework.data.repository.query.Param
 import org.springframework.stereotype.Repository
 import java.util.UUID
 
-@Repository
 /** Data access operations for users. */
+@Repository
 interface UserRepository : JpaRepository<User, UUID> {
 
     fun findByUsername(username: String): User?

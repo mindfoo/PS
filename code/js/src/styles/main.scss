@@ -14,3 +14,60 @@
 @use 'stats';       // .stat-card
 @use 'tabs';        // .tabs, .tab
 @use 'misc';        // utilities: .text-muted, code, .mt-2
+
+// ── Execution detail page ─────────────────────────────────────────────────────
+
+.back-link-row {
+  margin-bottom: 1rem;
+}
+
+.execution-title {
+  font-size: 1.4rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.execution-id {
+  font-size: 0.9rem;
+  background: var(--surface2, #1e2030);
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+}
+
+.detail-card {
+  background: var(--surface, #1a1d2e);
+  border: 1px solid var(--border, #2a2d3e);
+  border-radius: 8px;
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 1rem;
+}
+
+.detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.detail-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted, #8b92a5);
+}
+
+.exec-section {
+  margin-bottom: 2rem;
+}
+
+.section-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+}

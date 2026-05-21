@@ -19,8 +19,8 @@ import org.workflow.utils.failure
 import org.workflow.utils.success
 import java.time.LocalDateTime
 
-@Service
 /** Implements user registration, login (cookie token), logout and profile retrieval. */
+@Service
 class AuthService(
     private val userRepository: UserRepository,
     private val roleRepository: RoleRepository,

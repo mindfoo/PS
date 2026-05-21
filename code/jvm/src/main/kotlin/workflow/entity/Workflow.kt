@@ -15,5 +15,9 @@ class Workflow(
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
-    var createdBy: User
+    var createdBy: User,
+
+    /** When true, only the creator and admins can view this workflow. */
+    @Column(nullable = false)
+    var isPrivate: Boolean = false
 ) : Timestamp()

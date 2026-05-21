@@ -1,15 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
-// ── helpers ────────────────────────────────────────────────────────────────
-
-function mockFetch(status: number, body: unknown) {
-  return vi.fn().mockResolvedValue({
-    ok: status >= 200 && status < 300,
-    status,
-    json: () => Promise.resolve(body),
-  } as Response)
-}
-
 // ── api/client ────────────────────────────────────────────────────────────
 
 describe('api/client', () => {

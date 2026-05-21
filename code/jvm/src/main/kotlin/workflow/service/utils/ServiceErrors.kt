@@ -24,19 +24,30 @@ sealed class AuthError {
 
 /** All typed failure cases that [org.workflow.service.WorkflowService] can produce. */
 sealed class WorkflowError {
+    /** The requested workflow does not exist or the caller does not own it. */
     object WorkflowNotFound : WorkflowError()
+    /** The authenticated principal has no matching user record. */
     object UserNotFound : WorkflowError()
+    /** The workflow is private and the caller is neither its owner nor an admin. */
+    object AccessDenied : WorkflowError()
 }
 
 // ── Task ──────────────────────────────────────────────────────────────────────
 
 /** All typed failure cases that [org.workflow.service.TaskService] can produce. */
 sealed class TaskError {
+    /** The requested task does not exist. */
     object TaskNotFound : TaskError()
+    /** The target workflow does not exist or is not accessible to the caller. */
     object WorkflowNotFound : TaskError()
+    /** The authenticated principal has no matching user record. */
     object UserNotFound : TaskError()
+    /** The task is already associated with the target workflow. */
     object AlreadyLinked : TaskError()
+    /** The task has no association with the target workflow. */
     object NotLinked : TaskError()
+    /** The task is private and the caller is neither its owner nor an admin. */
+    object AccessDenied : TaskError()
 }
 
 // ── User ──────────────────────────────────────────────────────────────────────

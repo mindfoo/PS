@@ -37,7 +37,7 @@ class DataInitializer(
 
         log.info("DataInitializer: seeding permissions, roles and default admin...")
 
-        // Persist all permission-resource associations so that the bd is populated with that info
+        // Build all resource–action permission pairs and persist them to the database
         fun save(r: ResourceType, a: ActionType): Permission =
             permissionRepository.save(Permission(resource = r, action = a))
 

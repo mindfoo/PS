@@ -22,7 +22,6 @@ import org.springframework.web.bind.annotation.RestController
 import org.workflow.dto.TaskCreateRequest
 import org.workflow.dto.TaskResponse
 import org.workflow.dto.TaskUpdateRequest
-import org.workflow.dto.WorkflowTaskEntry
 import org.workflow.dto.ExecutionResponse
 import org.workflow.service.ExecutionService
 import org.workflow.service.utils.ExecutionError
@@ -34,9 +33,9 @@ import org.workflow.utils.Success
 import org.workflow.utils.Uris
 import java.util.UUID
 
+/** Exposes task CRUD endpoints scoped by workflow ownership and RBAC. */
 @RestController
 @Tag(name = "Tasks", description = "Task CRUD endpoints")
-/** Exposes task CRUD endpoints scoped by workflow ownership and RBAC. */
 class TaskController(
     private val taskService: TaskService,
     private val executionService: ExecutionService
@@ -66,6 +65,7 @@ class TaskController(
                 TaskError.TaskNotFound    -> Problem.response(404, Problem.taskNotFound)
                 TaskError.AlreadyLinked   -> Problem.response(409, Problem.taskAlreadyLinked)
                 TaskError.NotLinked       -> Problem.response(404, Problem.taskNotLinked)
+                TaskError.AccessDenied    -> Problem.response(403, Problem.accessDenied)
             }
         }
     }
@@ -91,6 +91,7 @@ class TaskController(
                 TaskError.TaskNotFound -> Problem.response(404, Problem.taskNotFound)
                 TaskError.AlreadyLinked -> Problem.response(409, Problem.taskAlreadyLinked)
                 TaskError.NotLinked -> Problem.response(404, Problem.taskNotLinked)
+                TaskError.AccessDenied -> Problem.response(403, Problem.accessDenied)
             }
         }
 
@@ -115,6 +116,7 @@ class TaskController(
                 TaskError.TaskNotFound -> Problem.response(404, Problem.taskNotFound)
                 TaskError.AlreadyLinked -> Problem.response(409, Problem.taskAlreadyLinked)
                 TaskError.NotLinked -> Problem.response(404, Problem.taskNotLinked)
+                TaskError.AccessDenied -> Problem.response(403, Problem.accessDenied)
             }
         }
 
@@ -140,6 +142,7 @@ class TaskController(
                 TaskError.TaskNotFound -> Problem.response(404, Problem.taskNotFound)
                 TaskError.AlreadyLinked -> Problem.response(409, Problem.taskAlreadyLinked)
                 TaskError.NotLinked -> Problem.response(404, Problem.taskNotLinked)
+                TaskError.AccessDenied -> Problem.response(403, Problem.accessDenied)
             }
         }
 
@@ -163,6 +166,7 @@ class TaskController(
                 TaskError.TaskNotFound -> Problem.response(404, Problem.taskNotFound)
                 TaskError.AlreadyLinked -> Problem.response(409, Problem.taskAlreadyLinked)
                 TaskError.NotLinked -> Problem.response(404, Problem.taskNotLinked)
+                TaskError.AccessDenied -> Problem.response(403, Problem.accessDenied)
             }
         }
 

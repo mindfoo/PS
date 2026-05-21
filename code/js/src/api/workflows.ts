@@ -6,6 +6,7 @@ export interface WorkflowResponse {
   ownerId: string
   ownerUsername: string
   lastRunStatus?: string | null
+  isPrivate: boolean
 }
 
 export interface TaskOrderItem {
@@ -16,8 +17,8 @@ export interface TaskOrderItem {
 export const workflowApi = {
   list: () => api.get<WorkflowResponse[]>('/workflows'),
   getById: (id: string) => api.get<WorkflowResponse>(`/workflows/${id}`),
-  create: (body: { name: string }) => api.post<WorkflowResponse>('/workflows', body),
-  update: (id: string, body: { name: string }) => api.put<WorkflowResponse>(`/workflows/${id}`, body),
+  create: (body: { name: string; isPrivate?: boolean }) => api.post<WorkflowResponse>('/workflows', body),
+  update: (id: string, body: { name: string; isPrivate?: boolean }) => api.put<WorkflowResponse>(`/workflows/${id}`, body),
   delete: (id: string) => api.delete<void>(`/workflows/${id}`),
   run: (id: string) => api.post<{ executionId: string; status: string }>(`/workflows/${id}/run`, {}),
   reorderTasks: (id: string, items: TaskOrderItem[]) =>

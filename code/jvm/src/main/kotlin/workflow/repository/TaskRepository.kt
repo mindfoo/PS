@@ -8,8 +8,8 @@ import org.springframework.stereotype.Repository
 import org.workflow.entity.Task
 import java.util.UUID
 
-@Repository
 /** Data access operations for tasks with workflow and ownership filters. */
+@Repository
 interface TaskRepository : JpaRepository<Task, UUID> {
 
     /** Tasks scoped to a workflow via the direct workflow FK. */
@@ -33,7 +33,7 @@ interface TaskRepository : JpaRepository<Task, UUID> {
         @Param("userId") userId: UUID
     ): Task?
 
-    /** All tasks created by a specific user (for the global task catalog). */
+    /** All tasks created by a specific user — used in admin list path; non-admins use findAllVisible. */
     @Query("select t from Task t where t.createdBy.id = :userId")
     fun findAllByCreatedById(@Param("userId") userId: UUID): List<Task>
 
@@ -45,4 +45,8 @@ interface TaskRepository : JpaRepository<Task, UUID> {
     @Modifying
     @Query("delete from Task t where t.workflow.id = :workflowId")
     fun deleteAllByWorkflowId(@Param("workflowId") workflowId: UUID)
+
+    /** Returns public tasks plus private tasks owned by the user. */
+    @Query("select t from Task t where t.isPrivate = false or t.createdBy.id = :userId")
+    fun findAllVisible(@Param("userId") userId: UUID): List<Task>
 }

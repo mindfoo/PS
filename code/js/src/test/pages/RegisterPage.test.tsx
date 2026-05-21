@@ -8,11 +8,11 @@ const mockNavigate = vi.fn()
 const mockRegister = vi.fn()
 
 vi.mock('../../api/auth', () => ({
-  authApi: { register: (...args: unknown[]) => mockRegister(...args) },
+  authApi: { register: (...args: unknown[]) => mockRegister(...args) as unknown },
 }))
 
-vi.mock('react-router-dom', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('react-router-dom')>()
+vi.mock('react-router-dom', async (importOriginal: () => Promise<Record<string, unknown>>) => {
+  const actual = await importOriginal()
   return { ...actual, useNavigate: () => mockNavigate }
 })
 

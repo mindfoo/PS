@@ -1,6 +1,5 @@
 package org.workflow.service
 
-import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.workflow.dto.RoleSummaryResponse
@@ -14,12 +13,11 @@ import org.workflow.utils.Either
 import org.workflow.utils.failure
 import org.workflow.utils.success
 
-@Service
 /** Handles user creation flow and role assignment. */
+@Service
 class UserService(
     private val userRepository: UserRepository,
-    private val roleRepository: RoleRepository,
-    private val passwordEncoder: PasswordEncoder
+    private val roleRepository: RoleRepository
 ) {
 
     @Transactional(readOnly = true)

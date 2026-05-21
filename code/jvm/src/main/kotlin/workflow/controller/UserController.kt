@@ -25,6 +25,7 @@ import org.workflow.utils.Success
 import org.workflow.utils.Uris
 import java.util.UUID
 
+/** Exposes user management and role administration endpoints. */
 @RestController
 @Tag(name = "Users", description = "User management endpoints")
 class UserController(private val userService: UserService) {

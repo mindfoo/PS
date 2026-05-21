@@ -4,6 +4,9 @@ import { scheduleApi, type ScheduleResponse } from '../api/schedules'
 import { workflowApi, type WorkflowResponse } from '../api/workflows'
 import { usePermissions } from '../contexts/AuthContext'
 import { Layout } from '../components/Layout'
+import { PageHeader } from '../components/PageHeader'
+import { EmptyState } from '../components/EmptyState'
+import { LoadingSpinner } from '../components/LoadingSpinner'
 
 interface ScheduleSlot {
   everyDay: boolean
@@ -25,14 +28,17 @@ function slotToCron(slot: ScheduleSlot): string {
   const daysPart = slot.everyDay || slot.days.length === 0
     ? '*'
     : [...slot.days].sort((a, b) => a - b).join(',')
-  return `${slot.minute} ${slot.hour} * * ${daysPart}`
+  // Spring CronExpression requires 6 fields: second minute hour dom month dow
+  return `0 ${slot.minute} ${slot.hour} * * ${daysPart}`
 }
 
 function cronToSlot(cron: string, description: string): ScheduleSlot {
   const parts = cron.trim().split(/\s+/)
-  const minute = parseInt(parts[0] ?? '0', 10)
-  const hour   = parseInt(parts[1] ?? '9', 10)
-  const daysPart = parts[4] ?? '*'
+  // Support both 5-field unix cron and 6-field Spring cron (leading seconds)
+  const offset = parts.length === 6 ? 1 : 0
+  const minute   = parseInt(parts[offset]     ?? '0', 10)
+  const hour     = parseInt(parts[offset + 1] ?? '9', 10)
+  const daysPart = parts[offset + 4] ?? '*'
   const everyDay = daysPart === '*'
   const days = everyDay ? [] : daysPart.split(',').map(Number)
   return { everyDay, days, hour, minute, description }
@@ -150,19 +156,18 @@ export function SchedulesPage() {
   const [enabled, setEnabled] = useState(true)
   const [saving, setSaving] = useState(false)
 
-  async function load() {
-    try {
-      const [s, w] = await Promise.all([scheduleApi.list(), workflowApi.list()])
-      setSchedules(s)
-      setWorkflows(w)
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to load')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    let cancelled = false
+    Promise.all([scheduleApi.list(), workflowApi.list()])
+      .then(([s, w]) => {
+        if (cancelled) return
+        setSchedules(s)
+        setWorkflows(w)
+      })
+      .catch(err => { if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load') })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [])
 
   function openCreate() {
     setEditTarget(null)
@@ -193,7 +198,7 @@ export function SchedulesPage() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     if (slots.some(s => !s.everyDay && s.days.length === 0)) {
-      alert('Please select at least one day for each slot, or toggle "Every day".')
+      setError('Please select at least one day for each slot, or toggle "Every day".')
       return
     }
     setSaving(true)
@@ -223,7 +228,7 @@ export function SchedulesPage() {
       }
       setShowForm(false)
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Save failed')
+      setError(err instanceof Error ? err.message : 'Save failed')
     } finally {
       setSaving(false)
     }
@@ -235,16 +240,19 @@ export function SchedulesPage() {
       await scheduleApi.delete(id)
       setSchedules(prev => prev.filter(s => s.id !== id))
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Delete failed')
+      setError(err instanceof Error ? err.message : 'Delete failed')
     }
   }
 
   return (
     <Layout>
-      <div className="page-header">
-        <h1>Schedules</h1>
-        {perms.canWriteSchedules && <button className="btn btn-primary" onClick={openCreate}>+ New Schedule</button>}
-      </div>
+      <PageHeader
+        title="Schedules"
+        actions={perms.canWriteSchedules
+          ? <button className="btn btn-primary" onClick={openCreate}>+ New Schedule</button>
+          : undefined
+        }
+      />
 
       {error && <div className="alert alert-error">{error}</div>}
 
@@ -303,9 +311,9 @@ export function SchedulesPage() {
       )}
 
       {loading ? (
-        <div className="loading">Loading…</div>
+        <LoadingSpinner />
       ) : schedules.length === 0 ? (
-        <div className="empty-state"><p>No schedules yet.</p></div>
+        <EmptyState message="No schedules yet." />
       ) : (
         <div className="table-wrapper">
           <table className="table">
@@ -347,4 +355,3 @@ export function SchedulesPage() {
     </Layout>
   )
 }
-

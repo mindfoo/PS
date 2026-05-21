@@ -230,4 +230,62 @@ class WorkflowControllerTest {
         every { workflowService.getExecution(execId, "alice") } returns failure(WorkflowError.WorkflowNotFound)
         assertEquals(404, controller.getExecution(execId, auth).statusCode.value())
     }
+
+    // ── AccessDenied (403) coverage for private resources ────────────────────
+
+    @Test
+    fun `getById returns 403 when resource is private and user has no access`() {
+        every { workflowService.getById(wfId, "alice") } returns failure(WorkflowError.AccessDenied)
+        assertEquals(403, controller.getById(wfId, auth).statusCode.value())
+    }
+
+    @Test
+    fun `update returns 403 when workflow is private`() {
+        every { workflowService.update(wfId, any(), "alice") } returns failure(WorkflowError.AccessDenied)
+        assertEquals(403, controller.update(wfId, WorkflowUpdateRequest("X"), auth).statusCode.value())
+    }
+
+    @Test
+    fun `delete returns 403 when workflow is private`() {
+        every { workflowService.delete(wfId, "alice") } returns failure(WorkflowError.AccessDenied)
+        assertEquals(403, controller.delete(wfId, auth).statusCode.value())
+    }
+
+    @Test
+    fun `listExecutions returns 403 when workflow is private`() {
+        every { workflowService.listExecutions(wfId, "alice") } returns failure(WorkflowError.AccessDenied)
+        assertEquals(403, controller.listExecutions(wfId, auth).statusCode.value())
+    }
+
+    @Test
+    fun `linkTask returns 403 when workflow is private`() {
+        every { taskService.linkToWorkflow(taskId, wfId, "alice") } returns failure(TaskError.AccessDenied)
+        assertEquals(403, controller.linkTask(wfId, taskId, auth).statusCode.value())
+    }
+
+    @Test
+    fun `unlinkTask returns 403 when workflow is private`() {
+        every { taskService.unlinkFromWorkflow(taskId, wfId, "alice") } returns failure(TaskError.AccessDenied)
+        assertEquals(403, controller.unlinkTask(wfId, taskId, auth).statusCode.value())
+    }
+
+    @Test
+    fun `reorderTasks returns 403 when workflow is private`() {
+        val request = TaskReorderRequest(items = emptyList())
+        every { workflowService.reorderTasks(wfId, request, "alice") } returns failure(WorkflowError.AccessDenied)
+        assertEquals(403, controller.reorderTasks(wfId, request, auth).statusCode.value())
+    }
+
+    @Test
+    fun `updateRetryPolicy returns 403 when workflow is private`() {
+        val request = RetryPolicyUpdateRequest(retryPolicy = 2)
+        every { workflowService.updateRetryPolicy(wfId, taskId, request, "alice") } returns failure(WorkflowError.AccessDenied)
+        assertEquals(403, controller.updateRetryPolicy(wfId, taskId, request, auth).statusCode.value())
+    }
+
+    @Test
+    fun `getExecution returns 403 when execution is private`() {
+        every { workflowService.getExecution(execId, "alice") } returns failure(WorkflowError.AccessDenied)
+        assertEquals(403, controller.getExecution(execId, auth).statusCode.value())
+    }
 }

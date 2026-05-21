@@ -1,14 +1,14 @@
-import { useEffect, useReducer, useState, type FormEvent } from 'react'
-import { useParams, useNavigate, Link, Navigate } from 'react-router-dom'
+import { useEffect, useReducer, useState } from 'react'
+import { useParams, useNavigate, Navigate } from 'react-router-dom'
 import { taskApi } from '../api/tasks'
 import { Layout } from '../components/Layout'
+import { PageHeader } from '../components/PageHeader'
+import { LoadingSpinner } from '../components/LoadingSpinner'
 import { genericFormReducer } from '../utils/form'
+import { TaskType } from '../utils/task'
+import type { FormEvent } from 'react'
 
-export enum TaskType {
-  HTTP= 'HTTP',
- SCRIPT= 'SCRIPT',
-  CUSTOM='CUSTOM'
-}
+export { TaskType } from '../utils/task'
 
 export interface TaskFormInputs {
   name: string
@@ -32,7 +32,7 @@ function fromTask(t: { name: string; type: TaskType; config: Record<string, unkn
   return {
     ...DEFAULT_INPUTS,
     name: t.name,
-    type: t.type as TaskType,
+    type: t.type,
     url: c.url ?? '', method: c.method ?? 'GET',
     command: c.command ?? '', fileName: c.fileName ?? '',
     directory: c.directory ?? '',
@@ -44,14 +44,14 @@ function fromTask(t: { name: string; type: TaskType; config: Record<string, unkn
 
 function buildConfig(inputs: TaskFormInputs): Record<string, unknown> {
   switch (inputs.type) {
-    case TaskType.HTTP:     return { url: inputs.url, method: inputs.method }
+    case TaskType.HTTP:   return { url: inputs.url, method: inputs.method }
     case TaskType.SCRIPT: {
       const cfg: Record<string, unknown> = { command: inputs.command, fileName: inputs.fileName }
       if (inputs.directory) cfg.directory = inputs.directory
       if (inputs.args)      cfg.args = inputs.args.trim().split(/\s+/)
       return cfg
     }
-    default:         return {}
+    default: return {}
   }
 }
 
@@ -63,33 +63,39 @@ export function TaskFormPage() {
 
   const [initialInputs, setInitialInputs] = useState<TaskFormInputs | null>(isEdit ? null : DEFAULT_INPUTS)
   const [workflowId, setWorkflowId]       = useState(routeWorkflowId ?? queryWorkflowId ?? '')
+  const [initialIsPrivate, setInitialIsPrivate] = useState(false)
   const [error, setError]                 = useState('')
 
   useEffect(() => {
     if (!isEdit) return
-    taskApi.getById(id!)
+    let cancelled = false
+    taskApi.getById(id)
       .then(t => {
+        if (cancelled) return
         setWorkflowId(t.workflowId ?? '')
+        setInitialIsPrivate(t.isPrivate)
         setInitialInputs(fromTask(t))
       })
-      .catch(err => setError(err instanceof Error ? err.message : 'Failed to load task'))
+      .catch(err => { if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load task') })
+    return () => { cancelled = true }
   }, [id, isEdit])
 
   if (error)          return <Layout><div className="alert alert-error">{error}</div></Layout>
-  if (!initialInputs) return <Layout><div className="loading">Loading…</div></Layout>
+  if (!initialInputs) return <Layout><LoadingSpinner /></Layout>
 
-  return <TaskForm initialInputs={initialInputs} workflowId={workflowId} taskId={id} />
+  return <TaskForm initialInputs={initialInputs} workflowId={workflowId} taskId={id} initialIsPrivate={initialIsPrivate} />
 }
 
-
-function TaskForm({ initialInputs, workflowId, taskId }: {
+function TaskForm({ initialInputs, workflowId, taskId, initialIsPrivate = false }: {
   initialInputs: TaskFormInputs
   workflowId: string
   taskId?: string
+  initialIsPrivate?: boolean
 }) {
   const isEdit = !!taskId
   const navigate = useNavigate()
   const backUrl = workflowId ? `/workflows/${workflowId}` : '/tasks'
+  const [isPrivate, setIsPrivate] = useState(initialIsPrivate)
 
   const [state, dispatch] = useReducer(
     genericFormReducer<TaskFormInputs>,
@@ -104,9 +110,9 @@ function TaskForm({ initialInputs, workflowId, taskId }: {
       const { name, type } = state.inputs
       const config = buildConfig(state.inputs)
       if (isEdit) {
-        await taskApi.update(taskId!, { name, type, config })
+        await taskApi.update(taskId, { name, type, config, isPrivate })
       } else {
-        await taskApi.create({ name, type, workflowId: workflowId || undefined, config })
+        await taskApi.create({ name, type, workflowId: workflowId || undefined, config, isPrivate })
       }
       dispatch({ type: 'success' })
     } catch (err: unknown) {
@@ -128,12 +134,10 @@ function TaskForm({ initialInputs, workflowId, taskId }: {
 
   return (
     <Layout>
-      <div className="page-header">
-        <div>
-          <Link to={backUrl} className="back-link">← Back</Link>
-          <h1>{isEdit ? 'Edit Task' : 'New Task'}</h1>
-        </div>
-      </div>
+      <PageHeader
+        title={isEdit ? 'Edit Task' : 'New Task'}
+        back={{ href: backUrl }}
+      />
 
       <div className="form-card">
         {state.tag === 'editing' && state.error && (
@@ -156,7 +160,7 @@ function TaskForm({ initialInputs, workflowId, taskId }: {
               </select>
             </div>
 
-            {inputs.type === 'HTTP' && <>
+            {inputs.type === TaskType.HTTP && <>
               <div className="form-group">
                 <label>URL</label>
                 <input value={inputs.url} onChange={field('url')} placeholder="https://example.com/api" required />
@@ -169,7 +173,7 @@ function TaskForm({ initialInputs, workflowId, taskId }: {
               </div>
             </>}
 
-            {inputs.type === 'SCRIPT' && <>
+            {inputs.type === TaskType.SCRIPT && <>
               <div className="form-group">
                 <label>Command</label>
                 <input value={inputs.command} onChange={field('command')} placeholder="ex: 'node'" required />
@@ -187,6 +191,17 @@ function TaskForm({ initialInputs, workflowId, taskId }: {
                 <input value={inputs.args} onChange={field('args')} placeholder="ex: --env prod" />
               </div>
             </>}
+
+            <div className="form-group">
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={isPrivate}
+                  onChange={e => setIsPrivate(e.target.checked)}
+                />
+                Private (visible only to you and admins)
+              </label>
+            </div>
 
             <div className="form-actions">
               <button type="button" className="btn btn-ghost" onClick={() => navigate(backUrl)}>Cancel</button>

@@ -13,8 +13,8 @@ vi.mock('../../contexts/AuthContext', () => ({
   useAuth: () => ({ login: mockLogin }),
 }))
 
-vi.mock('react-router-dom', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('react-router-dom')>()
+vi.mock('react-router-dom', async (importOriginal: () => Promise<Record<string, unknown>>) => {
+  const actual = await importOriginal()
   return { ...actual, useNavigate: () => mockNavigate }
 })
 

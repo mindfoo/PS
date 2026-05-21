@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 
 const baseUser = { id: '1', username: 'alice', role: 'READER', permissions: ['workflow:read'] }
 const baseRole = { name: 'READER', permissions: ['workflow:read'] }
@@ -7,7 +7,7 @@ function mockFetch(body: unknown, ok = true, status = 200) {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
     ok, status,
     json: () => Promise.resolve(body),
-  } as Response))
+  }))
 }
 
 describe('api/users', () => {

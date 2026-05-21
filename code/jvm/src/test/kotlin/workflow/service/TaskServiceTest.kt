@@ -59,6 +59,7 @@ class TaskServiceTest {
         val t = task(admin)
         every { helpers.findUser("admin") } returns admin
         every { taskRepository.findAll() } returns listOf(t)
+        every { wtoRepository.findAllByTaskIdIn(any()) } returns emptyList()
 
         val result = service.listAll("admin")
 
@@ -71,7 +72,8 @@ class TaskServiceTest {
         val alice = user()
         val t     = task(alice)
         every { helpers.findUser("alice") } returns alice
-        every { taskRepository.findAllByCreatedById(alice.id!!) } returns listOf(t)
+        every { taskRepository.findAllVisible(alice.id!!) } returns listOf(t)
+        every { wtoRepository.findAllByTaskIdIn(any()) } returns emptyList()
 
         val result = service.listAll("alice")
 
@@ -95,7 +97,8 @@ class TaskServiceTest {
         val alice = user()
         val t     = task(alice)
         every { helpers.findUser("alice") } returns alice
-        every { taskRepository.findByIdAndOwnerId(t.id!!, alice.id!!) } returns t
+        every { taskRepository.findById(t.id!!) } returns java.util.Optional.of(t)
+        every { wtoRepository.findAllByTaskId(t.id!!) } returns emptyList()
 
         val result = service.getById(t.id!!, "alice")
 
@@ -108,7 +111,7 @@ class TaskServiceTest {
         val alice = user()
         val id    = UUID.randomUUID()
         every { helpers.findUser("alice") } returns alice
-        every { taskRepository.findByIdAndOwnerId(id, alice.id!!) } returns null
+        every { taskRepository.findById(id) } returns java.util.Optional.empty()
 
         val result = service.getById(id, "alice")
 
@@ -212,7 +215,7 @@ class TaskServiceTest {
         val t     = task(alice)
         val wto   = WorkflowTaskOrder(id = UUID.randomUUID(), workflow = wf, task = t, taskOrder = 1)
         every { helpers.findUser("alice") } returns alice
-        every { workflowRepository.findByIdAndOwnerId(wf.id!!, alice.id!!) } returns wf
+        every { workflowRepository.findById(wf.id!!) } returns Optional.of(wf)
         every { wtoRepository.findAllByWorkflowIdOrderByTaskOrderAsc(wf.id!!) } returns listOf(wto)
         every { taskRepository.findAllByWorkflowId(wf.id!!) } returns emptyList()
 
@@ -237,7 +240,7 @@ class TaskServiceTest {
         val alice = user()
         val id    = UUID.randomUUID()
         every { helpers.findUser("alice") } returns alice
-        every { workflowRepository.findByIdAndOwnerId(id, alice.id!!) } returns null
+        every { workflowRepository.findById(id) } returns Optional.empty()
 
         val result = service.listByWorkflow(id, "alice")
 
@@ -357,6 +360,28 @@ class TaskServiceTest {
 
         assertTrue(result is Success)
         verify(exactly = 1) { wtoRepository.deleteAll(listOf(wto)) }
+    }
+
+    @Test
+    fun `unlinkFromWorkflow clears direct FK when task was created inside the workflow`() {
+        val alice = user()
+        val wf    = workflow(alice)
+        // Task was created with workflow set (the direct FK case)
+        val t     = Task(id = UUID.randomUUID(), name = "T", type = "SCRIPT",
+                         config = emptyMap(), workflow = wf, createdBy = alice)
+        val wto   = WorkflowTaskOrder(id = UUID.randomUUID(), workflow = wf, task = t, taskOrder = 1)
+        every { helpers.findUser("alice") } returns alice
+        every { taskRepository.findByIdAndOwnerId(t.id!!, alice.id!!) } returns t
+        every { workflowRepository.findByIdAndOwnerId(wf.id!!, alice.id!!) } returns wf
+        every { wtoRepository.findAllByWorkflowIdAndTaskId(wf.id!!, t.id!!) } returns listOf(wto)
+        every { wtoRepository.deleteAll(listOf(wto)) } returns Unit
+        every { taskRepository.save(t) } returns t
+
+        val result = service.unlinkFromWorkflow(t.id!!, wf.id!!, "alice")
+
+        assertTrue(result is Success)
+        assertNull(t.workflow)
+        verify(exactly = 1) { taskRepository.save(t) }
     }
 
     @Test

@@ -18,8 +18,8 @@ import org.workflow.utils.failure
 import org.workflow.utils.success
 import java.util.UUID
 
-@Service
 /** Implements task CRUD and workflow-link operations. Tasks are standalone and linked via WorkflowTaskOrder. */
+@Service
 class TaskService(
     private val taskRepository: TaskRepository,
     private val workflowRepository: WorkflowRepository,
@@ -34,12 +34,17 @@ class TaskService(
         val currentUser = findCurrentUser(authenticationName)
             ?: return failure(TaskError.UserNotFound)
 
-        val tasks = if (isAdmin(currentUser)) {
-            taskRepository.findAll()
-        } else {
-            taskRepository.findAllByCreatedById(currentUser.id!!)
-        }
-        return success(tasks.map { toResponse(it) })
+        val tasks = if (isAdmin(currentUser)) taskRepository.findAll()
+                     else taskRepository.findAllVisible(currentUser.id!!)
+        val taskIds = tasks.mapNotNull { it.id }.toSet()
+        val linkedWorkflowByTaskId: Map<UUID, UUID?> = if (taskIds.isNotEmpty()) {
+            workflowTaskOrderRepository.findAllByTaskIdIn(taskIds)
+                .groupBy { it.task.id!! }
+                .mapValues { (_, wtos) -> wtos.firstOrNull()?.workflow?.id }
+        } else emptyMap()
+        return success(tasks.map { task ->
+            toResponse(task, task.workflow?.id ?: linkedWorkflowByTaskId[task.id])
+        })
     }
 
     @Transactional(readOnly = true)
@@ -47,7 +52,7 @@ class TaskService(
         val currentUser = findCurrentUser(authenticationName)
             ?: return failure(TaskError.UserNotFound)
 
-        val workflow = findAccessibleWorkflow(workflowId, currentUser)
+        val workflow = workflowRepository.findById(workflowId).orElse(null)
             ?: return failure(TaskError.WorkflowNotFound)
 
         val orderRows = workflowTaskOrderRepository.findAllByWorkflowIdOrderByTaskOrderAsc(workflow.id!!)
@@ -61,7 +66,8 @@ class TaskService(
                 orderId = wto.id,
                 taskOrder = wto.taskOrder,
                 retryPolicy = wto.retryPolicy,
-                dependsOnTaskId = wto.dependsOnTask?.id
+                dependsOnTaskId = wto.dependsOnTask?.id,
+                isPrivate = wto.task.isPrivate
             )
         }
 
@@ -79,7 +85,8 @@ class TaskService(
                     orderId = null,
                     taskOrder = nextStage + idx,
                     retryPolicy = 0,
-                    dependsOnTaskId = null
+                    dependsOnTaskId = null,
+                    isPrivate = task.isPrivate
                 )
             }
 
@@ -93,13 +100,15 @@ class TaskService(
         val currentUser = findCurrentUser(authenticationName)
             ?: return failure(TaskError.UserNotFound)
 
-        val task = if (isAdmin(currentUser)) {
-            taskRepository.findById(taskId).orElse(null)
-        } else {
-            taskRepository.findByIdAndOwnerId(taskId, currentUser.id!!)
-        } ?: return failure(TaskError.TaskNotFound)
+        val task = taskRepository.findById(taskId).orElse(null)
+            ?: return failure(TaskError.TaskNotFound)
+        if (!isAdmin(currentUser) && task.isPrivate && task.createdBy?.id != currentUser.id) {
+            return failure(TaskError.AccessDenied)
+        }
 
-        return success(toResponse(task))
+        val effectiveWorkflowId = task.workflow?.id
+            ?: workflowTaskOrderRepository.findAllByTaskId(task.id!!).firstOrNull()?.workflow?.id
+        return success(toResponse(task, effectiveWorkflowId))
     }
 
     @Transactional
@@ -118,7 +127,8 @@ class TaskService(
                 type = request.type,
                 config = request.config,
                 workflow = workflow,
-                createdBy = currentUser
+                createdBy = currentUser,
+                isPrivate = request.isPrivate
             )
         )
 
@@ -149,6 +159,7 @@ class TaskService(
         task.name = request.name
         task.type = request.type
         task.config = request.config
+        task.isPrivate = request.isPrivate
 
         return success(toResponse(taskRepository.save(task)))
     }
@@ -216,6 +227,13 @@ class TaskService(
         if (rows.isEmpty()) return failure(TaskError.NotLinked)
 
         workflowTaskOrderRepository.deleteAll(rows)
+
+        // Clear the direct FK if it still points to this workflow (set when task was created inside it)
+        if (task.workflow?.id == workflow.id) {
+            task.workflow = null
+            taskRepository.save(task)
+        }
+
         return success(Unit)
     }
 
@@ -231,12 +249,13 @@ class TaskService(
     private fun findCurrentUser(username: String) = helpers.findUser(username)
     private fun isAdmin(user: User) = helpers.isAdmin(user)
 
-    private fun toResponse(task: Task): TaskResponse =
+    private fun toResponse(task: Task, effectiveWorkflowId: UUID? = task.workflow?.id): TaskResponse =
         TaskResponse(
             id = task.id,
             name = task.name,
             type = task.type,
             config = task.config,
-            workflowId = task.workflow?.id
+            workflowId = effectiveWorkflowId,
+            isPrivate = task.isPrivate
         )
 }

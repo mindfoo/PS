@@ -12,7 +12,8 @@ data class TaskCreateRequest(
     val type: String,
     /** Optional — if provided, task is immediately linked to this workflow. */
     val workflowId: UUID? = null,
-    val config: Map<String, Any> = emptyMap()
+    val config: Map<String, Any> = emptyMap(),
+    val isPrivate: Boolean = false
 )
 
 /** Payload to update mutable task fields. */
@@ -21,7 +22,8 @@ data class TaskUpdateRequest(
     val name: String,
     @field:NotBlank
     val type: String,
-    val config: Map<String, Any> = emptyMap()
+    val config: Map<String, Any> = emptyMap(),
+    val isPrivate: Boolean = false
 )
 
 /** Task representation returned by task endpoints. */
@@ -30,7 +32,8 @@ data class TaskResponse(
     val name: String,
     val type: String,
     val config: Map<String, Any>,
-    val workflowId: UUID?
+    val workflowId: UUID?,
+    val isPrivate: Boolean = false
 )
 
 /**
@@ -45,7 +48,8 @@ data class WorkflowTaskEntry(
     val orderId: UUID?,       // WorkflowTaskOrder.id — used as key in PATCH reorder
     val taskOrder: Int,
     val retryPolicy: Int,
-    val dependsOnTaskId: UUID?
+    val dependsOnTaskId: UUID?,
+    val isPrivate: Boolean = false
 )
 
 /** One item in a reorder request — identifies a WorkflowTaskOrder row and its new stage. */

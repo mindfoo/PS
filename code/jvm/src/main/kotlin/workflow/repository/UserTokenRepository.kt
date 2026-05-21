@@ -8,8 +8,8 @@ import org.springframework.stereotype.Repository
 import org.workflow.entity.UserToken
 import java.util.UUID
 
-@Repository
 /** Data access operations for user authentication tokens. */
+@Repository
 interface UserTokenRepository : JpaRepository<UserToken, UUID> {
 
     /**

@@ -136,4 +136,24 @@ class TaskControllerTest {
         every { executionService.triggerManualTask(taskId, "alice") } returns failure(ExecutionError.TaskNotFound)
         assertEquals(404, controller.runTask(taskId, auth).statusCode.value())
     }
+
+    // ── AccessDenied (403) coverage for private tasks ─────────────────────────
+
+    @Test
+    fun `getById returns 403 when task is private`() {
+        every { taskService.getById(taskId, "alice") } returns failure(TaskError.AccessDenied)
+        assertEquals(403, controller.getById(taskId, auth).statusCode.value())
+    }
+
+    @Test
+    fun `update returns 403 when task is private`() {
+        every { taskService.update(taskId, any(), "alice") } returns failure(TaskError.AccessDenied)
+        assertEquals(403, controller.update(taskId, TaskUpdateRequest("X", "SCRIPT"), auth).statusCode.value())
+    }
+
+    @Test
+    fun `delete returns 403 when task is private`() {
+        every { taskService.delete(taskId, "alice") } returns failure(TaskError.AccessDenied)
+        assertEquals(403, controller.delete(taskId, auth).statusCode.value())
+    }
 }

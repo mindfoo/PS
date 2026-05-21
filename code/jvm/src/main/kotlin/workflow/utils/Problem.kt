@@ -20,29 +20,30 @@ data class Problem(val title: String) {
                 .header("Content-Type", MEDIA_TYPE)
                 .body(problem)
 
-        // ── Auth ──────────────────────────────────────────────────────────────
+        /* Auth */
         val usernameAlreadyTaken = Problem("The username is already taken.")
         val roleNotFound = Problem("The specified role does not exist.")
         val invalidCredentials = Problem("The provided credentials are invalid.")
         val userNotFound = Problem("The requested user was not found.")
         val insecurePassword = Problem("Password must be at least 10 characters and include uppercase, lowercase, digit, and symbol.")
 
-        // ── Workflows ─────────────────────────────────────────────────────────
+        /* Workflows */
         val workflowNotFound = Problem("The requested workflow was not found.")
 
-        // ── Tasks ─────────────────────────────────────────────────────────────
+        /* Tasks */
         val taskNotFound = Problem("The requested task was not found.")
         val taskAlreadyLinked = Problem("The task is already linked to this workflow.")
         val taskNotLinked = Problem("The task is not linked to this workflow.")
-        // ── Schedules ─────────────────────────────────────────────────────────
+
+        /* Schedules */
         val scheduleNotFound = Problem("The requested schedule was not found.")
         val invalidCronExpression = Problem("The provided cron expression is invalid.")
 
-        // ── Generic ───────────────────────────────────────────────────────────
-        val invalidRequestContent = Problem("The request content is not valid.")
+        /* Generic */
         val accessDenied = Problem("Access denied: insufficient permissions.")
         val internalError = Problem("An unexpected error occurred.")
         val notCancelable = Problem("Execution cannot be canceled: it is already finished, not found, or not owned by you.")
+        val badRequest = Problem("Bad request.")
     }
 }
 

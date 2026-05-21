@@ -6,7 +6,6 @@ import io.mockk.verify
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.*
-import org.springframework.security.crypto.password.PasswordEncoder
 import org.workflow.dto.UserRoleUpdateRequest
 import org.workflow.entity.Roles
 import org.workflow.entity.User
@@ -22,7 +21,6 @@ class UserServiceTest {
 
     private lateinit var userRepository: UserRepository
     private lateinit var roleRepository: RoleRepository
-    private lateinit var passwordEncoder: PasswordEncoder
     private lateinit var service: UserService
 
     private fun role(name: String = "READER") = Roles(id = UUID.randomUUID(), name = name)
@@ -35,8 +33,7 @@ class UserServiceTest {
     fun setup() {
         userRepository  = mockk()
         roleRepository  = mockk()
-        passwordEncoder = mockk()
-        service = UserService(userRepository, roleRepository, passwordEncoder)
+        service = UserService(userRepository, roleRepository)
     }
 
     // ── listUsers ─────────────────────────────────────────────────────────────

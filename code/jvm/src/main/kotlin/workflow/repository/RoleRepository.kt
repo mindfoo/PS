@@ -8,8 +8,8 @@ import org.springframework.stereotype.Repository
 import org.workflow.entity.Roles
 import java.util.UUID
 
-@Repository
 /** Data access operations for RBAC roles. */
+@Repository
 interface RoleRepository : JpaRepository<Roles, UUID> {
     fun findByName(name: String): Roles?
 

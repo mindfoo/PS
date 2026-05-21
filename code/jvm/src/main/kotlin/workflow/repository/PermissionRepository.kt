@@ -7,8 +7,8 @@ import org.workflow.entity.enums.ActionType
 import org.workflow.entity.enums.ResourceType
 import java.util.UUID
 
-@Repository
 /** Data access operations for the permission catalogue. */
+@Repository
 interface PermissionRepository : JpaRepository<Permission, UUID> {
     @Suppress("unused")
     fun findByResourceAndAction(resource: ResourceType, action: ActionType): Permission?

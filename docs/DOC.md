@@ -2,13 +2,13 @@
 
 **Unidade Curricular:** Projeto e Seminário  
 **Data:** Abril de 2026  
-**Tecnologia Principal:** Kotlin · Spring Boot 3.2.3 · Spring Security · Spring Data JPA · PostgreSQL 15 · React + TypeScript
+**Tecnologia Principal:** Kotlin · Spring Boot 3.5.0· Spring Security · Spring Data JPA · PostgreSQL 15 · React + TypeScript
 
 ---
 
 ## Resumo
 
-A Workflow Platform é uma API REST desenvolvida em Kotlin com Spring Boot 3.2.3, concebida para permitir a criação, gestão e monitorização de pipelines compostas por tarefas ordenadas. O sistema implementa uma arquitetura em três camadas — Controller, Service, Repository — com persistência gerida pelo Spring Data JPA sobre PostgreSQL 15, autenticação *stateless* baseada em cookie HttpOnly com tokens opacos hashed via SHA-256, e controlo de acesso baseado em papéis (RBAC) de dois níveis. O modelo de domínio centra-se na entidade `WorkflowTaskOrder`, uma tabela de associação enriquecida que suporta paralelismo, sequenciamento e políticas de *retry* por tarefa. O frontend é uma Single Page Application desenvolvida em React com TypeScript. Este relatório documenta as decisões arquiteturais, as tecnologias escolhidas e as suas justificações, o modelo de segurança do Spring Security, e a lógica de execução de workflows com suporte a trigger manual, CRON e evento.
+A Workflow Platform é uma API REST desenvolvida em Kotlin com Spring Boot 3.5.0, concebida para permitir a criação, gestão e monitorização de pipelines compostas por tarefas ordenadas. O sistema implementa uma arquitetura em três camadas — Controller, Service, Repository — com persistência gerida pelo Spring Data JPA sobre PostgreSQL 15, autenticação *stateless* baseada em cookie HttpOnly com tokens opacos hashed via SHA-256, e controlo de acesso baseado em papéis (RBAC) de dois níveis. O modelo de domínio centra-se na entidade `WorkflowTaskOrder`, uma tabela de associação enriquecida que suporta paralelismo, sequenciamento e políticas de *retry* por tarefa. O frontend é uma Single Page Application desenvolvida em React com TypeScript. Este relatório documenta as decisões arquiteturais, as tecnologias escolhidas e as suas justificações, o modelo de segurança do Spring Security, e a lógica de execução de workflows com suporte a trigger manual, CRON e evento.
 
 **Palavras-chave:** Orquestração de processos; Pipeline; REST API; Spring Boot 3; Kotlin; RBAC; JPA; PostgreSQL; React; TypeScript.
 
@@ -16,7 +16,7 @@ A Workflow Platform é uma API REST desenvolvida em Kotlin com Spring Boot 3.2.3
 
 ## Abstract
 
-The Workflow Platform is a REST API developed in Kotlin with Spring Boot 3.2.3, designed to enable the creation, management, and monitoring of pipelines composed of ordered tasks. The system implements a three-layer architecture — Controller, Service, Repository — with persistence managed by Spring Data JPA over PostgreSQL 15, stateless authentication based on HttpOnly cookies with opaque tokens hashed via SHA-256, and a two-level Role-Based Access Control (RBAC) model. The domain model centres on the `WorkflowTaskOrder` entity, a rich association table that supports parallelism, sequential ordering, and per-task retry policies. The frontend is a Single Page Application developed in React with TypeScript. This report documents the architectural decisions made, the chosen technologies and their justifications, the Spring Security pipeline, and the workflow execution logic with support for manual, CRON, and event triggers.
+The Workflow Platform is a REST API developed in Kotlin with Spring Boot 3.5.0, designed to enable the creation, management, and monitoring of pipelines composed of ordered tasks. The system implements a three-layer architecture — Controller, Service, Repository — with persistence managed by Spring Data JPA over PostgreSQL 15, stateless authentication based on HttpOnly cookies with opaque tokens hashed via SHA-256, and a two-level Role-Based Access Control (RBAC) model. The domain model centres on the `WorkflowTaskOrder` entity, a rich association table that supports parallelism, sequential ordering, and per-task retry policies. The frontend is a Single Page Application developed in React with TypeScript. This report documents the architectural decisions made, the chosen technologies and their justifications, the Spring Security pipeline, and the workflow execution logic with support for manual, CRON, and event triggers.
 
 **Keywords:** Process orchestration; Pipeline; REST API; Spring Boot 3; Kotlin; RBAC; JPA; PostgreSQL; React; TypeScript.
 
@@ -81,15 +81,17 @@ O projeto foi desenvolvido no contexto de Projeto e Seminário (LEIC51N), com o 
 
 | Camada | Tecnologia | Versão |
 |---|---|---|
-| Linguagem | Kotlin | JVM 25 |
-| Framework Web | Spring Boot | 3.2.3 |
-| Segurança | Spring Security | 6.x (incluído no Boot 3.2) |
+| Linguagem | Kotlin | 2.3.0 |
+| Framework Web | Spring Boot | 3.5.0 |
+| Java | 25 (LTS) — Virtual Threads (Project Loom) |
+| Segurança | Spring Security | 6.x (incluído no Boot 3.5) |
 | ORM | Spring Data JPA + Hibernate | 6.x |
-| Base de Dados | PostgreSQL | 15 |
+| Base de Dados | PostgreSQL | 15 — LISTEN/NOTIFY para pub/sub |
 | Build | Gradle Kotlin DSL | 8.x |
 | Frontend | React + TypeScript + Vite | React 18 |
-| Testes | JUnit 5 + Spring Boot Test | — |
-| Infraestrutura Local | Docker / docker-compose | — |
+| Tempo Real | Server-Sent Events (SSE) | `SseEmitter` nativo do Spring MVC |
+| Testes | JUnit 5 + MockK | — |
+| Infraestrutura | Docker Compose (3 serviços) + nginx | — |
 
 ### 1.2 Estado da Arte
 
@@ -874,7 +876,7 @@ O `WorkflowService` gere o ciclo de vida completo dos workflows:
 - **Associação de tarefa** (`linkTask`): cria uma entrada em `workflow_tasks_order` com o próximo `taskOrder` disponível (max atual + 1), associando a tarefa ao workflow.
 - **Desassociação** (`unlinkTask`): remove a entrada de `workflow_tasks_order` sem eliminar a tarefa — esta permanece disponível para outros workflows.
 - **Reordenação** (`reorderTasks`): recebe uma lista de `TaskOrderItem { orderId, taskOrder }` e atualiza as linhas correspondentes em `workflow_tasks_order` numa única transação `@Transactional`, garantindo atomicidade.
-- **Execução** (`runWorkflow`): cria uma entrada de execução com status `PENDING`, delega ao `ExecutionService` e retorna o `executionId` para polling do cliente.
+- **Execução** (`runWorkflow`): cria uma entrada de execução com status `PENDING`, delega ao `ExecutionService` e retorna o `executionId` — o frontend abre uma ligação SSE para receber atualizações em tempo real.
 
 ### 7.4 Gestão de Tarefas (`TaskService`)
 
@@ -919,7 +921,7 @@ ERROR ─── retryPolicy > 0? ─── Sim ──► RUNNING (nova tentativa
 
 1. Agrupa as tarefas do `WorkflowTaskOrder` por valor de `task_order`.
 2. Processa os grupos sequencialmente por ordem crescente.
-3. Dentro de cada grupo (mesmo `task_order`), executa as tarefas **em paralelo** (via coroutines Kotlin ou `CompletableFuture`).
+3. Dentro de cada grupo (mesmo `task_order`), executa as tarefas **em paralelo** via `CompletableFuture.supplyAsync` no executor de virtual threads.
 4. Para cada tarefa, respeita o `retryPolicy` específico do `WorkflowTaskOrder` — em caso de erro, tenta novamente até `retryPolicy` vezes.
 5. Cria registos filho de execução (tipo `TASK`) associados ao pai para rastreabilidade.
 6. Atualiza o status do workflow para `SUCCESS` se todas as tarefas terminarem com sucesso, ou `ERROR` caso contrário.
@@ -935,6 +937,52 @@ val exitCode = process.waitFor()
 ```
 
 **Execução HTTP:** Emite um pedido HTTP conforme a configuração (`method`, `url`, `headers`, `body`) e armazena o status code e body da resposta como output da execução.
+
+### 7.5.1 Executor de Virtual Threads (`ExecutorConfig`)
+
+A execução assíncrona de workflows e tarefas é despachada para um `Executor` configurado com virtual threads da JVM 25 (Project Loom):
+
+```kotlin
+@Bean(name = ["executionExecutor"])
+fun executionExecutor(): Executor = Executors.newVirtualThreadPerTaskExecutor()
+```
+
+Antes desta mudança, o `CompletableFuture.runAsync {}` utilizava o `ForkJoinPool` comum da JVM, partilhado com outras operações internas do Spring. Como as tarefas de execução bloqueiam no I/O (chamadas HTTP, subprocessos do SO, queries JDBC), o ForkJoinPool corre o risco de saturação (*thread starvation*) sob carga concorrente — um problema clássico do modelo de threads plataforma em aplicações I/O-bound.
+
+Os virtual threads são *lightweight threads* geridos pela JVM que mapeiam M:N para threads de plataforma (carriers). Cada virtual thread pode bloquear em I/O sem ocupar um carrier thread — a JVM suspende automaticamente o virtual thread e liberta o carrier para outra tarefa. Este modelo elimina o starvation e permite milhares de execuções concorrentes com um footprint mínimo.
+
+O pool HikariCP foi ajustado para acomodar a maior concorrência possível:
+
+```properties
+spring.datasource.hikari.maximum-pool-size=25
+spring.datasource.hikari.minimum-idle=5
+```
+
+### 7.5.2 Notificações em Tempo Real — PostgreSQL LISTEN/NOTIFY (`ExecutionEventService`)
+
+Após cada transição de estado de execução, o `ExecutionService` emite uma notificação PostgreSQL via `pg_notify`:
+
+```kotlin
+jdbcTemplate.execute<Unit>("SELECT pg_notify('execution_events', ?)") { ps ->
+    ps.setString(1, payload)
+    ps.execute()
+}
+```
+
+O payload é um objeto JSON com a seguinte estrutura:
+
+```json
+{
+  "executionId": "uuid",
+  "status": "RUNNING",
+  "taskStatuses": { "taskId1": "SUCCESS", "taskId2": "RUNNING" },
+  "terminal": false
+}
+```
+
+O `ExecutionEventService` mantém uma ligação JDBC dedicada que executa `LISTEN execution_events` no arranque da aplicação (via `@PostConstruct`). Um virtual thread faz polling com `pgConn.getNotifications(50)` — bloqueando no máximo 50 ms por iteração. Ao receber uma notificação, deserializa o payload JSON e reencaminha o evento para os `SseEmitter` registados para esse `executionId`.
+
+Este mecanismo funciona como um sistema de pub/sub distribuído — se múltiplas instâncias da aplicação estiverem a correr, todas recebem as notificações PostgreSQL independentemente de qual instância despachou a execução.
 
 ### 7.6 Agendamento (`ScheduleService`)
 
@@ -1014,7 +1062,7 @@ O sistema utiliza também o tipo `Problem` (inspirado no [RFC 7807 — Problem D
 
 ### 9.1 Arquitetura da SPA
 
-O frontend é uma Single Page Application construída com React 18, TypeScript e Vite (bundler moderno baseado em ES modules nativos, significativamente mais rápido que Webpack em desenvolvimento). A navegação é gerida pelo React Router v6 com rotas declarativas aninhadas.
+O frontend é uma Single Page Application construída com React 18.3.1, TypeScript ~6.0.2 e Vite 6.3.0 (bundler moderno baseado em ES modules nativos, significativamente mais rápido que Webpack em desenvolvimento). A navegação é gerida pelo React Router v6 com rotas declarativas aninhadas.
 
 ### 9.2 Gestão de Estado de Autenticação — `AuthContext`
 
@@ -1092,22 +1140,33 @@ Esta é a página mais rica da aplicação, combinando múltiplas funcionalidade
 - Clicar no badge de stage abre um `<input type="number">` inline no lugar do badge.
 - `commitStageEdit()` recalcula `compactStages()` após o novo valor e persiste a ordem.
 
-**Execução de workflow com polling:**
+**Execução de workflow com SSE:**
 - Botão "▶ Run workflow" define todos os tasks como `PENDING` otimisticamente.
-- Dispara `POST /workflows/{id}/run`.
-- Inicia polling com `setInterval` a 1500ms que chama `executionApi.getById(executionId)`.
-- Os badges de status de cada tarefa são atualizados em tempo real a partir de `taskExecutions` na resposta.
-- Polling pára quando `status === 'SUCCESS' || status === 'ERROR'`.
+- Dispara `POST /workflows/{id}/run`, recebe o `executionId`.
+- Abre uma ligação SSE via `EventSource` para `/api/executions/{executionId}/events`.
+- Os badges de status de cada tarefa são atualizados em tempo real a partir dos eventos `ExecutionEvent` recebidos via SSE (campo `taskStatuses`).
+- A ligação SSE fecha-se automaticamente quando `event.terminal === true`, o que despoleta um reload do histórico.
 
 **Execução individual de tarefa:**
-- Botão "▶" por linha de tarefa, com polling próprio do `executionId` retornado.
+- Botão "▶" por linha de tarefa, com subscrição SSE própria do `executionId` retornado.
 - Status RUNNING é definido otimisticamente antes da resposta do servidor.
 
 **Histórico de execuções:**
 - Carregado no `useEffect` de mount da página (não apenas ao clicar "Show").
 - Atualizado imediatamente ao disparar qualquer execução (entry RUNNING aparece sem aguardar conclusão).
 - Atualizado novamente quando o polling termina com estado final.
-- Expandível por linha para mostrar `taskExecutions` filhas.
+- Cada linha inclui um botão "Details" que navega para a página de detalhe da execução.
+
+**Página de detalhe de execução (`ExecutionDetailPage`):**
+- Rota: `/workflows/:workflowId/executions/:executionId`.
+- Apresenta um cartão de sumário (status, trigger, datas, retries) e uma tabela de `taskExecutions` com outputs individuais.
+- Botão de cancelamento disponível para execuções `PENDING`/`RUNNING` (respeitando `canExecuteWorkflows`).
+- Botão "Back" navega para o workflow pai.
+
+**Sidebar colapsável:**
+- O sidebar de navegação pode ser colapsado para um rail de ícones (56 px de largura) através de um botão `‹`/`›` no fundo.
+- Estado de colapso persiste em `localStorage` com a chave `sidebar-collapsed`.
+- Em mobile (≤768 px), o colapso é ignorado — o sidebar abre sempre em largura completa via hamburger.
 
 ### 9.6 Clientes HTTP e Cross-Origin Credentials
 
@@ -1123,6 +1182,47 @@ const response = await fetch(BASE_URL + path, {
 ```
 
 Esta configuração é obrigatória para que o browser envie o cookie de autenticação em pedidos para uma origem diferente (ex: frontend em `localhost:5173`, backend em `localhost:8080`). O backend deve ter `Access-Control-Allow-Credentials: true` e uma origem explícita (não `*`) nas headers CORS.
+
+### 9.7 Agendamento — Formato de Expressão CRON
+
+O backend usa `org.springframework.scheduling.support.CronExpression.parse()`, que exige expressões de **6 campos** no formato Spring: `<segundo> <minuto> <hora> <dia-do-mês> <mês> <dia-da-semana>`. O formato unix padrão de 5 campos é rejeitado.
+
+O frontend gera expressões Spring-compatíveis através da função `slotToCron`:
+
+```typescript
+// Prefixo de segundos sempre '0' — Spring cron não suporta granularidade sub-minuto
+function slotToCron(slot: ScheduleSlot): string {
+  const daysPart = slot.everyDay ? '*' : [...slot.days].sort().join(',')
+  return `0 ${slot.minute} ${slot.hour} * * ${daysPart}`
+}
+```
+
+A função inversa `cronToSlot` detecta automaticamente 5 vs 6 campos para compatibilidade com dados históricos.
+
+**Limitações:** o Spring `CronExpression` não suporta trigger sub-minuto. Expressões como `*/30 * * * * *` (a cada 30 segundos) não são aceites pela UI de agendamento.
+
+### 9.8 Visibilidade Privada de Recursos
+
+Workflows e tasks têm um campo `isPrivate: Boolean` (default `false`). As regras de visibilidade são:
+
+| Papel | Recurso público | Recurso privado |
+|---|---|---|
+| Admin | Ver, editar, apagar | Ver, editar, apagar |
+| Criador | Ver, editar, apagar | Ver, editar, apagar |
+| Outros | Ver | 403 AccessDenied |
+
+O backend filtra via JPQL em `findAllVisible(@Param("userId") userId)`, que retorna todos os recursos públicos mais os privados do utilizador. Os controllers mapeiam `WorkflowError.AccessDenied` e `TaskError.AccessDenied` para `403 application/problem+json`.
+
+No frontend, o badge `🔒 Private` é exibido nos cards de dashboard, na tabela de tasks e no cabeçalho de detalhe do workflow. O campo `isPrivate` é enviado nos formulários de criação e edição.
+
+### 9.9 Code Quality — ESLint e Padrões de Handlers
+
+O frontend tem ESLint 9 (flat config, `eslint.config.js`) com:
+- `@typescript-eslint/recommended-type-checked` — regras com informação de tipos
+- `eslint-plugin-react` + `eslint-plugin-react-hooks` + `eslint-plugin-react-refresh`
+- Configuração relaxada para ficheiros de teste (`src/test/**`)
+
+**Regra de handlers:** funções assíncronas com lógica de negócio nunca são definidas inline em JSX — são sempre funções nomeadas no corpo do componente, com gestão de `loading`/`error` e sem uso de `alert()`. Esta convenção está registada em `.github/instructions/react.instructions.md`.
 
 ---
 
@@ -1144,9 +1244,9 @@ Observou-se que o acesso a propriedades `FetchType.LAZY` fora de uma transação
 
 Na fase inicial do projeto, reinicializações da aplicação com `ddl-auto=create-drop` eliminavam os dados semeados. A migração para `ddl-auto=update` e a verificação de existência no `DataInitializer` resolveu este problema, tornando o processo de seed idempotente e seguro para múltiplos restarts.
 
-### 10.5 Polling vs WebSockets
+### 10.5 SSE em vez de Polling
 
-Considerou-se a implementação de WebSockets (STOMP over SockJS) para notificações em tempo real de estado de execução. Optou-se por polling a 1500ms por simplicidade de implementação e por ser suficiente para o contexto de uso — execuções de segundos a minutos. A transição para WebSockets permanece identificada como melhoria futura.
+Inicialmente considerou-se polling a 1500ms com `setInterval` por simplicidade. Esta abordagem foi substituída por Server-Sent Events (SSE) via `EventSource`, eliminando o overhead de pedidos repetidos e reduzindo a latência de atualização de status de até 1500ms para sub-100ms. A implementação usa `SseEmitter` nativo do Spring MVC (sem dependências adicionais) e `pg_notify` para o pipeline de notificação backend → frontend. A alternativa WebSockets (STOMP over SockJS) foi considerada mas descartada por implicar uma dependência adicional e complexidade de handshake desnecessária para um canal unidirecional.
 
 ### 10.6 Gestão de Contexto de Modelo em Sessões Longas
 
@@ -1156,61 +1256,139 @@ Observou-se que em sessões de desenvolvimento longas com assistência de IA (Co
 
 ## 11. Infraestrutura e Implantação
 
-### 11.1 Ambiente Local com Docker
+### 11.1 Containerização Completa com Docker Compose
 
-A infraestrutura de desenvolvimento local é gerida com Docker Compose, definida em `src/docker-compose.yml`. A base de dados PostgreSQL 15 é iniciada num container isolado, exposto na porta 5432:
+A plataforma é totalmente containerizada com três serviços definidos em `docker-compose.yml` na raiz do repositório:
+
+```
+┌────────────────────────────────────────────────────────┐
+│  docker compose up                                     │
+│                                                        │
+│  ┌──────────┐    ┌───────────────┐    ┌────────────┐  │
+│  │ postgres │◄───│   backend     │◄───│  frontend  │  │
+│  │  :5432   │    │  Spring Boot  │    │   nginx    │  │
+│  │          │    │    :8080      │    │    :80     │  │
+│  └──────────┘    └───────────────┘    └────────────┘  │
+└────────────────────────────────────────────────────────┘
+```
+
+| Serviço | Imagem base | Porta exposta | Responsabilidade |
+|---|---|---|---|
+| `postgres` | `postgres:15-alpine` | 5432 | Persistência + LISTEN/NOTIFY |
+| `backend` | `eclipse-temurin:25-jre` (multi-stage) | 8080 | API REST Spring Boot |
+| `frontend` | `nginx:1.27-alpine` (multi-stage) | 80 | SPA React + proxy /api/ |
+
+**Arranque completo da plataforma:**
+
+```bash
+docker compose up --build
+```
+
+A aplicação fica disponível em `http://localhost` (nginx na porta 80). A API Swagger está em `http://localhost/api/swagger-ui/index.html`.
+
+### 11.2 Dockerfiles Multi-stage
+
+**Backend (`code/jvm/Dockerfile`):**
+
+```dockerfile
+# Estágio 1: compilação com JDK 25
+FROM eclipse-temurin:25-jdk AS builder
+WORKDIR /app
+COPY gradlew gradle/ build.gradle.kts settings.gradle.kts ./
+RUN ./gradlew dependencies --no-daemon --quiet || true
+COPY src/ src/
+RUN ./gradlew bootJar --no-daemon -x test
+
+# Estágio 2: runtime com JRE 25 (imagem ~200 MB mais pequena)
+FROM eclipse-temurin:25-jre AS runtime
+COPY --from=builder /app/build/libs/*.jar app.jar
+EXPOSE 8080
+ENTRYPOINT ["java", "-jar", "app.jar"]
+```
+
+A separação em dois estágios garante que o JDK (compilador, Gradle wrapper) não entra na imagem final. Apenas o JAR executável é copiado para o runtime.
+
+**Frontend (`code/js/Dockerfile`):**
+
+```dockerfile
+# Estágio 1: build com Node 22
+FROM node:22-alpine AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build     # produz dist/ com assets minificados
+
+# Estágio 2: servir com nginx 1.27
+FROM nginx:1.27-alpine AS runtime
+COPY --from=builder /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80
+```
+
+### 11.3 Nginx como Reverse Proxy com Suporte SSE
+
+O nginx (`code/js/nginx.conf`) serve dois papéis:
+
+1. **SPA fallback**: redireciona qualquer rota desconhecida para `index.html` (necessário para React Router).
+2. **Proxy da API**: reencaminha `/api/*` para o backend Spring Boot (`http://backend:8080`).
+
+O suporte a SSE requer desativação explícita do buffering nginx — por defeito o nginx acumula a resposta antes de a enviar ao cliente, quebrando o modelo *streaming* dos eventos:
+
+```nginx
+location /api/ {
+    proxy_pass         http://backend:8080;
+    proxy_http_version 1.1;
+    proxy_set_header   Connection '';
+    proxy_buffering    off;          # crítico para SSE
+    proxy_cache        off;
+    chunked_transfer_encoding on;
+}
+```
+
+Sem `proxy_buffering off`, os eventos SSE seriam retidos no buffer nginx e entregues em batch ao cliente em vez de em tempo real.
+
+### 11.4 Health Check e Ordem de Arranque
+
+O serviço `backend` só arranca depois do `postgres` reportar `healthy` (via `pg_isready`):
 
 ```yaml
-services:
+depends_on:
   postgres:
-    image: postgres:15
-    environment:
-      POSTGRES_DB: workflowdb
-      POSTGRES_USER: workflow
-      POSTGRES_PASSWORD: workflow
-    ports:
-      - "5432:5432"
+    condition: service_healthy
+healthcheck:
+  test: ["CMD-SHELL", "pg_isready -U admin -d workflow_db"]
+  interval: 5s
+  retries: 10
 ```
 
-O backend Spring Boot liga-se a este container através das propriedades em `src/main/resources/application.properties`:
+Isto previne `Connection refused` durante o arranque do Spring Boot enquanto o PostgreSQL ainda está a inicializar.
 
-```properties
-spring.datasource.url=jdbc:postgresql://localhost:5432/workflowdb
-spring.datasource.username=workflow
-spring.datasource.password=workflow
-spring.jpa.hibernate.ddl-auto=update
-spring.jpa.show-sql=false
-spring.jpa.properties.hibernate.format_sql=true
-```
-
-### 11.2 Inicialização Automática — `DataInitializer`
+### 11.5 Inicialização Automática — `DataInitializer`
 
 O `DataInitializer` (`@Component`, implementa `ApplicationRunner`) executa automaticamente no arranque da aplicação e semeia a base de dados com roles, permissões atómicas e o utilizador administrador padrão (`admin` / `admin123`). A operação é **idempotente** — verifica a existência do role `ADMIN` antes de executar qualquer escrita, sendo seguro em múltiplos restarts.
 
-### 11.3 Processo de Build e Execução
+### 11.6 Processo de Build e Execução (Desenvolvimento Local)
 
 ```bash
-# 1. Iniciar PostgreSQL
-docker-compose -f src/docker-compose.yml up -d
+# Arrancar apenas a base de dados (modo dev, sem containerizar a app)
+./gradlew dbUp        # inicia postgres via docker-compose interno
+./gradlew bootRun     # arranca Spring Boot contra localhost:5432
+cd code/js && npm run dev   # arranca frontend em localhost:5173
 
-# 2. Arrancar a aplicação Spring Boot
-./gradlew bootRun
+# Ou arrancar a plataforma completa containerizada
+docker compose up --build
 
-# 3. Iniciar o frontend (terminal separado)
-cd code/js && npm install && npm run dev
-
-# 4. Executar testes
+# Testes backend
 ./gradlew test
 
-# 5. Gerar JAR de produção
+# Build JAR de produção
 ./gradlew build
 ```
 
-A aplicação fica disponível em `http://localhost:8080` e o frontend em `http://localhost:5173`. A documentação Swagger da API está acessível em `http://localhost:8080/swagger-ui/index.html`.
+### 11.7 Configuração CORS e Cross-Origin
 
-### 11.4 Configuração CORS e Cross-Origin
-
-O frontend (`localhost:5173`) comunica com o backend (`localhost:8080`). A configuração CORS no `SecurityConfig` permite a origem do frontend com `allowCredentials = true` — obrigatório para que o browser envie cookies HttpOnly em pedidos cross-origin. Em produção, o frontend pode ser servido como recursos estáticos pelo mesmo servidor, eliminando a necessidade de configuração CORS.
+O frontend (`localhost:5173`) comunica com o backend (`localhost:8080`) em desenvolvimento. A configuração CORS no `SecurityConfig` permite a origem do frontend com `allowCredentials = true` — obrigatório para que o browser envie cookies HttpOnly em pedidos cross-origin. Em produção (Docker Compose), o frontend e o backend partilham a mesma origem (`localhost:80` → proxy nginx), eliminando qualquer problema CORS.
 
 ---
 
@@ -1325,7 +1503,7 @@ Esta secção analisa os seis projetos de semestres anteriores fornecidos como r
 - JDBI com SQL manual aumenta o esforço de manutenção em schemas evolutivos comparativamente a JPA com `ddl-auto=update`.
 - A comunicação com hardware via terminal não está completamente especificada nos protocolos de baixo nível.
 
-**Relevância para este projeto:** O SSE do OL50 é a alternativa técnica mais relevante ao polling de 1500ms implementado nesta plataforma para atualizações de estado de execuções. A diferença é significativa: SSE mantém uma ligação persistente, eliminando o overhead de intervalo de polling — mas requer gestão de conexões, reconexão em falha e compatibilidade com proxies HTTP. A decisão de polling foi tomada por simplicidade, com migração para SSE ou WebSockets identificada como melhoria futura (Secção 13). O capítulo de deployment do OL50 é o modelo de referência direto para a Secção 11 deste documento.
+**Relevância para este projeto:** A abordagem SSE do OL50 foi a referência directa para a implementação de SSE nesta plataforma. O `ExecutionEventService` implementa exactamente este modelo — `SseEmitter` Spring MVC, com PostgreSQL LISTEN/NOTIFY como canal de notificação para que o serviço SSE receba eventos das execuções asíncronas. A gestão de conexões, reconexão em falha e compatibilidade com proxies HTTP foi tratada com `proxy_buffering off` no nginx. O capítulo de deployment do OL50 é o modelo de referência directo para a Secção 11 deste documento.
 
 ---
 
@@ -1336,7 +1514,7 @@ Esta secção analisa os seis projetos de semestres anteriores fornecidos como r
 | **Autenticação** | OAuth2 + OIDC | Auth server separado | Não detalhado | JWT | OAuth2 (Entra) | Cookie HttpOnly + token opaco + SHA-256 | Controlo total, sem dependência externa, invalidação imediata no logout, proteção XSS nativa |
 | **Acesso a dados** | JDBC | JDBC | Spring Data JPA | JDBI + JPA | JDBI | Spring Data JPA | Produtividade com schema estável; JPA gere relações N:M enriquecidas (`WorkflowTaskOrder`) automaticamente |
 | **Base de dados** | PostgreSQL | PostgreSQL | PostgreSQL | Relacional + NoSQL | PostgreSQL | PostgreSQL 15 + JSONB | JSONB elimina necessidade de NoSQL para campos de estrutura flexível (`config`, `output`) |
-| **Tempo real** | Email (async) | — | — | Notificações | SSE | Polling 1500ms | SSE identificado como evolução futura; polling suficiente para duração típica das execuções |
+| **Tempo real** | Email (async) | — | — | Notificações | SSE | SSE via `EventSource` + PostgreSQL LISTEN/NOTIFY | SSE com virtual threads elimina polling; `pg_notify` como canal de pub/sub distribuído |
 | **Frontend** | Web + Mobile | React | React + TS + MUI | Não especificado | Não especificado | React + TypeScript + Vite + SCSS | SCSS modular dá controlo total de estilos sem dependência de biblioteca de componentes |
 | **Microserviços** | Não | Não | Sim (3 serviços) | Não | Não | Não (monólito modular) | Overhead não justificado em fase inicial; `ExecutionService` é candidato natural a extração futura |
 | **RBAC** | RBAC0/RBAC1 | Hierárquico | Não detalhado | JWT claims | Hierárquico | 2 níveis: role coarse-grained + permissões atómicas | Granularidade máxima sem complexidade de ABAC; autoridades carregadas pelo `CustomUserDetailsService` |
@@ -1372,7 +1550,7 @@ A Workflow Platform constitui uma implementação completa de uma REST API de or
 
 **Próximos passos identificados:**
 
-1. Migração do polling para WebSockets com Spring WebFlux para notificações em tempo real sem overhead de pedidos repetidos.
+1. Migração para WebSockets bidirecionais (STOMP over SockJS) para cenários de colaboração em tempo real — o SSE cobre o caso de uso actual (notificações unidireccionais de estado), mas WebSockets permitiriam notificações de múltiplos tipos sem uma ligação por tipo.
 2. Implementação de notificações de alerta via email/webhook quando execuções terminam em `ERROR`.
 3. Suporte a expressões CRON avançadas com fuso horário configurável por schedule.
 4. Testes de integração com Testcontainers para PostgreSQL, validando o comportamento real de queries JPA.

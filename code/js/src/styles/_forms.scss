@@ -25,6 +25,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
+  padding: .5rem 0 0;
 
   label {
     font-size: 0.85rem;
@@ -73,4 +74,25 @@
   justify-content: flex-end;
   gap: 0.5rem;
   margin-top: 0.5rem;
+}
+
+// Inline form-group (no top margin) — used inside table cells
+.form-group--inline {
+  margin: 0;
+}
+
+// Checkbox with label on same line
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  user-select: none;
+
+  input[type="checkbox"] {
+    width: 1rem;
+    height: 1rem;
+    cursor: pointer;
+  }
 }

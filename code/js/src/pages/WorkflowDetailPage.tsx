@@ -1,28 +1,16 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd'
 import { workflowApi, type TaskOrderItem } from '../api/workflows'
 import { taskApi, type WorkflowTaskEntry, type TaskResponse } from '../api/tasks'
-import { executionApi, type ExecutionSummaryResponse, type TaskExecutionSummary } from '../api/executions'
+import { executionApi, type ExecutionSummaryResponse } from '../api/executions'
 import { usePermissions } from '../contexts/AuthContext'
 import { Layout } from '../components/Layout'
 import type { WorkflowResponse } from '../api/workflows'
-import { TaskType } from './TaskFormPage.tsx'
-
-function configSummary(type: string, config: Record<string, unknown>): string {
-  switch (type) {
-    case TaskType.HTTP: return `${config.method ?? 'GET'} ${config.url ?? ''}`
-    case TaskType.SCRIPT: {
-      const cmd  = config.command  ?? ''
-      const file = config.fileName ?? ''
-      const dir  = config.directory ? `(in ${config.directory}) ` : ''
-      const args = Array.isArray(config.args) ? ' ' + (config.args as string[]).join(' ') : ''
-      return `${dir}${cmd} ${file}${args}`.trim()
-    }
-    default: return JSON.stringify(config)
-  }
-}
-
+import { StatusBadge } from '../components/StatusBadge'
+import { EmptyState } from '../components/EmptyState'
+import { LoadingSpinner } from '../components/LoadingSpinner'
+import { configSummary } from '../utils/task'
 
 function compactStages(entries: WorkflowTaskEntry[]): WorkflowTaskEntry[] {
   const uniqueStages = [...new Set(entries.map(e => e.taskOrder))].sort((a, b) => a - b)
@@ -45,6 +33,7 @@ export function WorkflowDetailPage() {
   const [loading, setLoading]   = useState(true)
   const [error, setError]       = useState('')
   const [saving, setSaving]     = useState(false)
+  const [running, setRunning]   = useState(false)
   const [editingStage, setEditingStage] = useState<string | null>(null)
   const [stageInput, setStageInput]     = useState('')
   const [editingRetry, setEditingRetry] = useState<string | null>(null)
@@ -54,11 +43,12 @@ export function WorkflowDetailPage() {
   const [executions, setExecutions]         = useState<ExecutionSummaryResponse[]>([])
   const [execLoading, setExecLoading]       = useState(false)
   const [execOpen, setExecOpen]             = useState(true)
-  const [expandedExec, setExpandedExec]     = useState<string | null>(null)
 
   // Per-task live status during an active run (taskId → status)
   const [taskStatuses, setTaskStatuses]     = useState<Record<string, string>>({})
-  const pollingRef                          = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // Active execution being monitored via SSE
+  const [activeExecutionId, setActiveExecutionId] = useState<string | null>(null)
 
   // Link existing task picker
   const [showLinkPicker, setShowLinkPicker] = useState(false)
@@ -71,19 +61,19 @@ export function WorkflowDetailPage() {
       .then(([w, t]) => { setWorkflow(w); setTasks(compactStages(t)) })
       .catch(err => setError(err instanceof Error ? err.message : 'Failed to load'))
       .finally(() => setLoading(false))
-    loadExecutions()
+    void loadExecutions()
   }, [id])
 
 
   async function persistOrder(updated: WorkflowTaskEntry[]) {
     if (!id) return
     const items: TaskOrderItem[] = updated
-      .filter(t => t.orderId != null)
+      .filter(t => t.orderId !== null)
       .map(t => ({ orderId: t.orderId!, taskOrder: t.taskOrder }))
     if (items.length === 0) return
     setSaving(true)
     try { await workflowApi.reorderTasks(id, items) }
-    catch (err) { alert(err instanceof Error ? err.message : 'Failed to save order') }
+    catch (err) { setError(err instanceof Error ? err.message : 'Failed to save order') }
     finally { setSaving(false) }
   }
 
@@ -100,7 +90,7 @@ export function WorkflowDetailPage() {
 
     const renumbered = reordered.map((t, i) => ({ ...t, taskOrder: i + 1 }))
     setTasks(renumbered)
-    persistOrder(renumbered)
+    void persistOrder(renumbered)
   }
 
 
@@ -118,7 +108,7 @@ export function WorkflowDetailPage() {
     const sorted  = [...updated].sort((a, b) => a.taskOrder - b.taskOrder)
     const compact = compactStages(sorted)
     setTasks(compact)
-    persistOrder(compact)
+    void persistOrder(compact)
     setEditingStage(null)
   }
 
@@ -135,7 +125,7 @@ export function WorkflowDetailPage() {
       await workflowApi.updateRetryPolicy(id, taskId, value)
       setTasks(prev => prev.map(t => t.taskId === taskId ? { ...t, retryPolicy: value } : t))
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to update retry policy')
+      setError(err instanceof Error ? err.message : 'Failed to update retry policy')
     } finally {
       setEditingRetry(null)
     }
@@ -149,101 +139,75 @@ export function WorkflowDetailPage() {
       await taskApi.delete(taskId)
       const updated = compactStages(tasks.filter(t => t.taskId !== taskId))
       setTasks(updated)
-      persistOrder(updated)
-    } catch (err) { alert(err instanceof Error ? err.message : 'Delete failed') }
+      void persistOrder(updated)
+    } catch (err) { setError(err instanceof Error ? err.message : 'Delete failed') }
   }
+
+  // ── SSE subscription for live execution updates ───────────────────────────
+
+  useEffect(() => {
+    if (!activeExecutionId) return
+    const unsub = executionApi.subscribeToExecution(
+      activeExecutionId,
+      (event) => {
+        setTaskStatuses(event.taskStatuses)
+        if (event.terminal) {
+          void loadExecutions()
+          setActiveExecutionId(null)
+        }
+      }
+    )
+    return unsub
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeExecutionId])
 
   // ── Task run ──────────────────────────────────────────────────────────────
 
   async function handleRunTask(taskId: string) {
     try {
       const res = await taskApi.run(taskId)
-      // Mark this task as RUNNING immediately for visual feedback
       setTaskStatuses(prev => ({ ...prev, [taskId]: 'RUNNING' }))
-      // Show new execution entry immediately
-      loadExecutions()
-      // Poll the single-task execution until it finishes
-      const poll = setInterval(async () => {
-        try {
-          const exec = await executionApi.getById(res.executionId)
-          setTaskStatuses(prev => ({ ...prev, [taskId]: exec.status }))
-          if (exec.status === 'SUCCESS' || exec.status === 'ERROR') {
-            clearInterval(poll)
-            loadExecutions()
-          }
-        } catch { clearInterval(poll) }
-      }, 1500)
-    } catch (err) { alert(err instanceof Error ? err.message : 'Run failed') }
+      setActiveExecutionId(res.executionId)
+      void loadExecutions()
+    } catch (err) { setError(err instanceof Error ? err.message : 'Run failed') }
   }
 
-  // ── Workflow run with polling ─────────────────────────────────────────────
+  // ── Workflow run ──────────────────────────────────────────────────────────
 
-  function stopPolling() {
-    if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null }
+  async function handleRunWorkflow() {
+    if (!id) return
+    setRunning(true)
+    setError('')
+    try {
+      const pending: Record<string, string> = {}
+      tasks.forEach(t => { if (t.taskId) pending[t.taskId] = 'PENDING' })
+      setTaskStatuses(pending)
+      const res = await workflowApi.run(id)
+      setActiveExecutionId(res.executionId)
+      void loadExecutions()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Run failed')
+    } finally {
+      setRunning(false)
+    }
   }
-
-  function startPolling(executionId: string) {
-    stopPolling()
-    // Show the new execution entry immediately
-    loadExecutions()
-    pollingRef.current = setInterval(async () => {
-      try {
-        const exec = await executionApi.getById(executionId)
-        // Update per-task statuses from child executions
-        if (exec.taskExecutions) {
-          const map: Record<string, string> = {}
-          exec.taskExecutions.forEach(te => { if (te.taskId) map[te.taskId] = te.status })
-          setTaskStatuses(map)
-        }
-        if (exec.status === 'SUCCESS' || exec.status === 'ERROR' || exec.status === 'CANCELED') {
-          stopPolling()
-          loadExecutions()
-        }
-      } catch { stopPolling() }
-    }, 1500)
-  }
-
-  // Clean up polling on unmount
-  useEffect(() => () => stopPolling(), [])
 
   // ── Execution cancel / rerun ──────────────────────────────────────────────
 
   async function handleCancelExecution(executionId: string) {
     try {
       await executionApi.cancel(executionId)
-      stopPolling()
-      setTaskStatuses({})
-      loadExecutions()
-    } catch (err) { alert(err instanceof Error ? err.message : 'Cancel failed') }
-  }
-
-  async function handleRerunWorkflow() {
-    if (!id) return
-    try {
-      const pending: Record<string, string> = {}
-      tasks.forEach(t => { if (t.taskId) pending[t.taskId] = 'PENDING' })
-      setTaskStatuses(pending)
-      const res = await workflowApi.run(id)
-      startPolling(res.executionId)
-    } catch (err) { alert(err instanceof Error ? err.message : 'Rerun failed') }
+      void loadExecutions()
+    } catch (err) { setError(err instanceof Error ? err.message : 'Cancel failed') }
   }
 
   async function handleRerunTask(taskId: string) {
     try {
       const res = await taskApi.run(taskId)
       setTaskStatuses(prev => ({ ...prev, [taskId]: 'RUNNING' }))
-      loadExecutions()
-      const poll = setInterval(async () => {
-        try {
-          const exec = await executionApi.getById(res.executionId)
-          setTaskStatuses(prev => ({ ...prev, [taskId]: exec.status }))
-          if (exec.status === 'SUCCESS' || exec.status === 'ERROR' || exec.status === 'CANCELED') {
-            clearInterval(poll)
-            loadExecutions()
-          }
-        } catch { clearInterval(poll) }
-      }, 1500)
-    } catch (err) { alert(err instanceof Error ? err.message : 'Rerun failed') }
+      setActiveExecutionId(res.executionId)
+      void loadExecutions()
+    } catch (err) { setError(err instanceof Error ? err.message : 'Rerun failed') }
   }
 
   // ── Execution history ─────────────────────────────────────────────────────
@@ -255,14 +219,14 @@ export function WorkflowDetailPage() {
       const data = await executionApi.listByWorkflow(id)
       setExecutions(data)
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to load executions')
+      setError(err instanceof Error ? err.message : 'Failed to load executions')
     } finally {
       setExecLoading(false)
     }
   }
 
   function toggleExecutions() {
-    if (!execOpen) loadExecutions()
+    if (!execOpen) void loadExecutions()
     setExecOpen(o => !o)
   }
 
@@ -276,7 +240,7 @@ export function WorkflowDetailPage() {
       const linkedIds = new Set(tasks.map(t => t.taskId))
       setAllTasks(all.filter(t => !linkedIds.has(t.id)))
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to load tasks')
+      setError(err instanceof Error ? err.message : 'Failed to load tasks')
       setShowLinkPicker(false)
     } finally {
       setLinkLoading(false)
@@ -291,7 +255,7 @@ export function WorkflowDetailPage() {
       const updated = compactStages(await taskApi.listByWorkflow(id))
       setTasks(updated)
       setShowLinkPicker(false)
-    } catch (err) { alert(err instanceof Error ? err.message : 'Link failed') }
+    } catch (err) { setError(err instanceof Error ? err.message : 'Link failed') }
   }
 
   async function handleUnlinkTask(taskId: string) {
@@ -300,13 +264,13 @@ export function WorkflowDetailPage() {
       await workflowApi.unlinkTask(id, taskId)
       const updated = compactStages(tasks.filter(t => t.taskId !== taskId))
       setTasks(updated)
-      if (updated.length > 0) persistOrder(updated)
-    } catch (err) { alert(err instanceof Error ? err.message : 'Unlink failed') }
+      if (updated.length > 0) void persistOrder(updated)
+    } catch (err) { setError(err instanceof Error ? err.message : 'Unlink failed') }
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
 
-  if (loading) return <Layout><div className="loading">Loading…</div></Layout>
+  if (loading) return <Layout><LoadingSpinner /></Layout>
   if (error)   return <Layout><div className="alert alert-error">{error}</div></Layout>
   if (!workflow) return <Layout><div>Not found</div></Layout>
 
@@ -320,10 +284,10 @@ export function WorkflowDetailPage() {
     <Layout>
       <div className="page-header">
         <div>
-          <Link to="/dashboard" className="back-link">← Workflows</Link>
-          <h1>{workflow.name}</h1>
-          <p className="text-muted">Owner: {workflow.ownerUsername}</p>
+          <Link to="/dashboard" className="back-link">← Workflows List</Link>
         </div>
+
+        {!perms.isReader &&
         <div className="header-actions">
           {perms.canWriteWorkflows && (
             <Link to={`/workflows/${id}/edit`} className="btn btn-secondary">Edit Workflow</Link>
@@ -332,27 +296,27 @@ export function WorkflowDetailPage() {
             <Link to={`/schedules?workflowId=${id}`} className="btn btn-secondary">🕒 Schedule</Link>
           )}
           {perms.canExecuteWorkflows && (
-            <button className="btn btn-success" onClick={async () => {
-              try {
-                // Reset all task statuses to PENDING immediately
-                const pending: Record<string, string> = {}
-                tasks.forEach(t => { if (t.taskId) pending[t.taskId] = 'PENDING' })
-                setTaskStatuses(pending)
-                const res = await workflowApi.run(id!)
-                startPolling(res.executionId)
-              } catch (err) { alert(err instanceof Error ? err.message : 'Run failed') }
-            }}>▶ Run workflow</button>
+            <button className="btn btn-success" onClick={() => { void handleRunWorkflow() }} disabled={running}>
+              {running ? 'Starting…' : '▶ Run workflow'}
+            </button>
           )}
         </div>
+        }
+      </div>
+
+      <div className="page-sub-header">
+        <h1>{workflow.name}</h1>
+        <p className="text-muted">Owner: {workflow.ownerUsername}</p>
+        {workflow.isPrivate && <span className="badge badge-private">🔒 Private</span>}
       </div>
 
       <div className="section-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+        <div className="section-header-title">
           <h2>Tasks ({tasks.length})</h2>
-          {saving && <span className="text-muted" style={{ fontSize: '0.8rem' }}>Saving…</span>}
+          {saving && <span className="text-muted saving-indicator">Saving…</span>}
         </div>
         {perms.canWriteTasks && (
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <div className="header-actions">
             <button className="btn btn-secondary" onClick={openLinkPicker}>Link existing</button>
             <button className="btn btn-primary" onClick={() => navigate(`/workflows/${id}/tasks/new`)}>+ New Task</button>
           </div>
@@ -360,32 +324,29 @@ export function WorkflowDetailPage() {
       </div>
 
       {perms.canWriteTasks && tasks.length > 1 && (
-        <p className="text-muted" style={{ fontSize: '0.8rem', marginBottom: '0.75rem' }}>
+        <p className="text-muted task-hint">
           Drag rows to reorder. Click a stage number to set it — tasks sharing the same stage run <strong>in parallel</strong>.
         </p>
       )}
 
       {tasks.length === 0 ? (
-        <div className="empty-state">
-          <p>No tasks yet.</p>
-          {perms.canWriteTasks && (
-            <button className="btn btn-primary" onClick={() => navigate(`/workflows/${id}/tasks/new`)}>Add first task</button>
-          )}
-        </div>
+        <EmptyState
+          message="No tasks yet."
+        />
       ) : (
         <div className="table-wrapper">
           <DragDropContext onDragEnd={onDragEnd}>
             <table className="table">
               <thead>
                 <tr>
-                  {perms.canWriteTasks && <th style={{ width: '1.5rem' }}></th>}
+                  {perms.canWriteTasks && <th className="th-drag-handle"></th>}
                   <th>Stage</th>
                   <th>Name</th>
                   <th>Type</th>
                   <th>Config</th>
                   <th>Retries</th>
                   <th>Status</th>
-                  <th>Actions</th>
+                  {!perms.isReader && <th>Actions</th>}
                 </tr>
               </thead>
               <Droppable droppableId="tasks">
@@ -414,7 +375,7 @@ export function WorkflowDetailPage() {
                               }}
                             >
                               {perms.canWriteTasks && (
-                                <td {...drag.dragHandleProps} style={{ cursor: 'grab', color: '#8892a4', userSelect: 'none' }} title="Drag to reorder">⠿</td>
+                                <td {...drag.dragHandleProps} className="td-drag-handle" title="Drag to reorder">⠿</td>
                               )}
                               <td>
                                 {perms.canWriteTasks ? (
@@ -428,7 +389,6 @@ export function WorkflowDetailPage() {
                                       onChange={e => setStageInput(e.target.value)}
                                       onBlur={() => commitStageEdit(t.taskId)}
                                       onKeyDown={e => { if (e.key === 'Enter') commitStageEdit(t.taskId); if (e.key === 'Escape') setEditingStage(null) }}
-                                      style={{ width: '3rem' }}
                                     />
                                   ) : (
                                     <span
@@ -460,15 +420,13 @@ export function WorkflowDetailPage() {
                                       autoFocus
                                       onChange={e => setRetryInput(e.target.value)}
                                       onBlur={() => commitRetryEdit(t.taskId)}
-                                      onKeyDown={e => { if (e.key === 'Enter') commitRetryEdit(t.taskId); if (e.key === 'Escape') setEditingRetry(null) }}
-                                      style={{ width: '3rem' }}
+                                      onKeyDown={e => { if (e.key === 'Enter') void commitRetryEdit(t.taskId); if (e.key === 'Escape') setEditingRetry(null) }}
                                     />
                                   ) : (
                                     <span
-                                      className="retry-badge"
+                                      className="retry-badge retry-badge--clickable"
                                       title="Click to edit retry count"
                                       onClick={() => beginEditRetry(t.taskId, t.retryPolicy)}
-                                      style={{ cursor: 'pointer' }}
                                     >
                                       {t.retryPolicy}
                                     </span>
@@ -479,23 +437,24 @@ export function WorkflowDetailPage() {
                               </td>
                               <td>
                                 {t.taskId && taskStatuses[t.taskId]
-                                  ? <span className={`badge badge-status-${taskStatuses[t.taskId].toLowerCase()}`}>{taskStatuses[t.taskId]}</span>
+                                  ? <StatusBadge status={taskStatuses[t.taskId]} />
                                   : <span className="badge badge-muted">—</span>}
                               </td>
-                              <td className="actions-cell">
+                              {!perms.isReader &&  <td className="actions-cell">
                                 {perms.canExecuteWorkflows && (
-                                  <button className="btn btn-sm btn-success" onClick={() => handleRunTask(t.taskId)} title="Run this task now">▶</button>
+                                    <button className="btn btn-sm btn-success" onClick={() => { void handleRunTask(t.taskId) }} title="Run this task now">▶</button>
                                 )}
                                 {perms.canWriteTasks && (
-                                  <Link to={`/tasks/${t.taskId}/edit?workflowId=${id}`} className="btn btn-sm btn-secondary">Edit</Link>
+                                    <Link to={`/tasks/${t.taskId}/edit?workflowId=${id}`} className="btn btn-sm btn-secondary">Edit</Link>
                                 )}
                                 {perms.canWriteTasks && (
-                                  <button className="btn btn-sm btn-secondary" onClick={() => handleUnlinkTask(t.taskId)} title="Remove from this workflow">Unlink</button>
+                                    <button className="btn btn-sm btn-secondary" onClick={() => { void handleUnlinkTask(t.taskId) }} title="Remove from this workflow">Unlink</button>
                                 )}
                                 {perms.canDeleteTasks && (
-                                  <button className="btn btn-sm btn-danger" onClick={() => handleDeleteTask(t.taskId)}>Delete</button>
+                                    <button className="btn btn-sm btn-danger" onClick={() => { void handleDeleteTask(t.taskId) }}>Delete</button>
                                 )}
-                              </td>
+                              </td>}
+
                             </tr>
                           )}
                         </Draggable>
@@ -531,7 +490,7 @@ export function WorkflowDetailPage() {
                       <td>{t.name}</td>
                       <td><span className="badge">{t.type}</span></td>
                       <td>
-                        <button className="btn btn-sm btn-primary" onClick={() => handleLinkTask(t.id!)}>Link</button>
+                        <button className="btn btn-sm btn-primary" onClick={() => { if (t.id) void handleLinkTask(t.id) }}>Link</button>
                       </td>
                     </tr>
                   ))}
@@ -543,7 +502,8 @@ export function WorkflowDetailPage() {
       )}
 
       {/* ── Execution history ───────────────────────────────────────────── */}
-      <div className="section-header" style={{ marginTop: '2rem' }}>
+      <div className={"background-wrapper"}>
+      <div className="section-header section-header--spaced">
         <h2>Execution History</h2>
         <button className="btn btn-secondary btn-sm" onClick={toggleExecutions}>
           {execOpen ? 'Hide' : 'Show'}
@@ -551,84 +511,62 @@ export function WorkflowDetailPage() {
       </div>
 
       {execOpen && (
-        execLoading ? <div className="loading">Loading…</div> :
+        execLoading ? <LoadingSpinner /> :
         executions.length === 0 ? (
-          <div className="empty-state"><p>No executions yet.</p></div>
+          <EmptyState message="No executions yet." />
         ) : (
           <div className="table-wrapper">
             <table className="table">
               <thead>
-                <tr><th>Status</th><th>Trigger</th><th>Started</th><th>Finished</th><th>By</th><th>Retries</th><th>Actions</th><th></th></tr>
+                <tr>
+                  <th>Status</th>
+                  <th>Type</th>
+                  <th>Trigger</th>
+                  <th>Started</th>
+                  <th>Finished</th>
+                  <th>By</th>
+                  <th>Retries</th>
+                  <th>Actions</th>
+                </tr>
               </thead>
               <tbody>
                 {executions.map(ex => (
-                  <>
-                    <tr key={ex.id} style={{ cursor: 'pointer' }} onClick={() => setExpandedExec(expandedExec === ex.id ? null : ex.id)}>
-                      <td><span className={`badge badge-status-${ex.status.toLowerCase()}`}>{ex.status}</span></td>
-                      <td><span className="badge">{ex.triggeredType}</span></td>
-                      <td style={{ fontSize: '0.82rem' }}>{new Date(ex.startedAt).toLocaleString()}</td>
-                      <td style={{ fontSize: '0.82rem' }}>{ex.finishedAt ? new Date(ex.finishedAt).toLocaleString() : '—'}</td>
-                      <td>{ex.triggeredBy}</td>
-                      <td>{ex.retryCount}</td>
-                      <td className="actions-cell" onClick={e => e.stopPropagation()}>
-                        {(ex.status === 'PENDING' || ex.status === 'RUNNING') && perms.canExecuteWorkflows && (
-                          <button className="btn btn-sm btn-danger" onClick={() => handleCancelExecution(ex.id)}>Cancel</button>
-                        )}
-                        {(ex.status === 'SUCCESS' || ex.status === 'ERROR' || ex.status === 'CANCELED') && perms.canExecuteWorkflows && (
-                          ex.type === 'WORKFLOW'
-                            ? <button className="btn btn-sm btn-secondary" onClick={handleRerunWorkflow}>Rerun</button>
-                            : ex.taskExecutions?.[0]?.taskId
-                              ? <button className="btn btn-sm btn-secondary" onClick={() => handleRerunTask(ex.taskExecutions![0].taskId!)}>Rerun</button>
-                              : null
-                        )}
-                      </td>
-                      <td style={{ color: '#8892a4' }}>{expandedExec === ex.id ? '▲' : '▼'}</td>
-                    </tr>
-                    {expandedExec === ex.id && (
-                      <tr key={`${ex.id}-output`}>
-                        <td colSpan={8} style={{ background: '#0f1117', padding: '0.75rem 1rem' }}>
-                          {ex.taskExecutions && ex.taskExecutions.length > 0 ? (
-                            <table className="table" style={{ fontSize: '0.8rem', margin: 0 }}>
-                              <thead>
-                                <tr>
-                                  <th>Task</th>
-                                  <th>Status</th>
-                                  <th>Started</th>
-                                  <th>Finished</th>
-                                  <th>Output</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {ex.taskExecutions.map((te: TaskExecutionSummary) => (
-                                  <tr key={te.executionId}>
-                                    <td>{te.taskName ?? te.taskId ?? '—'}</td>
-                                    <td><span className={`badge badge-status-${te.status.toLowerCase()}`}>{te.status}</span></td>
-                                    <td style={{ fontSize: '0.75rem' }}>{new Date(te.startedAt).toLocaleTimeString()}</td>
-                                    <td style={{ fontSize: '0.75rem' }}>{te.finishedAt ? new Date(te.finishedAt).toLocaleTimeString() : '—'}</td>
-                                    <td>
-                                      {te.output
-                                        ? <pre style={{ margin: 0, fontSize: '0.72rem', color: '#e2e8f0', whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: '6rem', overflow: 'auto' }}>{JSON.stringify(te.output, null, 2)}</pre>
-                                        : '—'}
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          ) : ex.output ? (
-                            <pre style={{ margin: 0, fontSize: '0.78rem', color: '#e2e8f0', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                              {JSON.stringify(ex.output, null, 2)}
-                            </pre>
-                          ) : <span className="text-muted">No output.</span>}
-                        </td>
-                      </tr>
-                    )}
-                  </>
+                  <tr key={ex.id}>
+                    <td><StatusBadge status={ex.status} showIcon /></td>
+                    <td><span className="badge">{ex.type}</span></td>
+                    <td><span className="badge">{ex.triggeredType}</span></td>
+                    <td className="td-timestamp">{new Date(ex.startedAt).toLocaleString()}</td>
+                    <td className="td-timestamp">{ex.finishedAt ? new Date(ex.finishedAt).toLocaleString() : '—'}</td>
+                    <td>{ex.triggeredBy}</td>
+                    <td>{ex.retryCount}</td>
+                    <td className="actions-cell">
+                      <Link
+                        to={`/workflows/${id}/executions/${ex.id}`}
+                        className="btn btn-sm btn-secondary"
+                      >
+                        Details
+                      </Link>
+                      {(ex.status === 'PENDING' || ex.status === 'RUNNING') && perms.canExecuteWorkflows && (
+                        <button className="btn btn-sm btn-danger" onClick={() => { void handleCancelExecution(ex.id) }}>
+                          Cancel
+                        </button>
+                      )}
+                      {(ex.status === 'SUCCESS' || ex.status === 'ERROR' || ex.status === 'CANCELED') && perms.canExecuteWorkflows && (
+                        ex.type === 'WORKFLOW'
+                          ? <button className="btn btn-sm btn-ghost" onClick={() => { void handleRunWorkflow() }}>Rerun</button>
+                          : ex.taskExecutions?.[0]?.taskId
+                            ? <button className="btn btn-sm btn-ghost" onClick={() => { const tid = ex.taskExecutions?.[0]?.taskId; if (tid) void handleRerunTask(tid) }}>Rerun</button>
+                            : null
+                      )}
+                    </td>
+                  </tr>
                 ))}
               </tbody>
             </table>
           </div>
         )
       )}
+      </div>
     </Layout>
   )
 }

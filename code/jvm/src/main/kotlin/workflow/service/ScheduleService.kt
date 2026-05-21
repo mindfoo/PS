@@ -20,8 +20,8 @@ import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.util.UUID
 
-@Service
 /** Manages schedule CRUD, cron calculation and periodic dispatch orchestration. */
+@Service
 class ScheduleService(
     private val scheduleRepository: ScheduleRepository,
     private val workflowRepository: WorkflowRepository,

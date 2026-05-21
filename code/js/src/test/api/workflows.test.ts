@@ -6,7 +6,7 @@ function mockFetch(body: unknown, ok = true, status = 200) {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
     ok, status,
     json: () => Promise.resolve(body),
-  } as Response))
+  }))
 }
 
 describe('api/workflows', () => {

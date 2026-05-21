@@ -30,9 +30,9 @@ import org.workflow.utils.Uris
 import org.workflow.security.CookieAuthenticationFilter.Companion.COOKIE_NAME
 import org.workflow.security.CookieAuthenticationFilter.Companion.USERNAME_COOKIE_NAME
 
+/** Exposes cookie-based authentication endpoints. */
 @RestController
 @Tag(name = "Auth", description = "Registration, login, logout and profile endpoints")
-/** Exposes cookie-based authentication endpoints. */
 class AuthController(
     private val authService: AuthService
 ) {

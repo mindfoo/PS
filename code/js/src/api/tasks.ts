@@ -7,9 +7,10 @@ export interface TaskResponse {
   type: TaskType
   config: Record<string, unknown>
   workflowId: string
+  isPrivate: boolean
 }
 
-/** Enriched task entry returned by GET /tasks?workflowId=... */
+/** Task entry enriched with workflow-scoped ordering metadata (stage, retry, dependencies). Returned by GET /tasks?workflowId=... */
 export interface WorkflowTaskEntry {
   taskId: string
   name: string
@@ -19,6 +20,7 @@ export interface WorkflowTaskEntry {
   taskOrder: number        
   retryPolicy: number
   dependsOnTaskId: string | null
+  isPrivate: boolean
 }
 
 export const taskApi = {
@@ -26,9 +28,9 @@ export const taskApi = {
   listByWorkflow: (workflowId: string) =>
     api.get<WorkflowTaskEntry[]>(`/tasks?workflowId=${workflowId}`),
   getById: (id: string) => api.get<TaskResponse>(`/tasks/${id}`),
-  create: (body: { name: string; type: string; workflowId?: string; config?: Record<string, unknown> }) =>
+  create: (body: { name: string; type: string; workflowId?: string; config?: Record<string, unknown>; isPrivate?: boolean }) =>
     api.post<TaskResponse>('/tasks', body),
-  update: (id: string, body: { name: string; type: string; config?: Record<string, unknown> }) =>
+  update: (id: string, body: { name: string; type: string; config?: Record<string, unknown>; isPrivate?: boolean }) =>
     api.put<TaskResponse>(`/tasks/${id}`, body),
   delete: (id: string) => api.delete<void>(`/tasks/${id}`),
   run: (id: string) => api.post<{ executionId: string; status: string }>(`/tasks/${id}/run`, {}),

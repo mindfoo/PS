@@ -1,9 +1,12 @@
 package org.workflow.service
 
+import com.fasterxml.jackson.databind.ObjectMapper
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.http.HttpEntity
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpMethod
+import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.client.RestTemplate
@@ -29,16 +32,20 @@ import java.util.UUID
 import java.util.concurrent.CancellationException
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executor
 
-@Service
 /** Creates and runs workflow/task executions, including manual and cron-triggered flows. */
+@Service
 class ExecutionService(
     private val executionLogRepository: ExecutionLogRepository,
     private val workflowRepository: WorkflowRepository,
     private val workflowTaskOrderRepository: WorkflowTaskOrderRepository,
     private val taskRepository: TaskRepository,
     private val restTemplate: RestTemplate,
-    private val helpers: ServiceHelpers
+    private val helpers: ServiceHelpers,
+    @Qualifier("executionExecutor") private val executionExecutor: Executor,
+    private val jdbcTemplate: JdbcTemplate,
+    private val objectMapper: ObjectMapper
 ) {
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -49,8 +56,10 @@ class ExecutionService(
         private const val MIN_TASK_RUNNING_MS = 2_000L
     }
 
-    /* Execution cancelation */
-
+    /**
+     * Cancels a PENDING or RUNNING execution. Non-admins can only cancel their own.
+     * Returns `true` if the execution was successfully canceled, `false` otherwise.
+     */
     @Transactional
     fun cancelExecution(executionId: UUID, authenticationName: String): Boolean {
         val user = helpers.findUser(authenticationName) ?: return false
@@ -81,7 +90,10 @@ class ExecutionService(
 
     /* Execution of Workflow manual */
 
-    /** Saves a top-level PENDING execution and dispatches async processing. Returns. */
+    /**
+     * Saves a top-level PENDING workflow execution and dispatches it asynchronously.
+     * Returns the new execution UUID.
+     */
     fun triggerManualWorkflow(workflowId: UUID, authenticationName: String): UUID {
         val user = findUser(authenticationName)
         val workflow = findAccessibleWorkflow(workflowId, user)
@@ -97,12 +109,16 @@ class ExecutionService(
             )
         )
 
-        CompletableFuture.runAsync { runExecution(execution.id!!) }
+        CompletableFuture.runAsync({ runExecution(execution.id!!) }, executionExecutor)
         return execution.id!!
     }
 
     /* Execution of Workflow schedule -> creates execution */
 
+    /**
+     * Saves a CRON-triggered workflow execution record.
+     * Called by [org.workflow.scheduler.ScheduleDispatchJob] for each due schedule.
+     */
     @Transactional
     fun createCronExecution(workflow: Workflow, triggeredBy: User): UUID {
         val execution = executionLogRepository.save(
@@ -118,8 +134,11 @@ class ExecutionService(
         return execution.id!!
     }
 
-    /* Execution run */
-
+    /**
+     * Runs the workflow execution identified by [executionId].
+     * Executes tasks respecting stage order; parallel tasks within a stage run concurrently.
+     * Invoked asynchronously — never call on the HTTP thread.
+     */
     fun runExecution(executionId: UUID) {
         val execution = executionLogRepository.findById(executionId).orElseThrow {
             NoSuchElementException("Execution '$executionId' not found")
@@ -137,6 +156,7 @@ class ExecutionService(
         execution.status = ExecutionStatus.RUNNING
         execution.startedAt = LocalDateTime.now()
         executionLogRepository.save(execution)
+        notifyStatusChange(executionId, ExecutionStatus.RUNNING)
 
         val logLines = mutableListOf<String>()
         logLines += "[${LocalDateTime.now()}] Execution $executionId started for workflow '${workflow.name}'"
@@ -160,6 +180,10 @@ class ExecutionService(
                 .mapNotNull { task -> task.id?.let { id -> id to createPendingTaskExecution(execution, task) } }
                 .toMap()
 
+            // Live task-status map for NOTIFY payloads
+            val taskStatusMap = mutableMapOf<String, String>()
+            stages.values.flatten().forEach { task -> task.id?.let { taskStatusMap[it.toString()] = ExecutionStatus.PENDING } }
+
             var totalExecuted = 0
             val taskOutputs = mutableListOf<Map<String, Any>>()
 
@@ -182,22 +206,27 @@ class ExecutionService(
                     taskOutputs += output
                     logLines += formatTaskLog(task, output)
                     totalExecuted++
+                    task.id?.let { taskStatusMap[it.toString()] = (output["status"] as? String) ?: ExecutionStatus.ERROR }
+                    notifyStatusChange(executionId, ExecutionStatus.RUNNING, taskStatusMap)
                 } else {
                     val futures = tasksInStage.map { task ->
                         val childId = taskExecIds[task.id!!]!!
-                        CompletableFuture.supplyAsync { task to runTaskWithTracking(task, childId, retryPolicies[task.id!!] ?: 0) }
+                        CompletableFuture.supplyAsync({ task to runTaskWithTracking(task, childId, retryPolicies[task.id!!] ?: 0) }, executionExecutor)
                     }
                     CompletableFuture.allOf(*futures.toTypedArray()).join()
                     futures.forEach { f ->
                         val (task, output) = f.get()
                         taskOutputs += output
                         logLines += formatTaskLog(task, output)
+                        task.id?.let { taskStatusMap[it.toString()] = (output["status"] as? String) ?: ExecutionStatus.ERROR }
                     }
                     totalExecuted += tasksInStage.size
+                    notifyStatusChange(executionId, ExecutionStatus.RUNNING, taskStatusMap)
                 }
             }
 
-            execution.status = ExecutionStatus.SUCCESS
+            val anyTaskFailed = taskOutputs.any { (it["status"] as? String) == ExecutionStatus.ERROR }
+            execution.status = if (anyTaskFailed) ExecutionStatus.ERROR else ExecutionStatus.SUCCESS
             execution.finishedAt = LocalDateTime.now()
             execution.output = mapOf(
                 "workflowId" to workflow.id.toString(),
@@ -228,10 +257,13 @@ class ExecutionService(
         cancelRequests.remove(executionId) // cleanup in case of early completion
         logLines += "[${LocalDateTime.now()}] Execution finished — status: ${execution.status}"
         writeLogFile("execution-$executionId", logLines)
+        notifyStatusChange(executionId, execution.status, emptyMap(), terminal = true)
     }
 
-    /* Execution of Task manual */
-
+    /**
+     * Saves a PENDING task execution and dispatches it asynchronously.
+     * Non-admins can only trigger tasks they own.
+     */
     fun triggerManualTask(taskId: UUID, authenticationName: String): Either<ExecutionError, UUID> {
         val user = helpers.findUser(authenticationName)
             ?: return failure(ExecutionError.UserNotFound)
@@ -255,13 +287,14 @@ class ExecutionService(
             )
         )
 
-        CompletableFuture.runAsync {
+        CompletableFuture.runAsync({
             val execRecord = executionLogRepository.findById(execution.id!!).get()
             // Respect cancellation requested before async block started
             if (execRecord.status == ExecutionStatus.CANCELED) return@runAsync
             execRecord.status = ExecutionStatus.RUNNING
             execRecord.startedAt = LocalDateTime.now()
             executionLogRepository.save(execRecord)
+            notifyStatusChange(execution.id!!, ExecutionStatus.RUNNING)
 
             val started = System.currentTimeMillis()
             val output: Map<String, Any>
@@ -273,6 +306,7 @@ class ExecutionService(
                 execRecord.finishedAt = LocalDateTime.now()
                 execRecord.output = mapOf("error" to (ex.message ?: "Unexpected error"))
                 executionLogRepository.save(execRecord)
+                notifyStatusChange(execution.id!!, ExecutionStatus.ERROR, terminal = true)
                 return@runAsync
             }
             enforceMinRunTime(started)
@@ -281,13 +315,14 @@ class ExecutionService(
             execRecord.finishedAt = LocalDateTime.now()
             execRecord.output = output
             executionLogRepository.save(execRecord)
+            notifyStatusChange(execution.id!!, execRecord.status, terminal = true)
 
             writeLogFile("task-${task.id}-${execution.id}", listOf(
                 "[${LocalDateTime.now()}] Task '${task.name}' (${task.id}) — manual run",
                 "[${LocalDateTime.now()}] Status: ${execRecord.status}",
                 output["stdout"]?.toString() ?: output["body"]?.toString() ?: ""
             ))
-        }
+        }, executionExecutor)
 
         return success(execution.id!!)
     }
@@ -407,7 +442,7 @@ class ExecutionService(
         log.info("Task '{}' running script: {}", task.id, cmd)
 
         val pb = ProcessBuilder(cmd)
-        if (directory != null) pb.directory(java.io.File(directory))
+        if (directory != null) pb.directory(File(directory))
         pb.redirectErrorStream(true)
 
         val process = pb.start()
@@ -470,5 +505,33 @@ class ExecutionService(
             workflowRepository.findByIdAndOwnerId(workflowId, user.id!!)
                 ?: throw NoSuchElementException("Workflow '$workflowId' not found")
         }
+
+    /**
+     * Fires a PostgreSQL NOTIFY on the `execution_events` channel so that
+     * [ExecutionEventService] can forward the event to subscribed SSE clients.
+     */
+    private fun notifyStatusChange(
+        executionId: UUID,
+        status: String,
+        taskStatuses: Map<String, String> = emptyMap(),
+        terminal: Boolean = false
+    ) {
+        try {
+            val payload = objectMapper.writeValueAsString(
+                mapOf(
+                    "executionId"  to executionId.toString(),
+                    "status"       to status,
+                    "taskStatuses" to taskStatuses,
+                    "terminal"     to terminal
+                )
+            )
+            jdbcTemplate.execute<Unit>("SELECT pg_notify('execution_events', ?)") { ps ->
+                ps.setString(1, payload)
+                ps.execute()
+            }
+        } catch (e: Exception) {
+            log.warn("pg_notify failed for execution {}: {}", executionId, e.message)
+        }
+    }
 }
 

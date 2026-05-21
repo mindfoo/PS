@@ -18,7 +18,7 @@ class WorkflowTaskOrder(
     @JoinColumn(name = "task_id", nullable = false)
     var task: Task,
 
-    // Nullable porque a primeira tarefa não tem dependência!
+    /** The upstream task that must complete before this one starts; null for the first task in a chain. */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "depends_on_task_id")
     var dependsOnTask: Task? = null,

@@ -11,6 +11,7 @@ import { TasksPage } from './pages/TasksPage'
 import { SchedulesPage } from './pages/SchedulesPage'
 import { ProfilePage } from './pages/ProfilePage'
 import { AdminPage } from './pages/AdminPage'
+import { ExecutionDetailPage } from './pages/ExecutionDetailPage'
 
 export default function App() {
   return (
@@ -29,6 +30,7 @@ export default function App() {
           <Route path="/workflows/new" element={<ProtectedRoute roles={['ADMIN','WRITER']}><WorkflowFormPage /></ProtectedRoute>} />
           <Route path="/workflows/:id" element={<ProtectedRoute><WorkflowDetailPage /></ProtectedRoute>} />
           <Route path="/workflows/:id/edit" element={<ProtectedRoute roles={['ADMIN','WRITER']}><WorkflowFormPage /></ProtectedRoute>} />
+          <Route path="/workflows/:workflowId/executions/:executionId" element={<ProtectedRoute><ExecutionDetailPage /></ProtectedRoute>} />
           <Route path="/workflows/:workflowId/tasks/new" element={<ProtectedRoute roles={['ADMIN','WRITER']}><TaskFormPage /></ProtectedRoute>} />
           <Route path="/schedules" element={<ProtectedRoute><SchedulesPage /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />

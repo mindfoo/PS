@@ -4,8 +4,8 @@ import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import org.workflow.service.ScheduleService
 
-@Component
 /** Periodic scheduler job that dispatches due workflow schedules. */
+@Component
 class ScheduleDispatchJob(
     private val scheduleService: ScheduleService
 ) {

@@ -1,7 +1,7 @@
 // ── Tables ────────────────────────────────────────────────────────────────────
 @use 'variables' as *;
 
-.table-wrapper { overflow-x: auto; }
+.table-wrapper { overflow-x: auto; margin: 1rem 0; }
 
 .table {
   width: 100%;
@@ -24,7 +24,7 @@
     letter-spacing: 0.05em;
   }
 
-  tr:last-child td { border-bottom: none; }
+  tr:last-child td { border-bottom: none;  padding: 0.7rem 1rem;}
   tr:hover td { background: $surface2; }
 }
 
@@ -71,4 +71,91 @@
   font-size: 0.85rem;
   outline: none;
   width: 3.5rem;
+}
+
+// Permission badges in admin table — adds gap between badges
+.permissions-cell .badge {
+  margin-right: 0.35rem;
+}
+
+// ── WorkflowDetailPage — tasks table ────────────────────────────────────────
+.th-drag-handle {
+  width: 1.5rem;
+}
+
+// ── WorkflowDetailPage — execution history table ────────────────────────────
+.execution-row {
+  cursor: pointer;
+}
+
+.execution-row td.td-timestamp {
+  font-size: 0.82rem;
+}
+
+.td-expand {
+  color: #8892a4;
+  width: 1.5rem;
+  text-align: center;
+}
+
+.execution-detail-cell {
+  background: #0f1117;
+  padding: 0.75rem 1rem;
+}
+
+.execution-subtable {
+  font-size: 0.8rem;
+  margin: 0;
+}
+
+.execution-subtable td.td-timestamp {
+  font-size: 0.75rem;
+}
+
+.execution-output-pre {
+  margin: 0;
+  font-size: 0.72rem;
+  color: #e2e8f0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 6rem;
+  overflow: auto;
+}
+
+.execution-output-pre--full {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #e2e8f0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+// ── WorkflowDetailPage — task row controls ───────────────────────────────────
+.td-drag-handle {
+  cursor: grab;
+  color: #8892a4;
+  user-select: none;
+}
+
+.stage-input {
+  width: 3rem;
+}
+
+.retry-badge--clickable {
+  cursor: pointer;
+}
+
+.task-hint {
+  font-size: 0.8rem;
+  margin-bottom: 0.75rem;
+}
+
+.saving-indicator {
+  font-size: 0.8rem;
+}
+
+.background-wrapper{
+  background: #1b1d27d6;
+  padding: 1rem;
+  border-radius: 5px;
 }

@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { usersApi, type RoleSummary, type UserResponse } from '../api/users'
 import { workflowApi, type WorkflowResponse } from '../api/workflows'
 import { Layout } from '../components/Layout'
+import { PageHeader } from '../components/PageHeader'
+import { LoadingSpinner } from '../components/LoadingSpinner'
 
 export function AdminPage() {
   const [users, setUsers] = useState<UserResponse[]>([])
@@ -18,16 +20,19 @@ export function AdminPage() {
   )
 
   useEffect(() => {
+    let cancelled = false
     Promise.all([
       usersApi.list().catch(() => []),
       usersApi.listRoles().catch(() => []),
       workflowApi.list().catch(() => []),
     ]).then(([u, r, w]) => {
+      if (cancelled) return
       setUsers(Array.isArray(u) ? u : [])
       setRoles(Array.isArray(r) ? r : [])
       setWorkflows(Array.isArray(w) ? w : [])
-    }).catch(err => setError(err instanceof Error ? err.message : 'Failed to load'))
-      .finally(() => setLoading(false))
+    }).catch(err => { if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load') })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
   }, [])
 
   async function handleRoleChange(userId: string, roleName: string) {
@@ -45,9 +50,7 @@ export function AdminPage() {
 
   return (
     <Layout>
-      <div className="page-header">
-        <h1>🛡 Admin Panel</h1>
-      </div>
+      <PageHeader title="🛡 Admin Panel" />
 
       {error && <div className="alert alert-error">{error}</div>}
 
@@ -67,20 +70,20 @@ export function AdminPage() {
         <button className={`tab ${tab === 'workflows' ? 'active' : ''}`} onClick={() => setTab('workflows')}>All Workflows</button>
       </div>
 
-      {loading ? <div className="loading">Loading…</div> : (
+      {loading ? <LoadingSpinner /> : (
         <>
           {tab === 'users' && (
             <div className="table-wrapper">
               <table className="table">
                 <thead><tr><th>Username</th><th>Role</th><th>Permissions</th></tr></thead>
                 <tbody>
-                  {users.length == 0
+                  {users.length === 0
                     ? <tr><td colSpan={3} className="text-muted">No users returned</td></tr>
                     : users.map((u) => (
                       <tr key={u.id}>
                         <td>{u.username}</td>
                         <td>
-                          <div className="form-group" style={{ margin: 0 }}>
+                          <div className="form-group form-group--inline">
                             <select
                               value={u.role}
                               disabled={savingUserId === u.id}
@@ -92,9 +95,9 @@ export function AdminPage() {
                             </select>
                           </div>
                         </td>
-                        <td>
+                        <td className="permissions-cell">
                           {(u.permissions?.length ? u.permissions : (rolePermissions.get(u.role) ?? [])).map((p) => (
-                            <span key={p} className="badge" style={{ marginRight: '0.35rem' }}>{p}</span>
+                            <span key={p} className="badge">{p}</span>
                           ))}
                         </td>
                       </tr>
@@ -125,4 +128,3 @@ export function AdminPage() {
     </Layout>
   )
 }
-

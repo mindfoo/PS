@@ -29,14 +29,14 @@ vi.mock('../../contexts/AuthContext', () => ({
 
 vi.mock('../../api/users', () => ({
   usersApi: {
-    list:       (...args: unknown[]) => mockListUsers(...args),
-    listRoles:  (...args: unknown[]) => mockListRoles(...args),
-    updateRole: (...args: unknown[]) => mockUpdateRole(...args),
+    list:       (...args: unknown[]) => mockListUsers(...args) as unknown,
+    listRoles:  (...args: unknown[]) => mockListRoles(...args) as unknown,
+    updateRole: (...args: unknown[]) => mockUpdateRole(...args) as unknown,
   },
 }))
 
 vi.mock('../../api/workflows', () => ({
-  workflowApi: { list: (...args: unknown[]) => mockListWorkflows(...args) },
+  workflowApi: { list: (...args: unknown[]) => mockListWorkflows(...args) as unknown },
 }))
 
 describe('AdminPage', () => {

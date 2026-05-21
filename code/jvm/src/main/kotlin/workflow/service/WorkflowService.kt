@@ -9,7 +9,6 @@ import org.workflow.dto.TaskReorderRequest
 import org.workflow.dto.WorkflowCreateRequest
 import org.workflow.dto.WorkflowResponse
 import org.workflow.dto.WorkflowUpdateRequest
-import org.workflow.entity.User
 import org.workflow.entity.Workflow
 import org.workflow.repository.AlertRepository
 import org.workflow.repository.ExecutionLogRepository
@@ -23,8 +22,8 @@ import org.workflow.utils.failure
 import org.workflow.utils.success
 import java.util.UUID
 
-@Service
 /** Implements workflow CRUD operations with ownership and admin visibility rules. */
+@Service
 class WorkflowService(
     private val workflowRepository: WorkflowRepository,
     private val workflowTaskOrderRepository: WorkflowTaskOrderRepository,
@@ -40,12 +39,8 @@ class WorkflowService(
         val currentUser = findCurrentUser(authenticationName)
             ?: return failure(WorkflowError.UserNotFound)
 
-        val workflows = if (isAdmin(currentUser)) {
-            workflowRepository.findAll()
-        } else {
-            workflowRepository.findAllByOwnerId(currentUser.id!!)
-        }
-
+        val workflows = if (isAdmin(currentUser)) workflowRepository.findAll()
+                         else workflowRepository.findAllVisible(currentUser.id!!)
         return success(workflows.map { toResponse(it) })
     }
 
@@ -54,12 +49,11 @@ class WorkflowService(
         val currentUser = findCurrentUser(authenticationName)
             ?: return failure(WorkflowError.UserNotFound)
 
-        val workflow = if (isAdmin(currentUser)) {
-            workflowRepository.findById(workflowId).orElse(null)
-        } else {
-            workflowRepository.findByIdAndOwnerId(workflowId, currentUser.id!!)
-        } ?: return failure(WorkflowError.WorkflowNotFound)
-
+        val workflow = workflowRepository.findById(workflowId).orElse(null)
+            ?: return failure(WorkflowError.WorkflowNotFound)
+        if (!isAdmin(currentUser) && workflow.isPrivate && workflow.createdBy.id != currentUser.id) {
+            return failure(WorkflowError.AccessDenied)
+        }
         return success(toResponse(workflow))
     }
 
@@ -71,7 +65,8 @@ class WorkflowService(
         val saved = workflowRepository.save(
             Workflow(
                 name = request.name,
-                createdBy = currentUser
+                createdBy = currentUser,
+                isPrivate = request.isPrivate
             )
         )
 
@@ -94,6 +89,7 @@ class WorkflowService(
         } ?: return failure(WorkflowError.WorkflowNotFound)
 
         workflow.name = request.name
+        workflow.isPrivate = request.isPrivate
         return success(toResponse(workflowRepository.save(workflow)))
     }
 
@@ -215,11 +211,8 @@ class WorkflowService(
         val currentUser = findCurrentUser(authenticationName)
             ?: return failure(WorkflowError.UserNotFound)
 
-        val workflow = if (isAdmin(currentUser)) {
-            workflowRepository.findById(workflowId).orElse(null)
-        } else {
-            workflowRepository.findByIdAndOwnerId(workflowId, currentUser.id!!)
-        } ?: return failure(WorkflowError.WorkflowNotFound)
+        val workflow = workflowRepository.findById(workflowId).orElse(null)
+            ?: return failure(WorkflowError.WorkflowNotFound)
 
         val executions = executionLogRepository.findTopLevelByWorkflowIdOrderByStartedAtDesc(workflow.id!!)
             .map { ex ->
@@ -263,7 +256,8 @@ class WorkflowService(
             name = workflow.name,
             ownerId = workflow.createdBy.id,
             ownerUsername = workflow.createdBy.username,
-            lastRunStatus = lastStatus
+            lastRunStatus = lastStatus,
+            isPrivate = workflow.isPrivate
         )
     }
 }

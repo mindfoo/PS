@@ -20,7 +20,7 @@ export enum RoleType {
 
 const AuthContext = createContext<AuthContext | null>(null)
 
-/** Provider for Authentication */
+/** Provides authentication state and exposes login/logout/refresh to the component tree. */
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserAuth | null>(null)
   const [loading, setLoading] = useState(true)
@@ -35,7 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
-    refresh().finally(() => setLoading(false))
+    void refresh().finally(() => setLoading(false))
   }, [])
 
   async function login(username: string, password: string) {
@@ -55,42 +55,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 }
 
-/** Hook to access auth context and check if user is logged in */
+/** Returns the nearest AuthContext value — throws if used outside AuthProvider. */
 export function useAuth() {
   const context = useContext(AuthContext)
   if (!context) throw new Error('useAuth must be used within AuthProvider')
   return context
 }
 
-/** Checks if user has any of the specified roles */
+/** Returns true if the current user holds any of the specified role names. */
 export function useHasRole(...roles: string[]) {
   const { user } = useAuth()
-  return user != null && roles.includes(user.role)
+  return user !== null && roles.includes(user.role)
 }
 
-/** Authorities inferred from role, returns all possible permissions from roles */
+/** Maps the current user's role to a flat set of boolean capability flags. */
 export function usePermissions() {
   const { user } = useAuth()
-  const role = user?.role ?? ''
+  const role = (user?.role ?? '') as RoleType
 
-  const isAdmin = role === RoleType.ADMIN
-  const isWrite = isAdmin || role === RoleType.WRITER
-  const isRead = isWrite || role === RoleType.READER || role === RoleType.DEV
-  const isDev = isAdmin || role === RoleType.DEV
+  const isAdmin  = role === RoleType.ADMIN
+  const isWriter = isAdmin || role === RoleType.WRITER
+  const isDev    = isAdmin || role === RoleType.DEV
+  const isRead   = isWriter || role === RoleType.READER || isDev
 
   return {
-    canReadWorkflows: isRead,
-    canWriteWorkflows: isWrite,
-    canDeleteWorkflows: isWrite,
-    canExecuteWorkflows: isWrite,
-    canReadTasks: isRead,
-    canWriteTasks: isWrite,
-    canDeleteTasks: isWrite,
-    canReadSchedules: isRead,
-    canWriteSchedules: isWrite,
-    canDeleteSchedules: isWrite,
+    // Workflows
+    canReadWorkflows:    isRead,
+    canWriteWorkflows:   isWriter,
+    canDeleteWorkflows:  isWriter,
+    canExecuteWorkflows: isWriter || isDev,   // DEV has workflow:execute
+    // Tasks
+    canReadTasks:    isRead,
+    canWriteTasks:   isWriter,
+    canDeleteTasks:  isWriter,
+    // Schedules
+    canReadSchedules:   isRead,
+    canWriteSchedules:  isWriter,
+    canDeleteSchedules: isWriter,
+    // Executions
+    canReadExecutions: isRead,
+    // System
     canAccessAdmin: isAdmin,
-    canAccessDev: isDev,
+    canAccessDev:   isDev,
+    isReader: role === RoleType.READER,
   }
 }
 
