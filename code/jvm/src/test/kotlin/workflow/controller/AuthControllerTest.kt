@@ -30,7 +30,7 @@ class AuthControllerTest {
         controller = AuthController(authService)
     }
 
-    // ── register ─────────────────────────────────────────────────────────────
+    // register
 
     @Test
     fun `register returns 201 when user is created successfully`() {
@@ -60,7 +60,7 @@ class AuthControllerTest {
         assertEquals(400, response.statusCode.value())
     }
 
-    // ── login ─────────────────────────────────────────────────────────────────
+    // login
 
     @Test
     fun `login returns 200 and sets cookies on success`() {
@@ -80,7 +80,7 @@ class AuthControllerTest {
         assertEquals(401, response.statusCode.value())
     }
 
-    // ── logout ────────────────────────────────────────────────────────────────
+    // logout
 
     @Test
     fun `logout returns 204 and clears cookies`() {
@@ -95,7 +95,7 @@ class AuthControllerTest {
         assertEquals(204, response.statusCode.value())
     }
 
-    // ── me ────────────────────────────────────────────────────────────────────
+    // me
 
     @Test
     fun `me returns 200 with user profile when authenticated`() {

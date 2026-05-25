@@ -1,4 +1,4 @@
-// ── Misc utilities ────────────────────────────────────────────────────────────
+// Misc utilities
 @use 'variables' as *;
 
 * {box-sizing: border-box; margin: 0; padding: 0; }
@@ -18,7 +18,7 @@ code {
   font-size: 0.85em;
 }
 
-// ── Modal ───────────────────────────────────────────────────────────────
+// Modal
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -50,7 +50,7 @@ code {
   h3 { font-size: 1.1rem; }
 }
 
-// ── Schedule slot builder ────────────────────────────────────────────────────
+// Schedule slot builder
 .slots-section {
   margin-top: 1.25rem;
   border-top: 1px solid $border;
@@ -138,7 +138,7 @@ code {
   font-style: italic;
 }
 
-// ── Retry badge ──────────────────────────────────────────────────────────────
+// Retry badge
 .retry-badge {
   display: inline-block;
   min-width: 1.5rem;

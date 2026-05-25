@@ -53,7 +53,7 @@ function slotDescription(slot: ScheduleSlot): string {
   return `${daysStr} at ${time}`
 }
 
-// ── Slot row component ───────────────────────────────────────────────────────
+// Slot row component
 
 function SlotRow({
   slot, onChange, onRemove, showRemove,

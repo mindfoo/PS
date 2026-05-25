@@ -3,6 +3,7 @@ package org.workflow.repository
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
+import org.springframework.data.repository.query.Param
 import org.springframework.stereotype.Repository
 import org.workflow.entity.Execution
 import java.util.UUID
@@ -24,6 +25,13 @@ interface ExecutionLogRepository : JpaRepository<Execution, UUID> {
 
     /** All executions for a given task (single-task runs), most recent first. */
     fun findAllByTaskIdAndParentExecutionIdIsNullOrderByStartedAtDesc(taskId: UUID): List<Execution>
+
+    /**
+     * Returns (taskId, status) pairs for all child task-level executions of a workflow execution.
+     * Used by [ExecutionEventService] to build the catch-up event payload on SSE subscribe.
+     */
+    @Query("select e.task.id, e.status from Execution e where e.parentExecutionId = :parentId and e.task is not null")
+    fun findTaskStatusesByParentId(@Param("parentId") parentId: UUID): List<Array<Any>>
 
     /** Delete all execution records (children first, then parents) for a workflow. */
     @Modifying

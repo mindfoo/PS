@@ -53,10 +53,12 @@ class AuthController(
                 .header("Location", "${Uris.Auth.PROFILE}")
                 .body(result.value)
             is Failure -> when (result.value) {
-                AuthError.UsernameAlreadyTaken -> Problem.response(409, Problem.usernameAlreadyTaken)
-                AuthError.RoleNotFound -> Problem.response(400, Problem.roleNotFound)
-                AuthError.InsecurePassword -> Problem.response(400, Problem.insecurePassword)
-                else -> Problem.response(500, Problem.internalError)
+                AuthError.UsernameAlreadyTaken  -> Problem.response(409, Problem.usernameAlreadyTaken)
+                AuthError.RoleNotFound          -> Problem.response(400, Problem.roleNotFound)
+                AuthError.InsecurePassword      -> Problem.response(400, Problem.insecurePassword)
+                // These cases cannot occur during registration but are listed explicitly
+                AuthError.InvalidCredentials    -> Problem.response(500, Problem.internalError)
+                AuthError.UserNotFound          -> Problem.response(500, Problem.internalError)
             }
         }
 
@@ -92,8 +94,12 @@ class AuthController(
                     .body(mapOf("message" to "Logged in successfully"))
             }
             is Failure -> when (result.value) {
-                AuthError.InvalidCredentials -> Problem.response(401, Problem.invalidCredentials)
-                else -> Problem.response(500, Problem.internalError)
+                AuthError.InvalidCredentials    -> Problem.response(401, Problem.invalidCredentials)
+                // These cases cannot occur during login but are listed explicitly
+                AuthError.UsernameAlreadyTaken  -> Problem.response(500, Problem.internalError)
+                AuthError.RoleNotFound          -> Problem.response(500, Problem.internalError)
+                AuthError.InsecurePassword      -> Problem.response(500, Problem.internalError)
+                AuthError.UserNotFound          -> Problem.response(500, Problem.internalError)
             }
         }
 

@@ -39,7 +39,7 @@ class TaskControllerTest {
         auth             = mockk(); every { auth.name } returns "alice"
     }
 
-    // ── list (all) ────────────────────────────────────────────────────────────
+    // list (all)
 
     @Test
     fun `list with no workflowId returns 200 with task list`() {
@@ -53,7 +53,7 @@ class TaskControllerTest {
         assertEquals(404, controller.list(null, auth).statusCode.value())
     }
 
-    // ── list (by workflow) ────────────────────────────────────────────────────
+    // list (by workflow)
 
     @Test
     fun `list with workflowId returns 200 with ordered entries`() {
@@ -67,7 +67,7 @@ class TaskControllerTest {
         assertEquals(404, controller.list(wfId, auth).statusCode.value())
     }
 
-    // ── getById ───────────────────────────────────────────────────────────────
+    // getById
 
     @Test
     fun `getById returns 200 when task exists`() {
@@ -81,7 +81,7 @@ class TaskControllerTest {
         assertEquals(404, controller.getById(taskId, auth).statusCode.value())
     }
 
-    // ── create ────────────────────────────────────────────────────────────────
+    // create
 
     @Test
     fun `create returns 201 when task is created`() {
@@ -95,7 +95,7 @@ class TaskControllerTest {
         assertEquals(404, controller.create(TaskCreateRequest("My Task", "SCRIPT"), auth).statusCode.value())
     }
 
-    // ── update ────────────────────────────────────────────────────────────────
+    // update
 
     @Test
     fun `update returns 200 when task is updated`() {
@@ -109,7 +109,7 @@ class TaskControllerTest {
         assertEquals(404, controller.update(taskId, TaskUpdateRequest("New", "SCRIPT"), auth).statusCode.value())
     }
 
-    // ── delete ────────────────────────────────────────────────────────────────
+    // delete
 
     @Test
     fun `delete returns 204 on success`() {
@@ -123,7 +123,7 @@ class TaskControllerTest {
         assertEquals(404, controller.delete(taskId, auth).statusCode.value())
     }
 
-    // ── runTask ───────────────────────────────────────────────────────────────
+    // runTask
 
     @Test
     fun `runTask returns 202 when execution is started`() {
@@ -137,7 +137,7 @@ class TaskControllerTest {
         assertEquals(404, controller.runTask(taskId, auth).statusCode.value())
     }
 
-    // ── AccessDenied (403) coverage for private tasks ─────────────────────────
+    // AccessDenied (403) coverage for private tasks
 
     @Test
     fun `getById returns 403 when task is private`() {

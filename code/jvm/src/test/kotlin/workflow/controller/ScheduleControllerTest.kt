@@ -39,7 +39,7 @@ class ScheduleControllerTest {
         auth            = mockk(); every { auth.name } returns "alice"
     }
 
-    // ── list ──────────────────────────────────────────────────────────────────
+    // list
 
     @Test
     fun `list returns 200 with schedule list`() {
@@ -53,7 +53,7 @@ class ScheduleControllerTest {
         assertEquals(404, controller.list(auth).statusCode.value())
     }
 
-    // ── getById ───────────────────────────────────────────────────────────────
+    // getById
 
     @Test
     fun `getById returns 200 when schedule exists`() {
@@ -67,7 +67,7 @@ class ScheduleControllerTest {
         assertEquals(404, controller.getById(scheduleId, auth).statusCode.value())
     }
 
-    // ── create ────────────────────────────────────────────────────────────────
+    // create
 
     @Test
     fun `create returns 201 when schedule is created`() {
@@ -90,7 +90,7 @@ class ScheduleControllerTest {
         assertEquals(404, controller.create(request, auth).statusCode.value())
     }
 
-    // ── update ────────────────────────────────────────────────────────────────
+    // update
 
     @Test
     fun `update returns 200 when schedule is updated`() {
@@ -113,7 +113,7 @@ class ScheduleControllerTest {
         assertEquals(400, controller.update(scheduleId, request, auth).statusCode.value())
     }
 
-    // ── delete ────────────────────────────────────────────────────────────────
+    // delete
 
     @Test
     fun `delete returns 204 on success`() {

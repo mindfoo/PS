@@ -1,5 +1,6 @@
-// ── Alerts ────────────────────────────────────────────────────────────────────
+// Alerts
 @use 'variables' as *;
+@use 'sass:color';
 
 .alert {
   padding: 0.75rem 1rem;
@@ -8,14 +9,14 @@
   font-size: 0.9rem;
 
   &-error {
-    background: rgba($danger,  0.15);
-    border: 1px solid rgba($danger,  0.3);
-    color: #fca5a5;
+    background: color.adjust($danger,  $alpha: -0.85);
+    border: 1px solid color.adjust($danger,  $alpha: -0.7);
+    color: color.scale($danger, $lightness: 45%);
   }
 
   &-success {
-    background: rgba($success, 0.15);
-    border: 1px solid rgba($success, 0.3);
-    color: #86efac;
+    background: color.adjust($success, $alpha: -0.85);
+    border: 1px solid color.adjust($success, $alpha: -0.7);
+    color: color.scale($success, $lightness: 45%);
   }
 }

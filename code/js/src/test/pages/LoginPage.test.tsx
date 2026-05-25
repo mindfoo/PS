@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { LoginPage } from '../../pages/LoginPage'
 
-// ── mock dependencies ──────────────────────────────────────────────────────
+/** mock dependencies */
 
 const mockLogin = vi.fn()
 const mockNavigate = vi.fn()
@@ -18,7 +18,7 @@ vi.mock('react-router-dom', async (importOriginal: () => Promise<Record<string, 
   return { ...actual, useNavigate: () => mockNavigate }
 })
 
-// ── tests ──────────────────────────────────────────────────────────────────
+/** tests */
 
 describe('LoginPage', () => {
   beforeEach(() => {

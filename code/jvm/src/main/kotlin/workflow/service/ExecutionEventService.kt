@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import jakarta.annotation.PostConstruct
 import jakarta.annotation.PreDestroy
 import org.postgresql.PGConnection
+import org.workflow.entity.ExecutionStatus
+import org.workflow.repository.ExecutionLogRepository
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter
@@ -13,7 +15,6 @@ import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.Executors
 import javax.sql.DataSource
 
-/** Payload sent to the frontend over SSE when an execution status changes. */
 data class ExecutionEvent(
     val executionId: String,
     val status: String,
@@ -21,47 +22,47 @@ data class ExecutionEvent(
     val terminal: Boolean = false
 )
 
-/**
- * Manages SSE client subscriptions and receives PostgreSQL LISTEN/NOTIFY events
- * on the `execution_events` channel. One LISTEN connection is shared across all
- * clients on this application instance.
- */
 @Service
 class ExecutionEventService(
     private val dataSource: DataSource,
-    private val objectMapper: ObjectMapper
+    private val objectMapper: ObjectMapper,
+    private val executionLogRepository: ExecutionLogRepository
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
-
-    /** executionId → list of active SSE emitters for that execution */
     private val emitters = ConcurrentHashMap<UUID, CopyOnWriteArrayList<SseEmitter>>()
-
     @Volatile private var running = true
     private val listenerExecutor = Executors.newVirtualThreadPerTaskExecutor()
 
     @PostConstruct
     fun startListening() {
         listenerExecutor.submit {
-            try {
-                val conn = dataSource.connection
-                val pgConn = conn.unwrap(PGConnection::class.java)
-                conn.createStatement().use { stmt -> stmt.execute("LISTEN execution_events") }
-                log.info("ExecutionEventService: LISTEN execution_events started")
+            // CRITICAL FIX: Outer loop ensures the listener restarts if the connection pool kills the connection
+            while (running) {
+                try {
+                    dataSource.connection.use { conn ->
+                        val pgConn = conn.unwrap(PGConnection::class.java)
+                        conn.createStatement().use { stmt -> stmt.execute("LISTEN execution_events") }
+                        log.info("ExecutionEventService: LISTEN execution_events started")
 
-                while (running) {
-                    val notifications = pgConn.getNotifications(50) // 50 ms wait
-                    notifications?.forEach { n ->
-                        try {
-                            val event = objectMapper.readValue(n.parameter, ExecutionEvent::class.java)
-                            broadcast(UUID.fromString(event.executionId), event)
-                        } catch (e: Exception) {
-                            log.warn("Failed to parse execution_events notification: {}", e.message)
+                        while (running) {
+                            // Increased wait to 5000ms to prevent heavy CPU polling overhead
+                            val notifications = pgConn.getNotifications(5000)
+                            notifications?.forEach { n ->
+                                try {
+                                    val event = objectMapper.readValue(n.parameter, ExecutionEvent::class.java)
+                                    broadcast(UUID.fromString(event.executionId), event)
+                                } catch (e: Exception) {
+                                    log.warn("Failed to parse execution_events notification: {}", e.message)
+                                }
+                            }
                         }
                     }
+                } catch (e: Exception) {
+                    if (running) {
+                        log.error("Database listener connection dropped (likely pool timeout). Reconnecting in 5s...", e.message)
+                        Thread.sleep(5000)
+                    }
                 }
-                conn.close()
-            } catch (e: Exception) {
-                log.error("ExecutionEventService listener failed: {}", e.message, e)
             }
         }
     }
@@ -72,7 +73,6 @@ class ExecutionEventService(
         listenerExecutor.shutdown()
     }
 
-    /** Registers a new SSE emitter for the given execution. */
     fun subscribe(executionId: UUID): SseEmitter {
         val emitter = SseEmitter(300_000L) // 5 min timeout
         emitters.getOrPut(executionId) { CopyOnWriteArrayList() }.add(emitter)
@@ -80,10 +80,33 @@ class ExecutionEventService(
         emitter.onCompletion(cleanup)
         emitter.onTimeout(cleanup)
         emitter.onError { cleanup.run() }
+
+        executionLogRepository.findById(executionId).orElse(null)?.let { execution ->
+            val isTerminal = execution.status !in setOf(ExecutionStatus.PENDING, ExecutionStatus.RUNNING)
+            val taskStatuses = executionLogRepository
+                .findTaskStatusesByParentId(executionId)
+                .associate { row -> row[0].toString() to row[1].toString() }
+            try {
+                val initial = ExecutionEvent(
+                    executionId = executionId.toString(),
+                    status = execution.status,
+                    taskStatuses = taskStatuses,
+                    terminal = isTerminal
+                )
+                emitter.send(SseEmitter.event().name("execution").data(objectMapper.writeValueAsString(initial)))
+                if (isTerminal) {
+                    emitter.complete()
+                    emitters.remove(executionId)
+                }
+            } catch (e: Exception) {
+                log.warn("Failed to send catch-up event for execution {}: {}", executionId, e.message)
+                cleanup.run()
+            }
+        }
+
         return emitter
     }
 
-    /** Broadcasts an event to all SSE emitters subscribed to this execution. */
     fun broadcast(executionId: UUID, event: ExecutionEvent) {
         val list = emitters[executionId] ?: return
         val dead = mutableListOf<SseEmitter>()

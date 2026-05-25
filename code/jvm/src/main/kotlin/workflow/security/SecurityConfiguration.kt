@@ -1,5 +1,6 @@
 package org.workflow.security
 
+import jakarta.servlet.DispatcherType
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -52,6 +53,12 @@ class SecurityConfig(
             .formLogin { it.disable() }
             .addFilterBefore(cookieAuthenticationFilter(), UsernamePasswordAuthenticationFilter::class.java)
             .authorizeHttpRequests { auth ->
+                // ASYNC and ERROR dispatches come from Tomcat's internal async/error handling
+                // (e.g., SSE completion, timeout). No security context is available on those
+                // threads, so permit them unconditionally — @PreAuthorize on each handler
+                // already enforces fine-grained access on the original request.
+                auth.dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
+
                 auth.requestMatchers(
                     "/api/auth/**",
                     "/swagger-ui/**",

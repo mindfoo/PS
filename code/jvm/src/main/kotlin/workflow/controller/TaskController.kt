@@ -45,7 +45,10 @@ class TaskController(
     @PreAuthorize("hasAuthority('task:read')")
     @Operation(summary = "List tasks", description = "If workflowId is provided returns ordered entries for that workflow; otherwise returns all tasks visible to the caller")
     @ApiResponses(
-        ApiResponse(responseCode = "200", description = "Task list returned"),
+        ApiResponse(responseCode = "200", description = "Task list returned",
+            content = [Content(schema = Schema(implementation = TaskResponse::class))]),
+        ApiResponse(responseCode = "403", description = "Private resource — access denied",
+            content = [Content(mediaType = Problem.MEDIA_TYPE)]),
         ApiResponse(responseCode = "404", description = "Workflow not found",
             content = [Content(mediaType = Problem.MEDIA_TYPE)])
     )
@@ -76,6 +79,8 @@ class TaskController(
     @ApiResponses(
         ApiResponse(responseCode = "200", description = "Task found",
             content = [Content(schema = Schema(implementation = TaskResponse::class))]),
+        ApiResponse(responseCode = "403", description = "Private resource — access denied",
+            content = [Content(mediaType = Problem.MEDIA_TYPE)]),
         ApiResponse(responseCode = "404", description = "Task not found",
             content = [Content(mediaType = Problem.MEDIA_TYPE)])
     )
@@ -101,6 +106,8 @@ class TaskController(
     @ApiResponses(
         ApiResponse(responseCode = "201", description = "Task created",
             content = [Content(schema = Schema(implementation = TaskResponse::class))]),
+        ApiResponse(responseCode = "403", description = "Insufficient permissions",
+            content = [Content(mediaType = Problem.MEDIA_TYPE)]),
         ApiResponse(responseCode = "404", description = "Workflow or user not found",
             content = [Content(mediaType = Problem.MEDIA_TYPE)])
     )
@@ -126,6 +133,8 @@ class TaskController(
     @ApiResponses(
         ApiResponse(responseCode = "200", description = "Task updated",
             content = [Content(schema = Schema(implementation = TaskResponse::class))]),
+        ApiResponse(responseCode = "403", description = "Private resource — access denied",
+            content = [Content(mediaType = Problem.MEDIA_TYPE)]),
         ApiResponse(responseCode = "404", description = "Task or user not found",
             content = [Content(mediaType = Problem.MEDIA_TYPE)])
     )
@@ -151,6 +160,8 @@ class TaskController(
     @Operation(summary = "Delete task")
     @ApiResponses(
         ApiResponse(responseCode = "204", description = "Task deleted"),
+        ApiResponse(responseCode = "403", description = "Private resource — access denied",
+            content = [Content(mediaType = Problem.MEDIA_TYPE)]),
         ApiResponse(responseCode = "404", description = "Task or user not found",
             content = [Content(mediaType = Problem.MEDIA_TYPE)])
     )
@@ -174,7 +185,10 @@ class TaskController(
     @PreAuthorize("hasAuthority('workflow:execute')")
     @Operation(summary = "Run a single task now", description = "Trigger a manual execution for a single task")
     @ApiResponses(
-        ApiResponse(responseCode = "202", description = "Task execution started"),
+        ApiResponse(responseCode = "202", description = "Task execution started",
+            content = [Content(schema = Schema(implementation = ExecutionResponse::class))]),
+        ApiResponse(responseCode = "403", description = "Insufficient permissions",
+            content = [Content(mediaType = Problem.MEDIA_TYPE)]),
         ApiResponse(responseCode = "404", description = "Task not found",
             content = [Content(mediaType = Problem.MEDIA_TYPE)])
     )

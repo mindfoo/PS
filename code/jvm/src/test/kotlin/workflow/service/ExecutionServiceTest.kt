@@ -82,7 +82,7 @@ class ExecutionServiceTest {
         )
     }
 
-    // ── cancelExecution ───────────────────────────────────────────────────────
+    // cancelExecution
 
     @Test
     fun `cancelExecution returns true and marks execution CANCELED for owner`() {
@@ -150,7 +150,7 @@ class ExecutionServiceTest {
         assertFalse(service.cancelExecution(execId, "bob"))
     }
 
-    // ── triggerManualTask ─────────────────────────────────────────────────────
+    // triggerManualTask
 
     @Test
     fun `triggerManualTask returns Success with execution id for task owner`() {

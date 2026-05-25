@@ -46,7 +46,7 @@ class AuthServiceTest {
         service = AuthService(userRepository, roleRepository, tokenRepository, passwordEncoder)
     }
 
-    // ── register ─────────────────────────────────────────────────────────────
+    // register
 
     @Test
     fun `register succeeds and returns ProfileResponse`() {
@@ -92,7 +92,7 @@ class AuthServiceTest {
         assertEquals(AuthError.InsecurePassword, (result as Failure).value)
     }
 
-    // ── login ─────────────────────────────────────────────────────────────────
+    // login
 
     @Test
     fun `login succeeds and returns token`() {
@@ -137,7 +137,7 @@ class AuthServiceTest {
         assertEquals(AuthError.InvalidCredentials, (result as Failure).value)
     }
 
-    // ── logout ────────────────────────────────────────────────────────────────
+    // logout
 
     @Test
     fun `logout deletes token by hash`() {
@@ -148,7 +148,7 @@ class AuthServiceTest {
         verify(exactly = 1) { tokenRepository.deleteByTokenHash(any()) }
     }
 
-    // ── me ────────────────────────────────────────────────────────────────────
+    // me
 
     @Test
     fun `me returns ProfileResponse for existing user`() {

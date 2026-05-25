@@ -1,6 +1,6 @@
 package org.workflow.service.utils
 
-// ── Auth ──────────────────────────────────────────────────────────────────────
+/** Auth */
 
 /** All typed failure cases that [org.workflow.service.AuthService] can produce. */
 sealed class AuthError {
@@ -20,7 +20,7 @@ sealed class AuthError {
     object InsecurePassword : AuthError()
 }
 
-// ── Workflow ──────────────────────────────────────────────────────────────────
+/** Workflow */
 
 /** All typed failure cases that [org.workflow.service.WorkflowService] can produce. */
 sealed class WorkflowError {
@@ -32,7 +32,7 @@ sealed class WorkflowError {
     object AccessDenied : WorkflowError()
 }
 
-// ── Task ──────────────────────────────────────────────────────────────────────
+/** Task */
 
 /** All typed failure cases that [org.workflow.service.TaskService] can produce. */
 sealed class TaskError {
@@ -50,7 +50,7 @@ sealed class TaskError {
     object AccessDenied : TaskError()
 }
 
-// ── User ──────────────────────────────────────────────────────────────────────
+/** User */
 
 /** All typed failure cases that [org.workflow.service.UserService] can produce. */
 sealed class UserError {
@@ -64,7 +64,7 @@ sealed class UserError {
     object UserNotFound : UserError()
 }
 
-// ── Schedule ──────────────────────────────────────────────────────────────────
+/** Schedule */
 
 /** All typed failure cases that [org.workflow.service.ScheduleService] can produce. */
 sealed class ScheduleError {
@@ -74,7 +74,7 @@ sealed class ScheduleError {
     object InvalidCronExpression : ScheduleError()
 }
 
-// ── Execution ─────────────────────────────────────────────────────────────────
+/** Execution */
 
 /** All typed failure cases that [org.workflow.service.ExecutionService] can produce. */
 sealed class ExecutionError {

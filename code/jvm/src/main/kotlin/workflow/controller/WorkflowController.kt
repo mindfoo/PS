@@ -53,6 +53,10 @@ class WorkflowController(
         ApiResponse(responseCode = "200", description = "List returned",
             content = [Content(schema = Schema(implementation = WorkflowResponse::class))]),
         ApiResponse(responseCode = "401", description = "Not authenticated",
+            content = [Content(mediaType = Problem.MEDIA_TYPE)]),
+        ApiResponse(responseCode = "403", description = "Private resource — access denied",
+            content = [Content(mediaType = Problem.MEDIA_TYPE)]),
+        ApiResponse(responseCode = "404", description = "User not found",
             content = [Content(mediaType = Problem.MEDIA_TYPE)])
     )
     fun list(authentication: Authentication): ResponseEntity<Any> =
@@ -71,6 +75,8 @@ class WorkflowController(
     @ApiResponses(
         ApiResponse(responseCode = "200", description = "Workflow found",
             content = [Content(schema = Schema(implementation = WorkflowResponse::class))]),
+        ApiResponse(responseCode = "403", description = "Private resource — access denied",
+            content = [Content(mediaType = Problem.MEDIA_TYPE)]),
         ApiResponse(responseCode = "404", description = "Workflow not found",
             content = [Content(mediaType = Problem.MEDIA_TYPE)])
     )
@@ -93,6 +99,8 @@ class WorkflowController(
     @ApiResponses(
         ApiResponse(responseCode = "201", description = "Workflow created",
             content = [Content(schema = Schema(implementation = WorkflowResponse::class))]),
+        ApiResponse(responseCode = "403", description = "Insufficient permissions",
+            content = [Content(mediaType = Problem.MEDIA_TYPE)]),
         ApiResponse(responseCode = "404", description = "User not found",
             content = [Content(mediaType = Problem.MEDIA_TYPE)])
     )
@@ -115,6 +123,8 @@ class WorkflowController(
     @ApiResponses(
         ApiResponse(responseCode = "200", description = "Workflow updated",
             content = [Content(schema = Schema(implementation = WorkflowResponse::class))]),
+        ApiResponse(responseCode = "403", description = "Private resource — access denied",
+            content = [Content(mediaType = Problem.MEDIA_TYPE)]),
         ApiResponse(responseCode = "404", description = "Workflow or user not found",
             content = [Content(mediaType = Problem.MEDIA_TYPE)])
     )
@@ -137,6 +147,8 @@ class WorkflowController(
     @Operation(summary = "Delete workflow")
     @ApiResponses(
         ApiResponse(responseCode = "204", description = "Workflow deleted"),
+        ApiResponse(responseCode = "403", description = "Private resource — access denied",
+            content = [Content(mediaType = Problem.MEDIA_TYPE)]),
         ApiResponse(responseCode = "404", description = "Workflow or user not found",
             content = [Content(mediaType = Problem.MEDIA_TYPE)])
     )
@@ -159,7 +171,9 @@ class WorkflowController(
     @ApiResponses(
         ApiResponse(responseCode = "202", description = "Execution started",
             content = [Content(schema = Schema(implementation = TriggerWorkflowResponse::class))]),
-        ApiResponse(responseCode = "404", description = "Workflow not found",
+        ApiResponse(responseCode = "403", description = "Insufficient permissions",
+            content = [Content(mediaType = Problem.MEDIA_TYPE)]),
+        ApiResponse(responseCode = "404", description = "Workflow or user not found",
             content = [Content(mediaType = Problem.MEDIA_TYPE)])
     )
     fun runNow(
@@ -176,6 +190,8 @@ class WorkflowController(
     @Operation(summary = "Reorder tasks", description = "Update taskOrder for each WorkflowTaskOrder row. Tasks sharing the same taskOrder run in parallel.")
     @ApiResponses(
         ApiResponse(responseCode = "204", description = "Order updated"),
+        ApiResponse(responseCode = "403", description = "Private resource — access denied",
+            content = [Content(mediaType = Problem.MEDIA_TYPE)]),
         ApiResponse(responseCode = "404", description = "Workflow or order row not found",
             content = [Content(mediaType = Problem.MEDIA_TYPE)])
     )
@@ -199,6 +215,8 @@ class WorkflowController(
     @ApiResponses(
         ApiResponse(responseCode = "200", description = "Execution list returned",
             content = [Content(schema = Schema(implementation = ExecutionSummaryResponse::class))]),
+        ApiResponse(responseCode = "403", description = "Private resource — access denied",
+            content = [Content(mediaType = Problem.MEDIA_TYPE)]),
         ApiResponse(responseCode = "404", description = "Workflow not found",
             content = [Content(mediaType = Problem.MEDIA_TYPE)])
     )
@@ -221,6 +239,8 @@ class WorkflowController(
     @ApiResponses(
         ApiResponse(responseCode = "204", description = "Task linked"),
         ApiResponse(responseCode = "404", description = "Workflow or task not found",
+            content = [Content(mediaType = Problem.MEDIA_TYPE)]),
+        ApiResponse(responseCode = "403", description = "Private resource — access denied",
             content = [Content(mediaType = Problem.MEDIA_TYPE)]),
         ApiResponse(responseCode = "409", description = "Task already linked",
             content = [Content(mediaType = Problem.MEDIA_TYPE)])
@@ -247,6 +267,8 @@ class WorkflowController(
     @Operation(summary = "Update task retry policy", description = "Set the number of retry attempts for a task in a workflow")
     @ApiResponses(
         ApiResponse(responseCode = "204", description = "Retry policy updated"),
+        ApiResponse(responseCode = "403", description = "Private resource — access denied",
+            content = [Content(mediaType = Problem.MEDIA_TYPE)]),
         ApiResponse(responseCode = "404", description = "Workflow or task not found",
             content = [Content(mediaType = Problem.MEDIA_TYPE)])
     )
@@ -270,6 +292,8 @@ class WorkflowController(
     @Operation(summary = "Unlink task from workflow")
     @ApiResponses(
         ApiResponse(responseCode = "204", description = "Task unlinked"),
+        ApiResponse(responseCode = "403", description = "Private resource — access denied",
+            content = [Content(mediaType = Problem.MEDIA_TYPE)]),
         ApiResponse(responseCode = "404", description = "Workflow, task, or link not found",
             content = [Content(mediaType = Problem.MEDIA_TYPE)])
     )
@@ -296,6 +320,8 @@ class WorkflowController(
     @ApiResponses(
         ApiResponse(responseCode = "200", description = "Execution found",
             content = [Content(schema = Schema(implementation = ExecutionSummaryResponse::class))]),
+        ApiResponse(responseCode = "403", description = "Private resource — access denied",
+            content = [Content(mediaType = Problem.MEDIA_TYPE)]),
         ApiResponse(responseCode = "404", description = "Execution not found",
             content = [Content(mediaType = Problem.MEDIA_TYPE)])
     )

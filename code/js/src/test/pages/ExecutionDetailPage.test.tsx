@@ -3,8 +3,11 @@ import { render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { ExecutionDetailPage } from '../../pages/ExecutionDetailPage'
 
-const mockGetById = vi.fn()
-const mockCancel  = vi.fn()
+const mockGetById   = vi.fn()
+const mockCancel    = vi.fn()
+const mockRun       = vi.fn()
+const mockSubscribe = vi.fn()
+const mockTaskRun   = vi.fn()
 
 const sampleExecution = {
   id: 'exec-1234-abcd',
@@ -36,8 +39,21 @@ vi.mock('../../contexts/AuthContext', () => ({
 
 vi.mock('../../api/executions', () => ({
   executionApi: {
-    getById: (...args: unknown[]) => mockGetById(...args) as unknown,
-    cancel:  (...args: unknown[]) => mockCancel(...args)  as unknown,
+    getById:                (...args: unknown[]) => mockGetById(...args)   as unknown,
+    cancel:                 (...args: unknown[]) => mockCancel(...args)    as unknown,
+    subscribeToExecution:   (...args: unknown[]) => mockSubscribe(...args) as unknown,
+  },
+}))
+
+vi.mock('../../api/workflows', () => ({
+  workflowApi: {
+    run: (...args: unknown[]) => mockRun(...args) as unknown,
+  },
+}))
+
+vi.mock('../../api/tasks', () => ({
+  taskApi: {
+    run: (...args: unknown[]) => mockTaskRun(...args) as unknown,
   },
 }))
 
@@ -49,6 +65,7 @@ describe('ExecutionDetailPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockGetById.mockResolvedValue(sampleExecution)
+    mockSubscribe.mockReturnValue(() => {})
   })
 
   function renderPage(executionId = 'exec-1234-abcd', workflowId = 'wf1') {
@@ -102,6 +119,33 @@ describe('ExecutionDetailPage', () => {
     renderPage()
     await waitFor(() => {
       expect(screen.queryByRole('button', { name: /cancel execution/i })).toBeNull()
+    })
+  })
+
+  it('shows retry button for terminal executions', async () => {
+    renderPage()
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /retry/i })).toBeDefined()
+    })
+  })
+
+  it('subscribes to SSE for active executions', async () => {
+    mockGetById.mockResolvedValue({ ...sampleExecution, status: 'RUNNING' })
+    renderPage()
+    await waitFor(() => {
+      expect(mockSubscribe).toHaveBeenCalledWith('exec-1234-abcd', expect.any(Function))
+    })
+  })
+
+  it('closes SSE immediately when execution is already terminal', async () => {
+    // SSE is always opened first; the guard fetch closes it when status is terminal
+    const mockUnsub = vi.fn()
+    mockSubscribe.mockReturnValue(mockUnsub)
+    renderPage()
+    await waitFor(() => {
+      expect(screen.getAllByText(/SUCCESS/i).length).toBeGreaterThan(0)
+      expect(mockSubscribe).toHaveBeenCalledWith('exec-1234-abcd', expect.any(Function))
+      expect(mockUnsub).toHaveBeenCalled()
     })
   })
 })

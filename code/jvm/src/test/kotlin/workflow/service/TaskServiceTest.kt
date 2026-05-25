@@ -50,7 +50,7 @@ class TaskServiceTest {
         service = TaskService(taskRepository, workflowRepository, wtoRepository, helpers)
     }
 
-    // ── listAll ───────────────────────────────────────────────────────────────
+    // listAll
 
     @Test
     fun `listAll returns all tasks for admin`() {
@@ -90,7 +90,7 @@ class TaskServiceTest {
         assertEquals(TaskError.UserNotFound, (result as Failure).value)
     }
 
-    // ── getById ───────────────────────────────────────────────────────────────
+    // getById
 
     @Test
     fun `getById returns task for owner`() {
@@ -119,7 +119,7 @@ class TaskServiceTest {
         assertEquals(TaskError.TaskNotFound, (result as Failure).value)
     }
 
-    // ── create ────────────────────────────────────────────────────────────────
+    // create
 
     @Test
     fun `create returns saved task when no workflow specified`() {
@@ -147,7 +147,7 @@ class TaskServiceTest {
         assertEquals(TaskError.WorkflowNotFound, (result as Failure).value)
     }
 
-    // ── update ────────────────────────────────────────────────────────────────
+    // update
 
     @Test
     fun `update returns updated task`() {
@@ -175,7 +175,7 @@ class TaskServiceTest {
         assertEquals(TaskError.TaskNotFound, (result as Failure).value)
     }
 
-    // ── delete ────────────────────────────────────────────────────────────────
+    // delete
 
     @Test
     fun `delete removes task on success`() {
@@ -206,7 +206,7 @@ class TaskServiceTest {
         assertEquals(TaskError.TaskNotFound, (result as Failure).value)
     }
 
-    // ── listByWorkflow ────────────────────────────────────────────────────────
+    // listByWorkflow
 
     @Test
     fun `listByWorkflow returns ordered task entries for workflow`() {
@@ -248,7 +248,7 @@ class TaskServiceTest {
         assertEquals(TaskError.WorkflowNotFound, (result as Failure).value)
     }
 
-    // ── create with workflowId ────────────────────────────────────────────────
+    // create with workflowId
 
     @Test
     fun `create with workflowId saves task and creates WorkflowTaskOrder`() {
@@ -267,7 +267,7 @@ class TaskServiceTest {
         verify(exactly = 1) { wtoRepository.save(any()) }
     }
 
-    // ── linkToWorkflow ────────────────────────────────────────────────────────
+    // linkToWorkflow
 
     @Test
     fun `linkToWorkflow returns success and saves WorkflowTaskOrder`() {
@@ -342,7 +342,7 @@ class TaskServiceTest {
         assertEquals(TaskError.UserNotFound, (result as Failure).value)
     }
 
-    // ── unlinkFromWorkflow ────────────────────────────────────────────────────
+    // unlinkFromWorkflow
 
     @Test
     fun `unlinkFromWorkflow returns success and deletes link`() {

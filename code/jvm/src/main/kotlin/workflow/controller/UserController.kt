@@ -25,52 +25,63 @@ import org.workflow.utils.Success
 import org.workflow.utils.Uris
 import java.util.UUID
 
-/** Exposes user management and role administration endpoints. */
+/** Exposes user management and role administration endpoints (admin only). */
 @RestController
-@Tag(name = "Users", description = "User management endpoints")
+@Tag(name = "Users", description = "User management endpoints — restricted to the user:manage authority")
 class UserController(private val userService: UserService) {
 
     @GetMapping(Uris.Users.BASE)
-    @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "List users", description = "Admin-only endpoint to list all users with role and effective permissions")
+    @PreAuthorize("hasAuthority('user:manage')")
+    @Operation(summary = "List users", description = "Returns all users with their role and effective permission set")
     @ApiResponses(
         ApiResponse(responseCode = "200", description = "Users returned",
             content = [Content(schema = Schema(implementation = UserAdminResponse::class))]),
-        ApiResponse(responseCode = "403", description = "Forbidden",
+        ApiResponse(responseCode = "401", description = "Not authenticated",
+            content = [Content(mediaType = Problem.MEDIA_TYPE)]),
+        ApiResponse(responseCode = "403", description = "Insufficient permissions — user:manage required",
             content = [Content(mediaType = Problem.MEDIA_TYPE)])
     )
     fun listUsers(): ResponseEntity<List<UserAdminResponse>> =
         ResponseEntity.ok(userService.listUsers())
 
     @GetMapping(Uris.Users.ROLES)
-    @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "List roles", description = "Admin-only endpoint returning role catalog and permissions")
+    @PreAuthorize("hasAuthority('user:manage')")
+    @Operation(summary = "List roles", description = "Returns the role catalogue with associated permission slugs")
     @ApiResponses(
         ApiResponse(responseCode = "200", description = "Roles returned",
             content = [Content(schema = Schema(implementation = RoleSummaryResponse::class))]),
-        ApiResponse(responseCode = "403", description = "Forbidden",
+        ApiResponse(responseCode = "401", description = "Not authenticated",
+            content = [Content(mediaType = Problem.MEDIA_TYPE)]),
+        ApiResponse(responseCode = "403", description = "Insufficient permissions — user:manage required",
             content = [Content(mediaType = Problem.MEDIA_TYPE)])
     )
     fun listRoles(): ResponseEntity<List<RoleSummaryResponse>> =
         ResponseEntity.ok(userService.listRoles())
 
     @PatchMapping(Uris.Users.UPDATE_ROLE)
-    @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Update user role", description = "Admin-only endpoint to grant a different role to a user")
+    @PreAuthorize("hasAuthority('user:manage')")
+    @Operation(summary = "Update user role", description = "Assigns a different role to an existing user")
     @ApiResponses(
         ApiResponse(responseCode = "200", description = "Role updated",
             content = [Content(schema = Schema(implementation = UserAdminResponse::class))]),
         ApiResponse(responseCode = "400", description = "Role not found",
             content = [Content(mediaType = Problem.MEDIA_TYPE)]),
+        ApiResponse(responseCode = "401", description = "Not authenticated",
+            content = [Content(mediaType = Problem.MEDIA_TYPE)]),
+        ApiResponse(responseCode = "403", description = "Insufficient permissions — user:manage required",
+            content = [Content(mediaType = Problem.MEDIA_TYPE)]),
         ApiResponse(responseCode = "404", description = "User not found",
             content = [Content(mediaType = Problem.MEDIA_TYPE)])
     )
-    fun updateUserRole(@PathVariable("id") userId: UUID, @RequestBody request: UserRoleUpdateRequest): ResponseEntity<Any> =
+    fun updateUserRole(
+        @PathVariable("id") userId: UUID,
+        @RequestBody request: UserRoleUpdateRequest
+    ): ResponseEntity<Any> =
         when (val result = userService.updateUserRole(userId, request)) {
             is Success -> ResponseEntity.ok(result.value)
             is Failure -> when (result.value) {
-                UserError.RoleNotFound -> Problem.response(400, Problem.roleNotFound)
-                UserError.UserNotFound -> Problem.response(404, Problem.userNotFound)
+                UserError.RoleNotFound         -> Problem.response(400, Problem.roleNotFound)
+                UserError.UserNotFound         -> Problem.response(404, Problem.userNotFound)
                 UserError.UsernameAlreadyTaken -> Problem.response(409, Problem.usernameAlreadyTaken)
             }
         }

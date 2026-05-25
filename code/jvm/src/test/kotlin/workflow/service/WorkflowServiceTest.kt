@@ -66,7 +66,7 @@ class WorkflowServiceTest {
         )
     }
 
-    // ── list ──────────────────────────────────────────────────────────────────
+    // list
 
     @Test
     fun `list returns all workflows for admin`() {
@@ -106,7 +106,7 @@ class WorkflowServiceTest {
         assertEquals(WorkflowError.UserNotFound, (result as Failure).value)
     }
 
-    // ── getById ───────────────────────────────────────────────────────────────
+    // getById
 
     @Test
     fun `getById returns workflow for any authenticated user`() {
@@ -135,7 +135,7 @@ class WorkflowServiceTest {
         assertEquals(WorkflowError.WorkflowNotFound, (result as Failure).value)
     }
 
-    // ── create ────────────────────────────────────────────────────────────────
+    // create
 
     @Test
     fun `create saves and returns a new workflow`() {
@@ -151,7 +151,7 @@ class WorkflowServiceTest {
         verify(exactly = 1) { workflowRepository.save(any()) }
     }
 
-    // ── update ────────────────────────────────────────────────────────────────
+    // update
 
     @Test
     fun `update saves updated name`() {
@@ -167,7 +167,7 @@ class WorkflowServiceTest {
         assertTrue(result is Success)
     }
 
-    // ── delete ────────────────────────────────────────────────────────────────
+    // delete
 
     @Test
     fun `delete cascades and deletes workflow`() {
@@ -201,7 +201,7 @@ class WorkflowServiceTest {
         assertEquals(WorkflowError.WorkflowNotFound, (result as Failure).value)
     }
 
-    // ── admin branch: getById ─────────────────────────────────────────────────
+    // admin branch: getById
 
     @Test
     fun `getById returns workflow for admin using findById`() {
@@ -216,7 +216,7 @@ class WorkflowServiceTest {
         assertTrue(result is Success)
     }
 
-    // ── create: UserNotFound ──────────────────────────────────────────────────
+    // create: UserNotFound
 
     @Test
     fun `create returns UserNotFound when user does not exist`() {
@@ -228,7 +228,7 @@ class WorkflowServiceTest {
         assertEquals(WorkflowError.UserNotFound, (result as Failure).value)
     }
 
-    // ── update: missing branches ──────────────────────────────────────────────
+    // update: missing branches
 
     @Test
     fun `update returns UserNotFound when user does not exist`() {
@@ -253,7 +253,7 @@ class WorkflowServiceTest {
         assertEquals(WorkflowError.WorkflowNotFound, (result as Failure).value)
     }
 
-    // ── delete: UserNotFound ──────────────────────────────────────────────────
+    // delete: UserNotFound
 
     @Test
     fun `delete returns UserNotFound when user does not exist`() {
@@ -265,7 +265,7 @@ class WorkflowServiceTest {
         assertEquals(WorkflowError.UserNotFound, (result as Failure).value)
     }
 
-    // ── listExecutions ────────────────────────────────────────────────────────
+    // listExecutions
 
     @Test
     fun `listExecutions returns list for workflow owner`() {
@@ -310,7 +310,7 @@ class WorkflowServiceTest {
         assertEquals(WorkflowError.WorkflowNotFound, (result as Failure).value)
     }
 
-    // ── getExecution ──────────────────────────────────────────────────────────
+    // getExecution
 
     @Test
     fun `getExecution returns summary when execution found`() {
@@ -355,7 +355,7 @@ class WorkflowServiceTest {
         assertEquals(WorkflowError.WorkflowNotFound, (result as Failure).value)
     }
 
-    // ── reorderTasks ──────────────────────────────────────────────────────────
+    // reorderTasks
 
     @Test
     fun `reorderTasks updates taskOrder and returns success`() {
@@ -399,7 +399,7 @@ class WorkflowServiceTest {
         assertEquals(WorkflowError.WorkflowNotFound, (result as Failure).value)
     }
 
-    // ── updateRetryPolicy ─────────────────────────────────────────────────────
+    // updateRetryPolicy
 
     @Test
     fun `updateRetryPolicy updates retry count and returns success`() {

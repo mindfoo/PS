@@ -48,7 +48,7 @@ class WorkflowControllerTest {
         auth             = mockk(); every { auth.name } returns "alice"
     }
 
-    // ── list ──────────────────────────────────────────────────────────────────
+    // list
 
     @Test
     fun `list returns 200 with workflows`() {
@@ -62,7 +62,7 @@ class WorkflowControllerTest {
         assertEquals(404, controller.list(auth).statusCode.value())
     }
 
-    // ── getById ───────────────────────────────────────────────────────────────
+    // getById
 
     @Test
     fun `getById returns 200 when workflow exists`() {
@@ -76,7 +76,7 @@ class WorkflowControllerTest {
         assertEquals(404, controller.getById(wfId, auth).statusCode.value())
     }
 
-    // ── create ────────────────────────────────────────────────────────────────
+    // create
 
     @Test
     fun `create returns 201 when workflow is created`() {
@@ -90,7 +90,7 @@ class WorkflowControllerTest {
         assertEquals(404, controller.create(WorkflowCreateRequest("My WF"), auth).statusCode.value())
     }
 
-    // ── update ────────────────────────────────────────────────────────────────
+    // update
 
     @Test
     fun `update returns 200 when workflow is updated`() {
@@ -104,7 +104,7 @@ class WorkflowControllerTest {
         assertEquals(404, controller.update(wfId, WorkflowUpdateRequest("New Name"), auth).statusCode.value())
     }
 
-    // ── delete ────────────────────────────────────────────────────────────────
+    // delete
 
     @Test
     fun `delete returns 204 on success`() {
@@ -118,7 +118,7 @@ class WorkflowControllerTest {
         assertEquals(404, controller.delete(wfId, auth).statusCode.value())
     }
 
-    // ── runNow ────────────────────────────────────────────────────────────────
+    // runNow
 
     @Test
     fun `runNow returns 202 with execution id`() {
@@ -128,7 +128,7 @@ class WorkflowControllerTest {
         assertEquals("STARTED", response.body!!.status)
     }
 
-    // ── listExecutions ────────────────────────────────────────────────────────
+    // listExecutions
 
     @Test
     fun `listExecutions returns 200 with execution list`() {
@@ -142,7 +142,7 @@ class WorkflowControllerTest {
         assertEquals(404, controller.listExecutions(wfId, auth).statusCode.value())
     }
 
-    // ── linkTask / unlinkTask ─────────────────────────────────────────────────
+    // linkTask / unlinkTask
 
     @Test
     fun `linkTask returns 204 on success`() {
@@ -168,7 +168,7 @@ class WorkflowControllerTest {
         assertEquals(404, controller.unlinkTask(wfId, taskId, auth).statusCode.value())
     }
 
-    // ── cancelExecution ───────────────────────────────────────────────────────
+    // cancelExecution
 
     @Test
     fun `cancelExecution returns 204 when execution is canceled`() {
@@ -182,7 +182,7 @@ class WorkflowControllerTest {
         assertEquals(409, controller.cancelExecution(execId, auth).statusCode.value())
     }
 
-    // ── reorderTasks ──────────────────────────────────────────────────────────
+    // reorderTasks
 
     @Test
     fun `reorderTasks returns 204 on success`() {
@@ -198,7 +198,7 @@ class WorkflowControllerTest {
         assertEquals(404, controller.reorderTasks(wfId, request, auth).statusCode.value())
     }
 
-    // ── updateRetryPolicy ─────────────────────────────────────────────────────
+    // updateRetryPolicy
 
     @Test
     fun `updateRetryPolicy returns 204 on success`() {
@@ -214,7 +214,7 @@ class WorkflowControllerTest {
         assertEquals(404, controller.updateRetryPolicy(wfId, taskId, request, auth).statusCode.value())
     }
 
-    // ── getExecution ──────────────────────────────────────────────────────────
+    // getExecution
 
     @Test
     fun `getExecution returns 200 with execution summary`() {
@@ -231,7 +231,7 @@ class WorkflowControllerTest {
         assertEquals(404, controller.getExecution(execId, auth).statusCode.value())
     }
 
-    // ── AccessDenied (403) coverage for private resources ────────────────────
+    // AccessDenied (403) coverage for private resources
 
     @Test
     fun `getById returns 403 when resource is private and user has no access`() {

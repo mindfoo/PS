@@ -36,7 +36,7 @@ class UserServiceTest {
         service = UserService(userRepository, roleRepository)
     }
 
-    // ── listUsers ─────────────────────────────────────────────────────────────
+    // listUsers
 
     @Test
     fun `listUsers returns all users with permissions`() {
@@ -49,7 +49,7 @@ class UserServiceTest {
         assertEquals("alice", result[0].username)
     }
 
-    // ── listRoles ─────────────────────────────────────────────────────────────
+    // listRoles
 
     @Test
     fun `listRoles returns all roles`() {
@@ -60,7 +60,7 @@ class UserServiceTest {
         assertEquals(2, result.size)
     }
 
-    // ── updateUserRole ────────────────────────────────────────────────────────
+    // updateUserRole
 
     @Test
     fun `updateUserRole returns updated user on success`() {

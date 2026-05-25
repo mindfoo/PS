@@ -27,7 +27,7 @@ class TaskService(
     private val helpers: ServiceHelpers
 ) {
 
-    // ── List ─────────────────────────────────────────────────────────────────
+    // List
 
     @Transactional(readOnly = true)
     fun listAll(authenticationName: String): Either<TaskError, List<TaskResponse>> {
@@ -93,7 +93,7 @@ class TaskService(
         return success(ordered + unordered)
     }
 
-    // ── CRUD ─────────────────────────────────────────────────────────────────
+    // CRUD
 
     @Transactional(readOnly = true)
     fun getById(taskId: UUID, authenticationName: String): Either<TaskError, TaskResponse> {
@@ -180,7 +180,7 @@ class TaskService(
         return success(Unit)
     }
 
-    // ── Workflow linking ──────────────────────────────────────────────────────
+    // Workflow linking
 
     @Transactional
     fun linkToWorkflow(taskId: UUID, workflowId: UUID, authenticationName: String): Either<TaskError, Unit> {
@@ -237,7 +237,7 @@ class TaskService(
         return success(Unit)
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
+    // Helpers
 
     private fun findAccessibleWorkflow(workflowId: UUID, user: User) =
         if (isAdmin(user)) {

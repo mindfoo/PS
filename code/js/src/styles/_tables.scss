@@ -1,4 +1,4 @@
-// ── Tables ────────────────────────────────────────────────────────────────────
+// Tables
 @use 'variables' as *;
 
 .table-wrapper { overflow-x: auto; margin: 1rem 0; }
@@ -45,7 +45,7 @@
   white-space: nowrap;
 }
 
-// ── Stage badge (parallel group indicator) ────────────────────────────────────
+// Stage badge (parallel group indicator)
 .stage-badge {
   display: inline-flex;
   align-items: center;
@@ -78,12 +78,12 @@
   margin-right: 0.35rem;
 }
 
-// ── WorkflowDetailPage — tasks table ────────────────────────────────────────
+// WorkflowDetailPage — tasks table
 .th-drag-handle {
   width: 1.5rem;
 }
 
-// ── WorkflowDetailPage — execution history table ────────────────────────────
+// WorkflowDetailPage — execution history table
 .execution-row {
   cursor: pointer;
 }
@@ -93,13 +93,13 @@
 }
 
 .td-expand {
-  color: #8892a4;
+  color: $text-muted;
   width: 1.5rem;
   text-align: center;
 }
 
 .execution-detail-cell {
-  background: #0f1117;
+  background: $bg;
   padding: 0.75rem 1rem;
 }
 
@@ -115,7 +115,7 @@
 .execution-output-pre {
   margin: 0;
   font-size: 0.72rem;
-  color: #e2e8f0;
+  color: $text;
   white-space: pre-wrap;
   word-break: break-word;
   max-height: 6rem;
@@ -125,15 +125,15 @@
 .execution-output-pre--full {
   margin: 0;
   font-size: 0.78rem;
-  color: #e2e8f0;
+  color: $text;
   white-space: pre-wrap;
   word-break: break-word;
 }
 
-// ── WorkflowDetailPage — task row controls ───────────────────────────────────
+// WorkflowDetailPage — task row controls
 .td-drag-handle {
   cursor: grab;
-  color: #8892a4;
+  color: $text-muted;
   user-select: none;
 }
 
@@ -155,7 +155,7 @@
 }
 
 .background-wrapper{
-  background: #1b1d27d6;
+  background: rgba($surface, 0.84);
   padding: 1rem;
   border-radius: 5px;
 }

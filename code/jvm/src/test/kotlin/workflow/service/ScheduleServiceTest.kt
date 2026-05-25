@@ -54,7 +54,7 @@ class ScheduleServiceTest {
         service = ScheduleService(scheduleRepository, workflowRepository, executionService, helpers)
     }
 
-    // ── list ──────────────────────────────────────────────────────────────────
+    // list
 
     @Test
     fun `list returns all schedules for admin`() {
@@ -90,7 +90,7 @@ class ScheduleServiceTest {
         assertEquals(ScheduleError.UserNotFound, (result as Failure).value)
     }
 
-    // ── getById ───────────────────────────────────────────────────────────────
+    // getById
 
     @Test
     fun `getById returns schedule when found`() {
@@ -116,7 +116,7 @@ class ScheduleServiceTest {
         assertEquals(ScheduleError.ScheduleNotFound, (result as Failure).value)
     }
 
-    // ── create ────────────────────────────────────────────────────────────────
+    // create
 
     @Test
     fun `create returns ScheduleResponse on success`() {
@@ -158,7 +158,7 @@ class ScheduleServiceTest {
         assertEquals(ScheduleError.WorkflowNotFound, (result as Failure).value)
     }
 
-    // ── update ────────────────────────────────────────────────────────────────
+    // update
 
     @Test
     fun `update returns updated schedule on success`() {
@@ -188,7 +188,7 @@ class ScheduleServiceTest {
         assertEquals(ScheduleError.InvalidCronExpression, (result as Failure).value)
     }
 
-    // ── delete ────────────────────────────────────────────────────────────────
+    // delete
 
     @Test
     fun `delete removes schedule on success`() {

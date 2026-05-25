@@ -1,11 +1,11 @@
 package org.workflow.controller
 
 import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.media.Content
 import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.http.MediaType
-import org.springframework.http.ResponseEntity
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.GetMapping
@@ -27,18 +27,25 @@ class ExecutionEventController(
     @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Subscribe to live execution events via SSE")
     @ApiResponses(
-        ApiResponse(responseCode = "200", description = "SSE stream opened"),
-        ApiResponse(responseCode = "400", description = "Invalid execution ID format")
+        ApiResponse(responseCode = "200", description = "SSE stream opened — text/event-stream"),
+        ApiResponse(responseCode = "400", description = "Execution ID is not a valid UUID",
+            content = [Content(mediaType = Problem.MEDIA_TYPE)]),
+        ApiResponse(responseCode = "401", description = "Not authenticated",
+            content = [Content(mediaType = Problem.MEDIA_TYPE)])
     )
     fun subscribe(
         @PathVariable id: String,
         authentication: Authentication
-    ): ResponseEntity<*> {
+    ): SseEmitter {
+
         val executionId = try {
             UUID.fromString(id)
         } catch (e: IllegalArgumentException) {
-            return Problem.response(400, Problem.badRequest)
+            val errorEmitter = SseEmitter()
+            errorEmitter.completeWithError(IllegalArgumentException("Invalid Execution ID format"))
+            return errorEmitter
         }
-        return ResponseEntity.ok(executionEventService.subscribe(executionId))
+
+        return executionEventService.subscribe(executionId)
     }
 }

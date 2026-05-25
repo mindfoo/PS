@@ -26,7 +26,7 @@ class UserControllerTest {
         controller = UserController(userService)
     }
 
-    // ── listUsers ─────────────────────────────────────────────────────────────
+    // listUsers
 
     @Test
     fun `listUsers returns 200 with all users`() {
@@ -52,7 +52,7 @@ class UserControllerTest {
         assertEquals(0, response.body!!.size)
     }
 
-    // ── listRoles ─────────────────────────────────────────────────────────────
+    // listRoles
 
     @Test
     fun `listRoles returns 200 with role catalog`() {
@@ -68,7 +68,7 @@ class UserControllerTest {
         assertEquals(2, response.body!!.size)
     }
 
-    // ── updateUserRole ────────────────────────────────────────────────────────
+    // updateUserRole
 
     @Test
     fun `updateUserRole returns 200 on success`() {

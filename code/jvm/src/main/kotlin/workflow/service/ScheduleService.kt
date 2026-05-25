@@ -3,6 +3,8 @@ package org.workflow.service
 import org.springframework.scheduling.support.CronExpression
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.support.TransactionSynchronization
+import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.util.concurrent.CompletableFuture
 import org.workflow.dto.ScheduleCreateRequest
 import org.workflow.dto.ScheduleResponse
@@ -134,7 +136,15 @@ class ScheduleService(
             if (!schedule.enabled) return@forEach
 
             val executionId = executionService.createCronExecution(schedule.workflow, schedule.createdBy)
-            CompletableFuture.runAsync { executionService.runExecution(executionId) }
+
+            // Dispatch AFTER this transaction commits: createCronExecution saves the execution
+            // record inside this transaction, so runExecution's findById would fail with
+            // READ_COMMITTED isolation if called before the commit.
+            TransactionSynchronizationManager.registerSynchronization(object : TransactionSynchronization {
+                override fun afterCommit() {
+                    CompletableFuture.runAsync { executionService.runExecution(executionId) }
+                }
+            })
 
             schedule.lastRunAt = now
             schedule.nextRunAt = computeNextRun(schedule.cronExpression, schedule.timezone)
@@ -147,7 +157,9 @@ class ScheduleService(
         return try {
             val zone = ZoneId.of(timezone)
             val cron = CronExpression.parse(cronExpression)
-            cron.next(ZonedDateTime.now(zone))?.toLocalDateTime()
+            val nextInZone = cron.next(ZonedDateTime.now(zone))
+
+            nextInZone?.withZoneSameInstant(ZoneId.systemDefault())?.toLocalDateTime()
         } catch (_: Exception) {
             null
         }

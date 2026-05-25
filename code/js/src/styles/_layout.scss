@@ -1,4 +1,4 @@
-// ── Layout ───────────────────────────────────────────────────────────────────
+// Layout
 @use 'variables' as *;
 
 .app-layout {
@@ -6,7 +6,7 @@
   min-height: 100vh;
 }
 
-// ── Sidebar ──────────────────────────────────────────────────────────────────
+// Sidebar
 .sidebar {
   width: $sidebar-w;
   background: $surface;
@@ -48,7 +48,7 @@
     overflow: hidden;
   }
 
-  // ── Collapsed state (desktop only) ─────────────────────────────────────────
+  // Collapsed state (desktop only)
   &--collapsed {
     width: $sidebar-w-collapsed;
     padding: 1rem 0.5rem;
@@ -75,7 +75,7 @@
 
 .logo-icon { font-size: 1.25rem; flex-shrink: 0; }
 
-// ── Nav links ─────────────────────────────────────────────────────────────────
+// Nav links
 .nav-links {
   list-style: none;
   flex: 1;
@@ -103,7 +103,7 @@
 .nav-icon  { flex-shrink: 0; font-size: 1rem; }
 .nav-label { overflow: hidden; }
 
-// ── User info ─────────────────────────────────────────────────────────────────
+// User info
 .user-info {
   font-size: 0.8rem;
   color: $text-muted;
@@ -117,7 +117,7 @@
 
 .user-avatar { font-size: 1rem; flex-shrink: 0; }
 
-// ── Collapse toggle button (desktop) ─────────────────────────────────────────
+// Collapse toggle button (desktop)
 .sidebar-toggle-btn {
   display: flex;
   align-items: center;
@@ -140,7 +140,7 @@
   }
 }
 
-// ── Main content ─────────────────────────────────────────────────────────────
+// Main content
 .main-content {
   margin-left: $sidebar-w;
   padding: 2rem;
@@ -153,7 +153,6 @@
   margin-left: $sidebar-w-collapsed;
 }
 
-// ── Page chrome ───────────────────────────────────────────────────────────────
 .page-header {
   display: flex;
   align-items: center;
@@ -167,7 +166,7 @@
 
 .page-sub-header {
   padding: 0 0 2rem;
-  border-bottom: 2px dotted #1b1d27;
+  border-bottom: 2px dotted $surface;
   margin: 0 0 2rem;
 }
 
@@ -195,7 +194,7 @@
   &:hover { color: $text; }
 }
 
-// ── Hamburger button (hidden on desktop) ──────────────────────────────────────
+// Hamburger button (hidden on desktop)
 .hamburger-btn {
   display: none;
   position: fixed;
@@ -214,7 +213,7 @@
   justify-content: center;
 }
 
-// ── Backdrop (mobile only) ────────────────────────────────────────────────────
+// Backdrop (mobile only)
 .sidebar-backdrop {
   display: none;
   position: fixed;
@@ -223,7 +222,7 @@
   z-index: 99;
 }
 
-// ── Mobile breakpoint ─────────────────────────────────────────────────────────
+// Mobile breakpoint
 @media (max-width: 768px) {
   .hamburger-btn { display: flex; }
 
@@ -258,7 +257,7 @@
   }
 }
 
-// ── Misc section helpers ──────────────────────────────────────────────────────
+// Misc section helpers
 .section-header-title {
   display: flex;
   align-items: center;

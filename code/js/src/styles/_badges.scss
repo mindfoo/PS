@@ -1,5 +1,6 @@
-// ── Badges ────────────────────────────────────────────────────────────────────
+// Badges
 @use 'variables' as *;
+@use 'sass:color';
 
 .badge {
   display: inline-block;
@@ -10,15 +11,15 @@
   background: $surface2;
   color: $text;
 
-  &-success { background: rgba($success, 0.15); color: $success; }
+  &-success { background: color.adjust($success, $alpha: -0.85); color: $success; }
   &-muted   { background: $surface2; color: $text-muted; }
 
   // Execution status variants
-  &-status-success  { background: rgba($success, 0.15); color: $success; }
-  &-status-error    { background: rgba($danger,  0.15); color: $danger;  }
-  &-status-running  { background: rgba($primary, 0.15); color: $primary; }
-  &-status-pending  { background: rgba(#f59e0b, 0.15);  color: #f59e0b;  }
-  &-status-canceled { background: rgba(#94a3b8, 0.15);  color: #94a3b8;  }
+  &-status-success  { background: color.adjust($success,  $alpha: -0.85); color: $success;  }
+  &-status-error    { background: color.adjust($danger,   $alpha: -0.85); color: $danger;   }
+  &-status-running  { background: color.adjust($primary,  $alpha: -0.85); color: $primary;  }
+  &-status-pending  { background: color.adjust($warning,  $alpha: -0.85); color: $warning;  }
+  &-status-canceled { background: color.adjust($slate,    $alpha: -0.85); color: $slate;    }
 }
 
 .role-badge {
@@ -30,9 +31,9 @@
   letter-spacing: 0.04em;
 }
 
-.role-admin { background: rgba($danger,   0.2);  color: #f87171; }
-.role-writer { background: rgba($primary,  0.2);  color: #818cf8; }
-.role-reader { background: rgba($success,  0.15); color: #4ade80; }
-.role-dev   { background: rgba(#f59e0b,   0.15); color: #fbbf24; }
+.role-admin  { background: color.adjust($danger,   $alpha: -0.8);  color: color.scale($danger,   $lightness: 20%); }
+.role-writer { background: color.adjust($primary,  $alpha: -0.8);  color: color.scale($primary,  $lightness: 20%); }
+.role-reader { background: color.adjust($success,  $alpha: -0.85); color: color.scale($success,  $lightness: 20%); }
+.role-dev    { background: color.adjust($warning,  $alpha: -0.85); color: color.scale($warning,  $lightness: 20%); }
 
-.badge-private { background: rgba(#7c3aed, 0.15); color: #a78bfa; }
+.badge-private { background: color.adjust($purple, $alpha: -0.85); color: color.scale($purple, $lightness: 30%); }
