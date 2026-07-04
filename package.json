@@ -8,7 +8,8 @@
     "test": "npm run test:jvm && npm run test:js",
     "test:jvm": "cd code/jvm && ./gradlew test",
     "test:js":  "cd code/js  && npm run test",
-    "test:coverage": "npm run test:jvm && cd code/js && npm run test:coverage"
+    "test:coverage": "npm run test:jvm && cd code/js && npm run test:coverage",
+    "format:js": "cd code/js && npm run format"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

@@ -1,20 +1,20 @@
 // Design tokens — these mirror the CSS custom properties in :root so SCSS can use them
 // directly in rules (nesting, calculations, etc.) without string interpolation.
 
-$bg:            #0f1117;
-$surface:       #1a1d27;
-$surface2:      #22263a;
-$border:        #2e3347;
-$primary:       #6366f1;
+$bg: #0f1117;
+$surface: #1a1d27;
+$surface2: #22263a;
+$border: #2e3347;
+$primary: #6366f1;
 $primary-hover: #4f52d9;
-$success:       #22c55e;
-$danger:        #ef4444;
-$warning:       #f59e0b;
-$slate:         #94a3b8;
-$purple:        #7c3aed;
-$white:         #fff;
-$text:          #e2e8f0;
-$text-muted:    #8892a4;
-$radius:        8px;
-$sidebar-w:           230px;
+$success: #22c55e;
+$danger: #ef4444;
+$warning: #f59e0b;
+$slate: #94a3b8;
+$purple: #7c3aed;
+$white: #fff;
+$text: #e2e8f0;
+$text-muted: #8892a4;
+$radius: 8px;
+$sidebar-w: 230px;
 $sidebar-w-collapsed: 56px;

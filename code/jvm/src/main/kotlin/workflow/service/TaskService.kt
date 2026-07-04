@@ -1,7 +1,10 @@
 package org.workflow.service
 
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.web.multipart.MultipartFile
+import org.workflow.dto.ScriptInfoResponse
 import org.workflow.dto.TaskCreateRequest
 import org.workflow.dto.TaskResponse
 import org.workflow.dto.TaskUpdateRequest
@@ -16,16 +19,24 @@ import org.workflow.service.utils.TaskError
 import org.workflow.utils.Either
 import org.workflow.utils.failure
 import org.workflow.utils.success
+import java.nio.file.Files
+import java.nio.file.Paths
 import java.util.UUID
 
-/** Implements task CRUD and workflow-link operations. Tasks are standalone and linked via WorkflowTaskOrder. */
+/** Implements task CRUD, workflow-link operations, and script upload management. */
 @Service
 class TaskService(
     private val taskRepository: TaskRepository,
     private val workflowRepository: WorkflowRepository,
     private val workflowTaskOrderRepository: WorkflowTaskOrderRepository,
-    private val helpers: ServiceHelpers
+    private val helpers: ServiceHelpers,
+    @Value("\${app.scripts.base-dir:./scripts}") private val scriptsBaseDir: String,
+    @Value("\${app.scripts.max-size-mb:10}") private val maxScriptSizeMb: Long
 ) {
+
+    companion object {
+        private val ALLOWED_EXTENSIONS = setOf("py", "js", "ts", "sh", "bash")
+    }
 
     // List
 
@@ -34,16 +45,18 @@ class TaskService(
         val currentUser = findCurrentUser(authenticationName)
             ?: return failure(TaskError.UserNotFound)
 
+        val userId = currentUser.id ?: return failure(TaskError.UserNotFound)
         val tasks = if (isAdmin(currentUser)) taskRepository.findAll()
-                     else taskRepository.findAllVisible(currentUser.id!!)
+                     else taskRepository.findAllVisible(userId)
         val taskIds = tasks.mapNotNull { it.id }.toSet()
         val linkedWorkflowByTaskId: Map<UUID, UUID?> = if (taskIds.isNotEmpty()) {
             workflowTaskOrderRepository.findAllByTaskIdIn(taskIds)
-                .groupBy { it.task.id!! }
+                .mapNotNull { wto -> wto.task.id?.let { id -> id to wto } }
+                .groupBy({ it.first }, { it.second })
                 .mapValues { (_, wtos) -> wtos.firstOrNull()?.workflow?.id }
         } else emptyMap()
         return success(tasks.map { task ->
-            toResponse(task, task.workflow?.id ?: linkedWorkflowByTaskId[task.id])
+            task.toResponse(task.workflow?.id ?: linkedWorkflowByTaskId[task.id])
         })
     }
 
@@ -55,7 +68,8 @@ class TaskService(
         val workflow = workflowRepository.findById(workflowId).orElse(null)
             ?: return failure(TaskError.WorkflowNotFound)
 
-        val orderRows = workflowTaskOrderRepository.findAllByWorkflowIdOrderByTaskOrderAsc(workflow.id!!)
+        val wfId = workflow.id ?: return failure(TaskError.WorkflowNotFound)
+        val orderRows = workflowTaskOrderRepository.findAllByWorkflowIdOrderByTaskOrderAsc(wfId)
 
         val ordered = orderRows.map { wto ->
             WorkflowTaskEntry(
@@ -74,7 +88,7 @@ class TaskService(
         // Include tasks linked via direct workflow FK that have no WorkflowTaskOrder row yet
         val orderedTaskIds = orderRows.map { it.task.id }.toSet()
         val nextStage = (orderRows.maxOfOrNull { it.taskOrder } ?: 0) + 1
-        val unordered = taskRepository.findAllByWorkflowId(workflow.id!!)
+        val unordered = taskRepository.findAllByWorkflowId(wfId)
             .filter { it.id !in orderedTaskIds }
             .mapIndexed { idx, task ->
                 WorkflowTaskEntry(
@@ -107,8 +121,8 @@ class TaskService(
         }
 
         val effectiveWorkflowId = task.workflow?.id
-            ?: workflowTaskOrderRepository.findAllByTaskId(task.id!!).firstOrNull()?.workflow?.id
-        return success(toResponse(task, effectiveWorkflowId))
+            ?: task.id?.let { workflowTaskOrderRepository.findAllByTaskId(it).firstOrNull()?.workflow?.id }
+        return success(task.toResponse(effectiveWorkflowId))
     }
 
     @Transactional
@@ -133,8 +147,9 @@ class TaskService(
         )
 
         if (workflow != null) {
+            val wfId = workflow.id ?: return failure(TaskError.WorkflowNotFound)
             val nextStage = workflowTaskOrderRepository
-                .findAllByWorkflowIdOrderByTaskOrderAsc(workflow.id!!)
+                .findAllByWorkflowIdOrderByTaskOrderAsc(wfId)
                 .maxOfOrNull { it.taskOrder }?.plus(1) ?: 1
 
             workflowTaskOrderRepository.save(
@@ -142,7 +157,7 @@ class TaskService(
             )
         }
 
-        return success(toResponse(saved))
+        return success(saved.toResponse())
     }
 
     @Transactional
@@ -150,18 +165,15 @@ class TaskService(
         val currentUser = findCurrentUser(authenticationName)
             ?: return failure(TaskError.UserNotFound)
 
-        val task = if (isAdmin(currentUser)) {
-            taskRepository.findById(taskId).orElse(null)
-        } else {
-            taskRepository.findByIdAndOwnerId(taskId, currentUser.id!!)
-        } ?: return failure(TaskError.TaskNotFound)
+        val task = findOwnedTask(taskId, currentUser)
+            ?: return failure(TaskError.TaskNotFound)
 
         task.name = request.name
         task.type = request.type
         task.config = request.config
         task.isPrivate = request.isPrivate
 
-        return success(toResponse(taskRepository.save(task)))
+        return success(taskRepository.save(task).toResponse())
     }
 
     @Transactional
@@ -169,13 +181,11 @@ class TaskService(
         val currentUser = findCurrentUser(authenticationName)
             ?: return failure(TaskError.UserNotFound)
 
-        val task = if (isAdmin(currentUser)) {
-            taskRepository.findById(taskId).orElse(null)
-        } else {
-            taskRepository.findByIdAndOwnerId(taskId, currentUser.id!!)
-        } ?: return failure(TaskError.TaskNotFound)
+        val task = findOwnedTask(taskId, currentUser)
+            ?: return failure(TaskError.TaskNotFound)
 
-        workflowTaskOrderRepository.deleteAll(workflowTaskOrderRepository.findAllByTaskId(task.id!!))
+        val tId = task.id ?: return failure(TaskError.TaskNotFound)
+        workflowTaskOrderRepository.deleteAll(workflowTaskOrderRepository.findAllByTaskId(tId))
         taskRepository.delete(task)
         return success(Unit)
     }
@@ -187,20 +197,19 @@ class TaskService(
         val currentUser = findCurrentUser(authenticationName)
             ?: return failure(TaskError.UserNotFound)
 
-        val task = if (isAdmin(currentUser)) {
-            taskRepository.findById(taskId).orElse(null)
-        } else {
-            taskRepository.findByIdAndOwnerId(taskId, currentUser.id!!)
-        } ?: return failure(TaskError.TaskNotFound)
+        val task = findOwnedTask(taskId, currentUser)
+            ?: return failure(TaskError.TaskNotFound)
 
         val workflow = findAccessibleWorkflow(workflowId, currentUser)
             ?: return failure(TaskError.WorkflowNotFound)
 
-        val existing = workflowTaskOrderRepository.findAllByWorkflowIdAndTaskId(workflow.id!!, task.id!!)
+        val wfId = workflow.id ?: return failure(TaskError.WorkflowNotFound)
+        val tId = task.id ?: return failure(TaskError.TaskNotFound)
+        val existing = workflowTaskOrderRepository.findAllByWorkflowIdAndTaskId(wfId, tId)
         if (existing.isNotEmpty()) return failure(TaskError.AlreadyLinked)
 
         val nextStage = workflowTaskOrderRepository
-            .findAllByWorkflowIdOrderByTaskOrderAsc(workflow.id!!)
+            .findAllByWorkflowIdOrderByTaskOrderAsc(wfId)
             .maxOfOrNull { it.taskOrder }?.plus(1) ?: 1
 
         workflowTaskOrderRepository.save(
@@ -214,16 +223,15 @@ class TaskService(
         val currentUser = findCurrentUser(authenticationName)
             ?: return failure(TaskError.UserNotFound)
 
-        val task = if (isAdmin(currentUser)) {
-            taskRepository.findById(taskId).orElse(null)
-        } else {
-            taskRepository.findByIdAndOwnerId(taskId, currentUser.id!!)
-        } ?: return failure(TaskError.TaskNotFound)
+        val task = findOwnedTask(taskId, currentUser)
+            ?: return failure(TaskError.TaskNotFound)
 
         val workflow = findAccessibleWorkflow(workflowId, currentUser)
             ?: return failure(TaskError.WorkflowNotFound)
 
-        val rows = workflowTaskOrderRepository.findAllByWorkflowIdAndTaskId(workflow.id!!, task.id!!)
+        val wfId = workflow.id ?: return failure(TaskError.WorkflowNotFound)
+        val tId = task.id ?: return failure(TaskError.TaskNotFound)
+        val rows = workflowTaskOrderRepository.findAllByWorkflowIdAndTaskId(wfId, tId)
         if (rows.isEmpty()) return failure(TaskError.NotLinked)
 
         workflowTaskOrderRepository.deleteAll(rows)
@@ -237,25 +245,105 @@ class TaskService(
         return success(Unit)
     }
 
+    // Script upload
+
+    /**
+     * Saves the uploaded file to [scriptsBaseDir]/{taskId}/ and updates the task's config so
+     * the executor picks it up automatically on the next run.
+     * Only ADMIN and DEV (task:upload authority) reach this method; access is enforced by the controller.
+     */
+    @Transactional
+    fun uploadScript(
+        taskId: UUID,
+        file: MultipartFile,
+        authenticationName: String
+    ): Either<TaskError, ScriptInfoResponse> {
+        val currentUser = findCurrentUser(authenticationName) ?: return failure(TaskError.UserNotFound)
+        val task = taskRepository.findById(taskId).orElse(null) ?: return failure(TaskError.TaskNotFound)
+
+        if (task.isPrivate && !isAdmin(currentUser) && task.createdBy?.id != currentUser.id) {
+            return failure(TaskError.AccessDenied)
+        }
+
+        val originalName = file.originalFilename?.takeIf { it.isNotBlank() }
+            ?: return failure(TaskError.InvalidFileType)
+
+        /* Strip any path components — prevents path traversal attacks.
+           A name like "../../etc/evil.py" would pass extension check but resolve outside scriptsBaseDir.
+           Paths.get(...).fileName gives only the last segment, e.g. "evil.py". */
+        val safeName = Paths.get(originalName).fileName?.toString()
+            ?: return failure(TaskError.InvalidFileType)
+
+        val extension = safeName.substringAfterLast('.', "").lowercase()
+        if (extension !in ALLOWED_EXTENSIONS) return failure(TaskError.InvalidFileType)
+
+        if (file.size > maxScriptSizeMb * 1024 * 1024) return failure(TaskError.FileTooLarge)
+
+        val dir = Paths.get(scriptsBaseDir, taskId.toString())
+
+        /* Commit the DB record first. If the file write fails afterward the DB row is inconsistent
+           but there are no orphaned files. The reverse order (file first, then DB) would leave
+           a file on disk with no DB record if the transaction rolls back. */
+        val updatedConfig = task.config.toMutableMap()
+        updatedConfig["fileName"] = safeName
+        updatedConfig["directory"] = dir.toAbsolutePath().toString()
+        task.config = updatedConfig
+        task.scriptFileName = safeName
+        val saved = taskRepository.save(task)
+
+        Files.createDirectories(dir)
+        file.transferTo(dir.resolve(safeName))
+
+        return success(ScriptInfoResponse(taskId = taskId, fileName = safeName,
+            sizeBytes = file.size, uploadedAt = saved.lastUpdated))
+    }
+
+    /** Returns metadata for the script uploaded to a task without exposing file contents. */
+    @Transactional(readOnly = true)
+    fun getScriptInfo(taskId: UUID, authenticationName: String): Either<TaskError, ScriptInfoResponse> {
+        val currentUser = findCurrentUser(authenticationName) ?: return failure(TaskError.UserNotFound)
+        val task = taskRepository.findById(taskId).orElse(null) ?: return failure(TaskError.TaskNotFound)
+
+        if (task.isPrivate && !isAdmin(currentUser) && task.createdBy?.id != currentUser.id) {
+            return failure(TaskError.AccessDenied)
+        }
+
+        val fileName = task.scriptFileName ?: return failure(TaskError.ScriptNotFound)
+        val file = Paths.get(scriptsBaseDir, taskId.toString(), fileName).toFile()
+
+        /* scriptFileName in DB but no file on disk is a data integrity anomaly — treat as not found. */
+        if (!file.exists()) return failure(TaskError.ScriptNotFound)
+
+        return success(ScriptInfoResponse(taskId = taskId, fileName = fileName,
+            sizeBytes = file.length(), uploadedAt = task.lastUpdated))
+    }
+
     // Helpers
 
-    private fun findAccessibleWorkflow(workflowId: UUID, user: User) =
-        if (isAdmin(user)) {
-            workflowRepository.findById(workflowId).orElse(null)
-        } else {
-            workflowRepository.findByIdAndOwnerId(workflowId, user.id!!)
-        }
+    private fun findAccessibleWorkflow(workflowId: UUID, user: User): org.workflow.entity.Workflow? {
+        if (isAdmin(user)) return workflowRepository.findById(workflowId).orElse(null)
+        val userId = user.id ?: return null
+        return workflowRepository.findByIdAndOwnerId(workflowId, userId)
+    }
+
+    /** Admins can access any task by ID; other users only their own. */
+    private fun findOwnedTask(taskId: UUID, user: User): Task? {
+        if (isAdmin(user)) return taskRepository.findById(taskId).orElse(null)
+        val userId = user.id ?: return null
+        return taskRepository.findByIdAndOwnerId(taskId, userId)
+    }
 
     private fun findCurrentUser(username: String) = helpers.findUser(username)
     private fun isAdmin(user: User) = helpers.isAdmin(user)
 
-    private fun toResponse(task: Task, effectiveWorkflowId: UUID? = task.workflow?.id): TaskResponse =
+    private fun Task.toResponse(effectiveWorkflowId: UUID? = workflow?.id): TaskResponse =
         TaskResponse(
-            id = task.id,
-            name = task.name,
-            type = task.type,
-            config = task.config,
+            id = id,
+            name = name,
+            type = type,
+            config = config,
             workflowId = effectiveWorkflowId,
-            isPrivate = task.isPrivate
+            isPrivate = isPrivate,
+            scriptFileName = scriptFileName
         )
 }

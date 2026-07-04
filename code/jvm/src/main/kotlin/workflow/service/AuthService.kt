@@ -13,7 +13,9 @@ import org.workflow.repository.RoleRepository
 import org.workflow.repository.UserRepository
 import org.workflow.repository.UserTokenRepository
 import org.workflow.security.TokenUtils
-import org.workflow.service.utils.AuthError
+import org.workflow.entity.enums.RoleType
+import org.workflow.service.utils.AuthLoginError
+import org.workflow.service.utils.AuthRegisterError
 import org.workflow.utils.Either
 import org.workflow.utils.failure
 import org.workflow.utils.success
@@ -34,18 +36,20 @@ class AuthService(
     }
 
     @Transactional
-    fun register(request: RegisterRequest): Either<AuthError, ProfileResponse> {
+    fun register(request: RegisterRequest): Either<AuthRegisterError, ProfileResponse> {
         if (!isSafePassword(request.password)) {
-            return failure(AuthError.InsecurePassword)
+            return failure(AuthRegisterError.InsecurePassword)
         }
 
         if (userRepository.findByUsername(request.username) != null) {
-            return failure(AuthError.UsernameAlreadyTaken)
+            return failure(AuthRegisterError.UsernameAlreadyTaken)
         }
 
-        val resolvedRoleName = (request.roleName ?: "READER").uppercase()
-        val role = roleRepository.findByName(resolvedRoleName)
-            ?: return failure(AuthError.RoleNotFound)
+        val resolvedRoleName = (request.roleName ?: RoleType.READER.name).uppercase()
+        val roleType = RoleType.fromString(resolvedRoleName)
+            ?: return failure(AuthRegisterError.RoleNotFound)
+        val role = roleRepository.findByName(roleType)
+            ?: return failure(AuthRegisterError.RoleNotFound)
 
         val saved = userRepository.save(
             User(
@@ -58,22 +62,19 @@ class AuthService(
     }
 
     /**
-     * Validates credentials directly with [PasswordEncoder.matches] — no Spring Security
-     * [AuthenticationManager] involved — then generates an opaque random token, stores its
-     * SHA-256 hash in [UserToken] and returns the raw value for the cookie.
-     *
+     * Validates credentials directly with [PasswordEncoder.matches]
      */
     @Transactional
-    fun login(request: LoginRequest): Either<AuthError, TokenResponse> {
+    fun login(request: LoginRequest): Either<AuthLoginError, TokenResponse> {
         if (request.username.isBlank() || request.password.isBlank()) {
-            return failure(AuthError.InvalidCredentials)
+            return failure(AuthLoginError.InvalidCredentials)
         }
 
         val user = userRepository.findByUsername(request.username)
-            ?: return failure(AuthError.InvalidCredentials)
+            ?: return failure(AuthLoginError.InvalidCredentials)
 
         if (!passwordEncoder.matches(request.password, user.passwordValidation)) {
-            return failure(AuthError.InvalidCredentials)
+            return failure(AuthLoginError.InvalidCredentials)
         }
 
         val rawToken = TokenUtils.generateToken()
@@ -90,7 +91,6 @@ class AuthService(
 
     /**
      * Revokes the token by deleting its hash from the database.
-     * The controller clears the cookie client-side after calling this.
      */
     @Transactional
     fun logout(rawToken: String) {
@@ -98,15 +98,17 @@ class AuthService(
     }
 
     @Transactional(readOnly = true)
-    fun profile(username: String): Either<AuthError, ProfileResponse> {
+    fun profile(username: String): Either<AuthLoginError, ProfileResponse> {
         val user = userRepository.findByUsername(username)
-            ?: return failure(AuthError.UserNotFound)
+            ?: return failure(AuthLoginError.UserNotFound)
 
         return success(ProfileResponse(id = user.id, username = user.username, role = user.role.name))
     }
 
+    /** Password must be at least 10 characters and contain uppercase, lowercase, and a symbol. */
     private fun isSafePassword(password: String): Boolean =
-        password.length > 9 &&
-            password.any { it.isDigit() } &&
-            password.any { it.isLowerCase() } 
+        password.length >= 10 &&
+            password.any { it.isUpperCase() } &&
+            password.any { it.isLowerCase() } &&
+            password.any { !it.isLetterOrDigit() }
 }

@@ -30,6 +30,7 @@ import org.workflow.service.ExecutionService
 import org.workflow.service.TaskService
 import org.workflow.service.utils.TaskError
 import org.workflow.service.utils.WorkflowError
+import org.workflow.service.utils.ExecutionError
 import org.workflow.service.WorkflowService
 import org.workflow.utils.Failure
 import org.workflow.utils.Problem
@@ -53,20 +54,16 @@ class WorkflowController(
         ApiResponse(responseCode = "200", description = "List returned",
             content = [Content(schema = Schema(implementation = WorkflowResponse::class))]),
         ApiResponse(responseCode = "401", description = "Not authenticated",
-            content = [Content(mediaType = Problem.MEDIA_TYPE)]),
+            content = [Content(mediaType = Problem.PROB_TYPE)]),
         ApiResponse(responseCode = "403", description = "Private resource — access denied",
-            content = [Content(mediaType = Problem.MEDIA_TYPE)]),
+            content = [Content(mediaType = Problem.PROB_TYPE)]),
         ApiResponse(responseCode = "404", description = "User not found",
-            content = [Content(mediaType = Problem.MEDIA_TYPE)])
+            content = [Content(mediaType = Problem.PROB_TYPE)])
     )
     fun list(authentication: Authentication): ResponseEntity<Any> =
         when (val result = workflowService.list(authentication.name)) {
             is Success -> ResponseEntity.ok(result.value)
-            is Failure -> when (result.value) {
-                WorkflowError.UserNotFound -> Problem.response(404, Problem.userNotFound)
-                WorkflowError.WorkflowNotFound -> Problem.response(404, Problem.workflowNotFound)
-                WorkflowError.AccessDenied -> Problem.response(403, Problem.accessDenied)
-            }
+            is Failure -> result.value.toResponse()
         }
 
     @GetMapping(Uris.Workflows.BY_ID)
@@ -76,9 +73,9 @@ class WorkflowController(
         ApiResponse(responseCode = "200", description = "Workflow found",
             content = [Content(schema = Schema(implementation = WorkflowResponse::class))]),
         ApiResponse(responseCode = "403", description = "Private resource — access denied",
-            content = [Content(mediaType = Problem.MEDIA_TYPE)]),
+            content = [Content(mediaType = Problem.PROB_TYPE)]),
         ApiResponse(responseCode = "404", description = "Workflow not found",
-            content = [Content(mediaType = Problem.MEDIA_TYPE)])
+            content = [Content(mediaType = Problem.PROB_TYPE)])
     )
     fun getById(
         @PathVariable id: UUID,
@@ -86,11 +83,7 @@ class WorkflowController(
     ): ResponseEntity<Any> =
         when (val result = workflowService.getById(id, authentication.name)) {
             is Success -> ResponseEntity.ok(result.value)
-            is Failure -> when (result.value) {
-                WorkflowError.UserNotFound -> Problem.response(404, Problem.userNotFound)
-                WorkflowError.WorkflowNotFound -> Problem.response(404, Problem.workflowNotFound)
-                WorkflowError.AccessDenied -> Problem.response(403, Problem.accessDenied)
-            }
+            is Failure -> result.value.toResponse()
         }
 
     @PostMapping(Uris.Workflows.BASE)
@@ -100,21 +93,21 @@ class WorkflowController(
         ApiResponse(responseCode = "201", description = "Workflow created",
             content = [Content(schema = Schema(implementation = WorkflowResponse::class))]),
         ApiResponse(responseCode = "403", description = "Insufficient permissions",
-            content = [Content(mediaType = Problem.MEDIA_TYPE)]),
+            content = [Content(mediaType = Problem.PROB_TYPE)]),
         ApiResponse(responseCode = "404", description = "User not found",
-            content = [Content(mediaType = Problem.MEDIA_TYPE)])
+            content = [Content(mediaType = Problem.PROB_TYPE)])
     )
     fun create(
         @Valid @RequestBody request: WorkflowCreateRequest,
         authentication: Authentication
     ): ResponseEntity<Any> =
         when (val result = workflowService.create(request, authentication.name)) {
-            is Success -> ResponseEntity.status(HttpStatus.CREATED).body(result.value)
-            is Failure -> when (result.value) {
-                WorkflowError.UserNotFound -> Problem.response(404, Problem.userNotFound)
-                WorkflowError.WorkflowNotFound -> Problem.response(404, Problem.workflowNotFound)
-                WorkflowError.AccessDenied -> Problem.response(403, Problem.accessDenied)
+            is Success -> {
+                val builder = ResponseEntity.status(HttpStatus.CREATED)
+                result.value.id?.let { builder.location(Uris.Workflows.byId(it)) }
+                builder.body(result.value)
             }
+            is Failure -> result.value.toResponse()
         }
 
     @PutMapping(Uris.Workflows.BY_ID)
@@ -124,9 +117,9 @@ class WorkflowController(
         ApiResponse(responseCode = "200", description = "Workflow updated",
             content = [Content(schema = Schema(implementation = WorkflowResponse::class))]),
         ApiResponse(responseCode = "403", description = "Private resource — access denied",
-            content = [Content(mediaType = Problem.MEDIA_TYPE)]),
+            content = [Content(mediaType = Problem.PROB_TYPE)]),
         ApiResponse(responseCode = "404", description = "Workflow or user not found",
-            content = [Content(mediaType = Problem.MEDIA_TYPE)])
+            content = [Content(mediaType = Problem.PROB_TYPE)])
     )
     fun update(
         @PathVariable id: UUID,
@@ -135,11 +128,7 @@ class WorkflowController(
     ): ResponseEntity<Any> =
         when (val result = workflowService.update(id, request, authentication.name)) {
             is Success -> ResponseEntity.ok(result.value)
-            is Failure -> when (result.value) {
-                WorkflowError.UserNotFound -> Problem.response(404, Problem.userNotFound)
-                WorkflowError.WorkflowNotFound -> Problem.response(404, Problem.workflowNotFound)
-                WorkflowError.AccessDenied -> Problem.response(403, Problem.accessDenied)
-            }
+            is Failure -> result.value.toResponse()
         }
 
     @DeleteMapping(Uris.Workflows.BY_ID)
@@ -148,9 +137,9 @@ class WorkflowController(
     @ApiResponses(
         ApiResponse(responseCode = "204", description = "Workflow deleted"),
         ApiResponse(responseCode = "403", description = "Private resource — access denied",
-            content = [Content(mediaType = Problem.MEDIA_TYPE)]),
+            content = [Content(mediaType = Problem.PROB_TYPE)]),
         ApiResponse(responseCode = "404", description = "Workflow or user not found",
-            content = [Content(mediaType = Problem.MEDIA_TYPE)])
+            content = [Content(mediaType = Problem.PROB_TYPE)])
     )
     fun delete(
         @PathVariable id: UUID,
@@ -158,11 +147,7 @@ class WorkflowController(
     ): ResponseEntity<Any> =
         when (val result = workflowService.delete(id, authentication.name)) {
             is Success -> ResponseEntity.noContent().build()
-            is Failure -> when (result.value) {
-                WorkflowError.UserNotFound -> Problem.response(404, Problem.userNotFound)
-                WorkflowError.WorkflowNotFound -> Problem.response(404, Problem.workflowNotFound)
-                WorkflowError.AccessDenied -> Problem.response(403, Problem.accessDenied)
-            }
+            is Failure -> result.value.toResponse()
         }
 
     @PostMapping(Uris.Workflows.RUN)
@@ -172,18 +157,19 @@ class WorkflowController(
         ApiResponse(responseCode = "202", description = "Execution started",
             content = [Content(schema = Schema(implementation = TriggerWorkflowResponse::class))]),
         ApiResponse(responseCode = "403", description = "Insufficient permissions",
-            content = [Content(mediaType = Problem.MEDIA_TYPE)]),
+            content = [Content(mediaType = Problem.PROB_TYPE)]),
         ApiResponse(responseCode = "404", description = "Workflow or user not found",
-            content = [Content(mediaType = Problem.MEDIA_TYPE)])
+            content = [Content(mediaType = Problem.PROB_TYPE)])
     )
     fun runNow(
         @PathVariable id: UUID,
         authentication: Authentication
-    ): ResponseEntity<TriggerWorkflowResponse> {
-        val executionId = executionService.triggerManualWorkflow(id, authentication.name)
-        return ResponseEntity.status(HttpStatus.ACCEPTED)
-            .body(TriggerWorkflowResponse(executionId = executionId, status = "STARTED"))
-    }
+    ): ResponseEntity<Any> =
+        when (val result = executionService.triggerManualWorkflow(id, authentication.name)) {
+            is Success -> ResponseEntity.status(HttpStatus.ACCEPTED)
+                .body(TriggerWorkflowResponse(executionId = result.value, status = "STARTED"))
+            is Failure -> result.value.toResponse()
+        }
 
     @PatchMapping(Uris.Workflows.TASK_ORDER)
     @PreAuthorize("hasAuthority('workflow:write')")
@@ -191,9 +177,9 @@ class WorkflowController(
     @ApiResponses(
         ApiResponse(responseCode = "204", description = "Order updated"),
         ApiResponse(responseCode = "403", description = "Private resource — access denied",
-            content = [Content(mediaType = Problem.MEDIA_TYPE)]),
+            content = [Content(mediaType = Problem.PROB_TYPE)]),
         ApiResponse(responseCode = "404", description = "Workflow or order row not found",
-            content = [Content(mediaType = Problem.MEDIA_TYPE)])
+            content = [Content(mediaType = Problem.PROB_TYPE)])
     )
     fun reorderTasks(
         @PathVariable id: UUID,
@@ -202,11 +188,7 @@ class WorkflowController(
     ): ResponseEntity<Any> =
         when (val result = workflowService.reorderTasks(id, request, authentication.name)) {
             is Success -> ResponseEntity.noContent().build()
-            is Failure -> when (result.value) {
-                WorkflowError.UserNotFound -> Problem.response(404, Problem.userNotFound)
-                WorkflowError.WorkflowNotFound -> Problem.response(404, Problem.workflowNotFound)
-                WorkflowError.AccessDenied -> Problem.response(403, Problem.accessDenied)
-            }
+            is Failure -> result.value.toResponse()
         }
 
     @GetMapping(Uris.Workflows.EXECUTIONS)
@@ -216,9 +198,9 @@ class WorkflowController(
         ApiResponse(responseCode = "200", description = "Execution list returned",
             content = [Content(schema = Schema(implementation = ExecutionSummaryResponse::class))]),
         ApiResponse(responseCode = "403", description = "Private resource — access denied",
-            content = [Content(mediaType = Problem.MEDIA_TYPE)]),
+            content = [Content(mediaType = Problem.PROB_TYPE)]),
         ApiResponse(responseCode = "404", description = "Workflow not found",
-            content = [Content(mediaType = Problem.MEDIA_TYPE)])
+            content = [Content(mediaType = Problem.PROB_TYPE)])
     )
     fun listExecutions(
         @PathVariable id: UUID,
@@ -226,11 +208,7 @@ class WorkflowController(
     ): ResponseEntity<Any> =
         when (val result = workflowService.listExecutions(id, authentication.name)) {
             is Success -> ResponseEntity.ok(result.value)
-            is Failure -> when (result.value) {
-                WorkflowError.UserNotFound -> Problem.response(404, Problem.userNotFound)
-                WorkflowError.WorkflowNotFound -> Problem.response(404, Problem.workflowNotFound)
-                WorkflowError.AccessDenied -> Problem.response(403, Problem.accessDenied)
-            }
+            is Failure -> result.value.toResponse()
         }
 
     @PostMapping(Uris.Workflows.LINK_TASK)
@@ -239,11 +217,11 @@ class WorkflowController(
     @ApiResponses(
         ApiResponse(responseCode = "204", description = "Task linked"),
         ApiResponse(responseCode = "404", description = "Workflow or task not found",
-            content = [Content(mediaType = Problem.MEDIA_TYPE)]),
+            content = [Content(mediaType = Problem.PROB_TYPE)]),
         ApiResponse(responseCode = "403", description = "Private resource — access denied",
-            content = [Content(mediaType = Problem.MEDIA_TYPE)]),
+            content = [Content(mediaType = Problem.PROB_TYPE)]),
         ApiResponse(responseCode = "409", description = "Task already linked",
-            content = [Content(mediaType = Problem.MEDIA_TYPE)])
+            content = [Content(mediaType = Problem.PROB_TYPE)])
     )
     fun linkTask(
         @PathVariable id: UUID,
@@ -252,14 +230,7 @@ class WorkflowController(
     ): ResponseEntity<Any> =
         when (val result = taskService.linkToWorkflow(taskId, id, authentication.name)) {
             is Success -> ResponseEntity.noContent().build()
-            is Failure -> when (result.value) {
-                TaskError.UserNotFound -> Problem.response(404, Problem.userNotFound)
-                TaskError.WorkflowNotFound -> Problem.response(404, Problem.workflowNotFound)
-                TaskError.TaskNotFound -> Problem.response(404, Problem.taskNotFound)
-                TaskError.AlreadyLinked -> Problem.response(409, Problem.taskAlreadyLinked)
-                TaskError.NotLinked -> Problem.response(404, Problem.taskNotLinked)
-                TaskError.AccessDenied -> Problem.response(403, Problem.accessDenied)
-            }
+            is Failure -> result.value.toResponse()
         }
 
     @PatchMapping(Uris.Workflows.TASK_RETRY_POLICY)
@@ -268,9 +239,9 @@ class WorkflowController(
     @ApiResponses(
         ApiResponse(responseCode = "204", description = "Retry policy updated"),
         ApiResponse(responseCode = "403", description = "Private resource — access denied",
-            content = [Content(mediaType = Problem.MEDIA_TYPE)]),
+            content = [Content(mediaType = Problem.PROB_TYPE)]),
         ApiResponse(responseCode = "404", description = "Workflow or task not found",
-            content = [Content(mediaType = Problem.MEDIA_TYPE)])
+            content = [Content(mediaType = Problem.PROB_TYPE)])
     )
     fun updateRetryPolicy(
         @PathVariable id: UUID,
@@ -280,11 +251,7 @@ class WorkflowController(
     ): ResponseEntity<Any> =
         when (val result = workflowService.updateRetryPolicy(id, taskId, request, authentication.name)) {
             is Success -> ResponseEntity.noContent().build()
-            is Failure -> when (result.value) {
-                WorkflowError.UserNotFound -> Problem.response(404, Problem.userNotFound)
-                WorkflowError.WorkflowNotFound -> Problem.response(404, Problem.workflowNotFound)
-                WorkflowError.AccessDenied -> Problem.response(403, Problem.accessDenied)
-            }
+            is Failure -> result.value.toResponse()
         }
 
     @DeleteMapping(Uris.Workflows.LINK_TASK)
@@ -293,9 +260,9 @@ class WorkflowController(
     @ApiResponses(
         ApiResponse(responseCode = "204", description = "Task unlinked"),
         ApiResponse(responseCode = "403", description = "Private resource — access denied",
-            content = [Content(mediaType = Problem.MEDIA_TYPE)]),
+            content = [Content(mediaType = Problem.PROB_TYPE)]),
         ApiResponse(responseCode = "404", description = "Workflow, task, or link not found",
-            content = [Content(mediaType = Problem.MEDIA_TYPE)])
+            content = [Content(mediaType = Problem.PROB_TYPE)])
     )
     fun unlinkTask(
         @PathVariable id: UUID,
@@ -304,14 +271,7 @@ class WorkflowController(
     ): ResponseEntity<Any> =
         when (val result = taskService.unlinkFromWorkflow(taskId, id, authentication.name)) {
             is Success -> ResponseEntity.noContent().build()
-            is Failure -> when (result.value) {
-                TaskError.UserNotFound -> Problem.response(404, Problem.userNotFound)
-                TaskError.WorkflowNotFound -> Problem.response(404, Problem.workflowNotFound)
-                TaskError.TaskNotFound -> Problem.response(404, Problem.taskNotFound)
-                TaskError.AlreadyLinked -> Problem.response(409, Problem.taskAlreadyLinked)
-                TaskError.NotLinked -> Problem.response(404, Problem.taskNotLinked)
-                TaskError.AccessDenied -> Problem.response(403, Problem.accessDenied)
-            }
+            is Failure -> result.value.toResponse()
         }
 
     @GetMapping(Uris.Executions.BY_ID)
@@ -321,9 +281,9 @@ class WorkflowController(
         ApiResponse(responseCode = "200", description = "Execution found",
             content = [Content(schema = Schema(implementation = ExecutionSummaryResponse::class))]),
         ApiResponse(responseCode = "403", description = "Private resource — access denied",
-            content = [Content(mediaType = Problem.MEDIA_TYPE)]),
+            content = [Content(mediaType = Problem.PROB_TYPE)]),
         ApiResponse(responseCode = "404", description = "Execution not found",
-            content = [Content(mediaType = Problem.MEDIA_TYPE)])
+            content = [Content(mediaType = Problem.PROB_TYPE)])
     )
     fun getExecution(
         @PathVariable id: UUID,
@@ -331,11 +291,7 @@ class WorkflowController(
     ): ResponseEntity<Any> =
         when (val result = workflowService.getExecution(id, authentication.name)) {
             is Success -> ResponseEntity.ok(result.value)
-            is Failure -> when (result.value) {
-                WorkflowError.UserNotFound -> Problem.response(404, Problem.userNotFound)
-                WorkflowError.WorkflowNotFound -> Problem.response(404, Problem.workflowNotFound)
-                WorkflowError.AccessDenied -> Problem.response(403, Problem.accessDenied)
-            }
+            is Failure -> result.value.toResponse()
         }
 
     @PostMapping(Uris.Executions.CANCEL)
@@ -344,16 +300,43 @@ class WorkflowController(
     @ApiResponses(
         ApiResponse(responseCode = "204", description = "Execution canceled"),
         ApiResponse(responseCode = "409", description = "Execution is not cancelable",
-            content = [Content(mediaType = Problem.MEDIA_TYPE)]),
+            content = [Content(mediaType = Problem.PROB_TYPE)]),
         ApiResponse(responseCode = "404", description = "Execution not found",
-            content = [Content(mediaType = Problem.MEDIA_TYPE)])
+            content = [Content(mediaType = Problem.PROB_TYPE)])
     )
     fun cancelExecution(
         @PathVariable id: UUID,
         authentication: Authentication
-    ): ResponseEntity<Any> {
-        val canceled = executionService.cancelExecution(id, authentication.name)
-        return if (canceled) ResponseEntity.noContent().build()
-        else Problem.response(409, Problem.notCancelable)
+    ): ResponseEntity<Any> =
+        when (val result = executionService.cancelExecution(id, authentication.name)) {
+            is Success -> ResponseEntity.noContent().build()
+            is Failure -> result.value.toResponse()
+        }
+
+    private fun WorkflowError.toResponse(): ResponseEntity<Any> = when (this) {
+        WorkflowError.UserNotFound      -> Problem.response(404, Problem.userNotFound)
+        WorkflowError.WorkflowNotFound  -> Problem.response(404, Problem.workflowNotFound)
+        WorkflowError.AccessDenied      -> Problem.response(403, Problem.accessDenied)
+        WorkflowError.TaskNotLinked     -> Problem.response(404, Problem.taskNotLinked)
+        WorkflowError.ExecutionNotFound -> Problem.response(404, Problem.executionNotFound)
+    }
+
+    private fun ExecutionError.toResponse(): ResponseEntity<Any> = when (this) {
+        ExecutionError.UserNotFound     -> Problem.response(404, Problem.userNotFound)
+        ExecutionError.WorkflowNotFound -> Problem.response(404, Problem.workflowNotFound)
+        ExecutionError.TaskNotFound     -> Problem.response(404, Problem.taskNotFound)
+        ExecutionError.NotCancelable    -> Problem.response(409, Problem.notCancelable)
+    }
+
+    private fun TaskError.toResponse(): ResponseEntity<Any> = when (this) {
+        TaskError.UserNotFound     -> Problem.response(404, Problem.userNotFound)
+        TaskError.WorkflowNotFound -> Problem.response(404, Problem.workflowNotFound)
+        TaskError.TaskNotFound     -> Problem.response(404, Problem.taskNotFound)
+        TaskError.AlreadyLinked    -> Problem.response(409, Problem.taskAlreadyLinked)
+        TaskError.NotLinked        -> Problem.response(404, Problem.taskNotLinked)
+        TaskError.AccessDenied     -> Problem.response(403, Problem.accessDenied)
+        TaskError.InvalidFileType  -> Problem.response(400, Problem.invalidFileType)
+        TaskError.FileTooLarge     -> Problem.response(413, Problem.fileTooLarge)
+        TaskError.ScriptNotFound   -> Problem.response(404, Problem.scriptNotFound)
     }
 }

@@ -29,23 +29,14 @@ class ExecutionEventController(
     @ApiResponses(
         ApiResponse(responseCode = "200", description = "SSE stream opened — text/event-stream"),
         ApiResponse(responseCode = "400", description = "Execution ID is not a valid UUID",
-            content = [Content(mediaType = Problem.MEDIA_TYPE)]),
+            content = [Content(mediaType = Problem.PROB_TYPE)]),
         ApiResponse(responseCode = "401", description = "Not authenticated",
-            content = [Content(mediaType = Problem.MEDIA_TYPE)])
+            content = [Content(mediaType = Problem.PROB_TYPE)])
     )
     fun subscribe(
-        @PathVariable id: String,
+        @PathVariable id: UUID,
         authentication: Authentication
     ): SseEmitter {
-
-        val executionId = try {
-            UUID.fromString(id)
-        } catch (e: IllegalArgumentException) {
-            val errorEmitter = SseEmitter()
-            errorEmitter.completeWithError(IllegalArgumentException("Invalid Execution ID format"))
-            return errorEmitter
-        }
-
-        return executionEventService.subscribe(executionId)
+        return executionEventService.subscribe(id)
     }
 }

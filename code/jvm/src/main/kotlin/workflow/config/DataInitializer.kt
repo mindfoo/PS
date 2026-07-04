@@ -11,6 +11,7 @@ import org.workflow.entity.Roles
 import org.workflow.entity.User
 import org.workflow.entity.enums.ActionType
 import org.workflow.entity.enums.ResourceType
+import org.workflow.entity.enums.RoleType
 import org.workflow.repository.PermissionRepository
 import org.workflow.repository.RoleRepository
 import org.workflow.repository.UserRepository
@@ -30,7 +31,7 @@ class DataInitializer(
 
     @Transactional
     override fun run(args: ApplicationArguments) {
-        if (roleRepository.findByName("ADMIN") != null) {
+        if (roleRepository.findByName(RoleType.ADMIN) != null) {
             log.info("DataInitializer: roles already seeded, skipping.")
             return
         }
@@ -51,6 +52,7 @@ class DataInitializer(
         val tWrite   = save(ResourceType.TASK,      ActionType.WRITE)
         val tDelete  = save(ResourceType.TASK,      ActionType.DELETE)
         val tExecute = save(ResourceType.TASK,      ActionType.EXECUTE)
+        val tUpload  = save(ResourceType.TASK,      ActionType.UPLOAD)
         // s - schedules
         val sRead    = save(ResourceType.SCHEDULE,  ActionType.READ)
         val sWrite   = save(ResourceType.SCHEDULE,  ActionType.WRITE)
@@ -61,18 +63,18 @@ class DataInitializer(
         val uManage  = save(ResourceType.USER,      ActionType.MANAGE)
 
         // Build role-permission association
-        val reader = Roles(name = "READER").also {
+        val reader = Roles(name = RoleType.READER).also {
             it.permissions.addAll(setOf(wRead, tRead, sRead, eRead))
         }
-        val writer = Roles(name = "WRITER").also {
+        val writer = Roles(name = RoleType.WRITER).also {
             it.permissions.addAll(setOf(wRead, wWrite, wDelete, tRead, tWrite, tDelete, sRead, sWrite, sDelete, eRead))
         }
-        val dev = Roles(name = "DEV").also {
-            it.permissions.addAll(setOf(wRead, wExecute, tRead, tExecute, eRead))
+        val dev = Roles(name = RoleType.DEV).also {
+            it.permissions.addAll(setOf(wRead, wExecute, tRead, tExecute, tUpload, eRead))
         }
-        val admin = Roles(name = "ADMIN").also {
+        val admin = Roles(name = RoleType.ADMIN).also {
             it.permissions.addAll(setOf(wRead, wWrite, wDelete, wExecute,
-                                        tRead, tWrite, tDelete, tExecute,
+                                        tRead, tWrite, tDelete, tExecute, tUpload,
                                         sRead, sWrite, sDelete,
                                         eRead, uManage))
         }
@@ -84,11 +86,11 @@ class DataInitializer(
             userRepository.save(
                 User(
                     username = "admin",
-                    passwordValidation = passwordEncoder.encode("thisissafepassword"),
+                    passwordValidation = passwordEncoder.encode("Admin@12345!"),
                     role = admin
                 )
             )
-            log.warn("DataInitializer: default admin created (admin / thisissafepassword)")
+            log.warn("DataInitializer: default admin created. Username: admin — change password immediately on first login.")
         }
 
         log.info("DataInitializer: seeding complete — roles and its permissions.")

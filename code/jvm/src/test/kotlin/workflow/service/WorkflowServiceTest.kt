@@ -12,13 +12,13 @@ import org.workflow.dto.TaskReorderRequest
 import org.workflow.dto.WorkflowCreateRequest
 import org.workflow.dto.WorkflowUpdateRequest
 import org.workflow.entity.Execution
+import org.workflow.entity.enums.RoleType
 import org.workflow.entity.Roles
 import org.workflow.entity.Task
 import org.workflow.entity.WorkflowTaskOrder
 import java.time.LocalDateTime
 import org.workflow.entity.User
 import org.workflow.entity.Workflow
-import org.workflow.repository.AlertRepository
 import org.workflow.repository.ExecutionLogRepository
 import org.workflow.repository.ScheduleRepository
 import org.workflow.repository.TaskRepository
@@ -39,12 +39,11 @@ class WorkflowServiceTest {
     private lateinit var executionLogRepository: ExecutionLogRepository
     private lateinit var scheduleRepository: ScheduleRepository
     private lateinit var taskRepository: TaskRepository
-    private lateinit var alertRepository: AlertRepository
     private lateinit var helpers: ServiceHelpers
     private lateinit var service: WorkflowService
 
-    private fun readerRole() = Roles(id = UUID.randomUUID(), name = "READER")
-    private fun adminRole()  = Roles(id = UUID.randomUUID(), name = "ADMIN")
+    private fun readerRole() = Roles(id = UUID.randomUUID(), name = RoleType.READER)
+    private fun adminRole()  = Roles(id = UUID.randomUUID(), name = RoleType.ADMIN)
     private fun user(role: Roles = readerRole(), name: String = "alice") =
         User(id = UUID.randomUUID(), username = name, passwordValidation = "h", role = role)
     private fun workflow(owner: User) =
@@ -57,12 +56,11 @@ class WorkflowServiceTest {
         executionLogRepository = mockk()
         scheduleRepository    = mockk()
         taskRepository        = mockk()
-        alertRepository       = mockk()
         helpers              = mockk()
-        every { helpers.isAdmin(any()) } answers { firstArg<User>().role.name.equals("ADMIN", ignoreCase = true) }
+        every { helpers.isAdmin(any()) } answers { firstArg<User>().role.name == RoleType.ADMIN }
         service = WorkflowService(
             workflowRepository, wtoRepository,
-            executionLogRepository, scheduleRepository, taskRepository, alertRepository, helpers
+            executionLogRepository, scheduleRepository, taskRepository, helpers
         )
     }
 
@@ -175,7 +173,6 @@ class WorkflowServiceTest {
         val wf    = workflow(alice)
         every { helpers.findUser("alice") } returns alice
         every { workflowRepository.findByIdAndOwnerId(wf.id!!, alice.id!!) } returns wf
-        every { alertRepository.deleteAllByWorkflowId(wf.id!!) } returns Unit
         every { executionLogRepository.deleteAllByWorkflowId(wf.id!!) } returns Unit
         every { scheduleRepository.deleteAllByWorkflowId(wf.id!!) } returns Unit
         every { wtoRepository.deleteAllByWorkflowId(wf.id!!) } returns Unit
@@ -343,7 +340,7 @@ class WorkflowServiceTest {
     }
 
     @Test
-    fun `getExecution returns WorkflowNotFound when execution does not exist`() {
+    fun `getExecution returns ExecutionNotFound when execution does not exist`() {
         val alice  = user()
         val execId = UUID.randomUUID()
         every { helpers.findUser("alice") } returns alice
@@ -352,7 +349,7 @@ class WorkflowServiceTest {
         val result = service.getExecution(execId, "alice")
 
         assertTrue(result is Failure)
-        assertEquals(WorkflowError.WorkflowNotFound, (result as Failure).value)
+        assertEquals(WorkflowError.ExecutionNotFound, (result as Failure).value)
     }
 
     // reorderTasks
@@ -441,6 +438,6 @@ class WorkflowServiceTest {
         val result = service.updateRetryPolicy(wf.id!!, taskId, RetryPolicyUpdateRequest(2), "alice")
 
         assertTrue(result is Failure)
-        assertEquals(WorkflowError.WorkflowNotFound, (result as Failure).value)
+        assertEquals(WorkflowError.TaskNotLinked, (result as Failure).value)
     }
 }

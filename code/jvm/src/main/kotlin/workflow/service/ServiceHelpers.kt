@@ -2,6 +2,7 @@ package org.workflow.service
 
 import org.springframework.stereotype.Component
 import org.workflow.entity.User
+import org.workflow.entity.enums.RoleType
 import org.workflow.repository.UserRepository
 
 /** Shared helper methods used across multiple service classes. */
@@ -19,5 +20,5 @@ class ServiceHelpers(private val userRepository: UserRepository) {
 
     /** Returns true if the user has the ADMIN role. */
     fun isAdmin(user: User): Boolean =
-        user.role.name.equals("ADMIN", ignoreCase = true)
+        user.role.name == RoleType.ADMIN
 }

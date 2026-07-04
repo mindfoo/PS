@@ -1,273 +1,314 @@
 // Layout
-@use 'variables' as *;
+@use "variables" as *;
 
 .app-layout {
-  display: flex;
-  min-height: 100vh;
+	display: flex;
+	min-height: 100vh;
 }
 
 // Sidebar
 .sidebar {
-  width: $sidebar-w;
-  background: $surface;
-  border-right: 1px solid $border;
-  display: flex;
-  flex-direction: column;
-  position: fixed;
-  height: 100vh;
-  padding: 1rem;
-  transition: width 0.22s ease;
-  overflow: hidden;
-  z-index: 50;
+	width: $sidebar-w;
+	background: $surface;
+	border-right: 1px solid $border;
+	display: flex;
+	flex-direction: column;
+	position: fixed;
+	height: 100vh;
+	padding: 1rem;
+	transition: width 0.22s ease;
+	overflow: hidden;
+	z-index: 50;
 
-  &-logo {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-weight: 700;
-    font-size: 1rem;
-    padding: 0.75rem 0 1.5rem;
-    color: $white;
-    text-decoration: none;
-    white-space: nowrap;
-    overflow: hidden;
+	&-logo {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		font-weight: 700;
+		font-size: 1rem;
+		padding: 0.75rem 0 1.5rem;
+		color: $white;
+		text-decoration: none;
+		white-space: nowrap;
+		overflow: hidden;
 
-    a {
-      color: $white;
-      text-decoration: none;
-      &:hover { opacity: 0.85; }
-    }
-  }
+		a {
+			color: $white;
+			text-decoration: none;
+			&:hover {
+				opacity: 0.85;
+			}
+		}
+	}
 
-  &-footer {
-    border-top: 1px solid $border;
-    padding-top: 1rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    overflow: hidden;
-  }
+	&-footer {
+		border-top: 1px solid $border;
+		padding-top: 1rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		overflow: hidden;
+	}
 
-  // Collapsed state (desktop only)
-  &--collapsed {
-    width: $sidebar-w-collapsed;
-    padding: 1rem 0.5rem;
+	// Collapsed state (desktop only)
+	&--collapsed {
+		width: $sidebar-w-collapsed;
+		padding: 1rem 0.5rem;
 
-    .nav-label { display: none; }
-    .logo       { display: none; }
+		.nav-label {
+			display: none;
+		}
+		.logo {
+			display: none;
+		}
 
-    // Centre icons
-    .nav-links a {
-      justify-content: center;
-      padding: 0.6rem 0;
-    }
+		// Centre icons
+		.nav-links a {
+			justify-content: center;
+			padding: 0.6rem 0;
+		}
 
-    .user-info {
-      justify-content: center;
-    }
+		.user-info {
+			justify-content: center;
+		}
 
-    .sidebar-logo {
-      justify-content: center;
-      padding-bottom: 1.25rem;
-    }
-  }
+		.sidebar-logo {
+			justify-content: center;
+			padding-bottom: 1.25rem;
+		}
+	}
 }
 
-.logo-icon { font-size: 1.25rem; flex-shrink: 0; }
+.logo-icon {
+	font-size: 1.25rem;
+	flex-shrink: 0;
+}
 
 // Nav links
 .nav-links {
-  list-style: none;
-  flex: 1;
+	list-style: none;
+	flex: 1;
 
-  li { margin-bottom: 0.25rem; }
+	li {
+		margin-bottom: 0.25rem;
+	}
 
-  a {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    padding: 0.6rem 0.75rem;
-    border-radius: $radius;
-    color: $text-muted;
-    text-decoration: none;
-    transition: background 0.15s, color 0.15s;
-    white-space: nowrap;
+	a {
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+		padding: 0.6rem 0.75rem;
+		border-radius: $radius;
+		color: $text-muted;
+		text-decoration: none;
+		transition:
+			background 0.15s,
+			color 0.15s;
+		white-space: nowrap;
 
-    &:hover {
-      background: $surface2;
-      color: $text;
-    }
-  }
+		&:hover {
+			background: $surface2;
+			color: $text;
+		}
+	}
 }
 
-.nav-icon  { flex-shrink: 0; font-size: 1rem; }
-.nav-label { overflow: hidden; }
+.nav-icon {
+	flex-shrink: 0;
+	font-size: 1rem;
+}
+.nav-label {
+	overflow: hidden;
+}
 
 // User info
 .user-info {
-  font-size: 0.8rem;
-  color: $text-muted;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-  white-space: nowrap;
-  overflow: hidden;
+	font-size: 0.8rem;
+	color: $text-muted;
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	flex-wrap: wrap;
+	white-space: nowrap;
+	overflow: hidden;
 }
 
-.user-avatar { font-size: 1rem; flex-shrink: 0; }
+.user-avatar {
+	font-size: 1rem;
+	flex-shrink: 0;
+}
 
 // Collapse toggle button (desktop)
 .sidebar-toggle-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-top: 0.75rem;
-  width: 100%;
-  background: transparent;
-  border: 1px solid $border;
-  color: $text-muted;
-  border-radius: $radius;
-  height: 1.75rem;
-  font-size: 1rem;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-  flex-shrink: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	margin-top: 0.75rem;
+	width: 100%;
+	background: transparent;
+	border: 1px solid $border;
+	color: $text-muted;
+	border-radius: $radius;
+	height: 1.75rem;
+	font-size: 1rem;
+	cursor: pointer;
+	transition:
+		background 0.15s,
+		color 0.15s;
+	flex-shrink: 0;
 
-  &:hover {
-    background: $surface2;
-    color: $text;
-  }
+	&:hover {
+		background: $surface2;
+		color: $text;
+	}
 }
 
 // Main content
 .main-content {
-  margin-left: $sidebar-w;
-  padding: 2rem;
-  flex: 1;
-  max-width: calc(1100px + $sidebar-w);
-  transition: margin-left 0.22s ease;
+	margin-left: $sidebar-w;
+	padding: 2rem;
+	flex: 1;
+	max-width: calc(1100px + $sidebar-w);
+	transition: margin-left 0.22s ease;
 }
 
 .app-layout--sidebar-collapsed .main-content {
-  margin-left: $sidebar-w-collapsed;
+	margin-left: $sidebar-w-collapsed;
 }
 
 .page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 1.5rem;
-  gap: 1rem;
-  flex-wrap: wrap;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 1.5rem;
+	gap: 1rem;
+	flex-wrap: wrap;
 
-  h1 { font-size: 1.5rem; }
+	h1 {
+		font-size: 1.5rem;
+	}
 }
 
 .page-sub-header {
-  padding: 0 0 2rem;
-  border-bottom: 2px dotted $surface;
-  margin: 0 0 2rem;
+	padding: 0 0 2rem;
+	border-bottom: 2px dotted $surface;
+	margin: 0 0 2rem;
 }
 
 .header-actions {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
+	display: flex;
+	gap: 0.5rem;
+	flex-wrap: wrap;
 }
 
 .section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
 
-  h2 { font-size: 1.1rem; }
+	h2 {
+		font-size: 1.1rem;
+	}
 }
 
 .back-link {
-  color: $text-muted;
-  text-decoration: none;
-  font-size: 0.85rem;
-  display: block;
-  margin-bottom: 0.25rem;
+	color: $text-muted;
+	text-decoration: none;
+	font-size: 0.85rem;
+	display: block;
+	margin-bottom: 0.25rem;
 
-  &:hover { color: $text; }
+	&:hover {
+		color: $text;
+	}
 }
 
 // Hamburger button (hidden on desktop)
 .hamburger-btn {
-  display: none;
-  position: fixed;
-  top: 1rem;
-  left: 1rem;
-  z-index: 200;
-  background: $surface;
-  border: 1px solid $border;
-  color: $text;
-  border-radius: $radius;
-  width: 2.25rem;
-  height: 2.25rem;
-  font-size: 1.1rem;
-  cursor: pointer;
-  align-items: center;
-  justify-content: center;
+	display: none;
+	position: fixed;
+	top: 1rem;
+	left: 1rem;
+	z-index: 200;
+	background: $surface;
+	border: 1px solid $border;
+	color: $text;
+	border-radius: $radius;
+	width: 2.25rem;
+	height: 2.25rem;
+	font-size: 1.1rem;
+	cursor: pointer;
+	align-items: center;
+	justify-content: center;
 }
 
 // Backdrop (mobile only)
 .sidebar-backdrop {
-  display: none;
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  z-index: 99;
+	display: none;
+	position: fixed;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.5);
+	z-index: 99;
 }
 
 // Mobile breakpoint
 @media (max-width: 768px) {
-  .hamburger-btn { display: flex; }
+	.hamburger-btn {
+		display: flex;
+	}
 
-  .sidebar-backdrop { display: block; }
+	.sidebar-backdrop {
+		display: block;
+	}
 
-  .sidebar {
-    transform: translateX(-100%);
-    transition: transform 0.25s ease;
-    z-index: 100;
-    // Always full width on mobile — ignore collapsed state
-    width: $sidebar-w !important;
-    padding: 1rem !important;
+	.sidebar {
+		transform: translateX(-100%);
+		transition: transform 0.25s ease;
+		z-index: 100;
+		// Always full width on mobile — ignore collapsed state
+		width: $sidebar-w !important;
+		padding: 1rem !important;
 
-    // Show all labels on mobile even if collapsed
-    .nav-label { display: unset !important; }
-    .logo       { display: unset !important; }
+		// Show all labels on mobile even if collapsed
+		.nav-label {
+			display: unset !important;
+		}
+		.logo {
+			display: unset !important;
+		}
 
-    .nav-links a {
-      justify-content: flex-start !important;
-      padding: 0.6rem 0.75rem !important;
-    }
+		.nav-links a {
+			justify-content: flex-start !important;
+			padding: 0.6rem 0.75rem !important;
+		}
 
-    .sidebar-toggle-btn { display: none; }
+		.sidebar-toggle-btn {
+			display: none;
+		}
 
-    &--open { transform: translateX(0); }
-  }
+		&--open {
+			transform: translateX(0);
+		}
+	}
 
-  .main-content {
-    margin-left: 0 !important;
-    padding: 1rem;
-    padding-top: 4rem; // space for hamburger button
-  }
+	.main-content {
+		margin-left: 0 !important;
+		padding: 1rem;
+		padding-top: 4rem; // space for hamburger button
+	}
 }
 
 // Misc section helpers
 .section-header-title {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
 }
 
 .section-header--spaced {
-  display: flex;
-  align-items: center;
-  flex-direction: row;
-  justify-content: space-between;
-  width: 100%;
+	display: flex;
+	align-items: center;
+	flex-direction: row;
+	justify-content: space-between;
+	width: 100%;
 }

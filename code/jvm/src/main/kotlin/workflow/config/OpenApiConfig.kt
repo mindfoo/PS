@@ -31,7 +31,7 @@ class OpenApiConfig {
                 Components().addSecuritySchemes(
                     cookieSchemeName,
                     SecurityScheme()
-                        .name("token")                          // must match COOKIE_NAME constant
+                        .name("token")
                         .type(SecurityScheme.Type.APIKEY)
                         .`in`(SecurityScheme.In.COOKIE)
                 )

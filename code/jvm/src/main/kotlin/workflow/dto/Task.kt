@@ -33,7 +33,17 @@ data class TaskResponse(
     val type: String,
     val config: Map<String, Any>,
     val workflowId: UUID?,
-    val isPrivate: Boolean = false
+    val isPrivate: Boolean = false,
+    /** Non-null when a script has been uploaded for this task via POST /tasks/{id}/script. */
+    val scriptFileName: String? = null
+)
+
+/** Metadata returned after uploading a script or from GET /tasks/{id}/script-info. */
+data class ScriptInfoResponse(
+    val taskId: UUID,
+    val fileName: String,
+    val sizeBytes: Long,
+    val uploadedAt: java.time.LocalDateTime?
 )
 
 /**

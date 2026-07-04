@@ -6,11 +6,11 @@ import org.springframework.security.access.AccessDeniedException
 import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException
 import org.workflow.utils.Problem
 
 /**
  * Centralised exception handler that maps domain exceptions to RFC 7807 Problem responses.
- * Prevents raw stack traces from leaking into API clients.
  */
 @RestControllerAdvice
 class GlobalExceptionHandler {
@@ -30,14 +30,21 @@ class GlobalExceptionHandler {
     @ExceptionHandler(IllegalArgumentException::class)
     fun handleBadRequest(ex: IllegalArgumentException): ResponseEntity<Any> {
         log.debug("Bad request: {}", ex.message)
-        return Problem.response(400, Problem(ex.message ?: "Bad request"))
+        return Problem.response(400, Problem.badRequest)
+    }
+
+    /** 400 — a path/query parameter couldn't be converted to its expected type (e.g. a malformed UUID). */
+    @ExceptionHandler(MethodArgumentTypeMismatchException::class)
+    fun handleTypeMismatch(ex: MethodArgumentTypeMismatchException): ResponseEntity<Any> {
+        log.debug("Type mismatch: {}", ex.message)
+        return Problem.response(400, Problem.badRequest)
     }
 
     /** 404 — resource not found, typically from service findById queries. */
     @ExceptionHandler(NoSuchElementException::class)
     fun handleNotFound(ex: NoSuchElementException): ResponseEntity<Any> {
         log.debug("Not found: {}", ex.message)
-        return Problem.response(404, Problem(ex.message ?: "Not found"))
+        return Problem.response(404, Problem.resourceNotFound)
     }
 
     /** 403 — authenticated user lacks the required permission. */

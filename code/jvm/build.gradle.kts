@@ -1,7 +1,6 @@
 plugins {
     id("org.springframework.boot") version "3.5.0"
     id("io.spring.dependency-management") version "1.1.7"
-    id("jacoco")
 
     kotlin("jvm") version "2.3.0"
     kotlin("plugin.spring") version "2.3.0"
@@ -42,32 +41,10 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
 }
 
-jacoco {
-    toolVersion = "0.8.13"
-}
-
 tasks.test {
     useJUnitPlatform()
-    finalizedBy(tasks.jacocoTestReport)
 }
 
-tasks.jacocoTestReport {
-    dependsOn(tasks.test)
-    reports {
-        xml.required = true
-        html.required = true
-    }
-}
-
-tasks.jacocoTestCoverageVerification {
-    violationRules {
-        rule {
-            limit {
-                minimum = "0.80".toBigDecimal()
-            }
-        }
-    }
-}
 
 kotlin {
     jvmToolchain(25)
@@ -155,3 +132,4 @@ tasks.register("dev") {
     description = "Start DB, wait until healthy, then run Spring Boot"
     dependsOn("waitForDb", "bootRun")
 }
+

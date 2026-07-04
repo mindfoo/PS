@@ -1,152 +1,165 @@
 // Misc utilities
-@use 'variables' as *;
+@use "variables" as *;
 
-* {box-sizing: border-box; margin: 0; padding: 0; }
-
-.text-muted {
-  color: $text-muted;
-  font-size: 0.85rem;
+* {
+	box-sizing: border-box;
+	margin: 0;
+	padding: 0;
 }
 
-.mt-2 { margin-top: 0.5rem; }
+.text-muted {
+	color: $text-muted;
+	font-size: 0.85rem;
+}
+
+.mt-2 {
+	margin-top: 0.5rem;
+}
 
 code {
-  font-family: monospace;
-  background: $surface2;
-  padding: 0.1rem 0.35rem;
-  border-radius: 4px;
-  font-size: 0.85em;
+	font-family: monospace;
+	background: $surface2;
+	padding: 0.1rem 0.35rem;
+	border-radius: 4px;
+	font-size: 0.85em;
 }
 
 // Modal
 .modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.6);
-  z-index: 300;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1rem;
+	position: fixed;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.6);
+	z-index: 300;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 1rem;
 }
 
 .modal-card {
-  background: $surface;
-  border: 1px solid $border;
-  border-radius: $radius;
-  padding: 1.5rem;
-  width: 100%;
-  max-width: 560px;
-  max-height: 80vh;
-  overflow-y: auto;
+	background: $surface;
+	border: 1px solid $border;
+	border-radius: $radius;
+	padding: 1.5rem;
+	width: 100%;
+	max-width: 560px;
+	max-height: 80vh;
+	overflow-y: auto;
 }
 
 .modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 1rem;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 1rem;
 
-  h3 { font-size: 1.1rem; }
+	h3 {
+		font-size: 1.1rem;
+	}
 }
 
 // Schedule slot builder
 .slots-section {
-  margin-top: 1.25rem;
-  border-top: 1px solid $border;
-  padding-top: 1rem;
+	margin-top: 1.25rem;
+	border-top: 1px solid $border;
+	padding-top: 1rem;
 }
 
 .slots-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 0.25rem;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 0.25rem;
 
-  h3 { font-size: 1rem; font-weight: 600; }
+	h3 {
+		font-size: 1rem;
+		font-weight: 600;
+	}
 }
 
 .slots-hint {
-  font-size: 0.8rem;
-  color: $text-muted;
-  margin-bottom: 1rem;
+	font-size: 0.8rem;
+	color: $text-muted;
+	margin-bottom: 1rem;
 }
 
 .schedule-slot {
-  background: $surface2;
-  border: 1px solid $border;
-  border-radius: $radius;
-  padding: 0.9rem 1rem;
-  margin-bottom: 0.75rem;
+	background: $surface2;
+	border: 1px solid $border;
+	border-radius: $radius;
+	padding: 0.9rem 1rem;
+	margin-bottom: 0.75rem;
 }
 
 .slot-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-  align-items: flex-end;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 1rem;
+	align-items: flex-end;
 }
 
 .day-picker {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  margin-top: 0.25rem;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.4rem;
+	margin-top: 0.25rem;
 }
 
 .day-check {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  font-size: 0.85rem;
-  cursor: pointer;
-  user-select: none;
+	display: flex;
+	align-items: center;
+	gap: 0.25rem;
+	font-size: 0.85rem;
+	cursor: pointer;
+	user-select: none;
 
-  input[type="checkbox"] { cursor: pointer; }
+	input[type="checkbox"] {
+		cursor: pointer;
+	}
 
-  &.every-day {
-    font-weight: 600;
-    margin-right: 0.35rem;
-  }
+	&.every-day {
+		font-weight: 600;
+		margin-right: 0.35rem;
+	}
 }
 
 .slot-time {
-  display: flex;
-  gap: 0.5rem;
+	display: flex;
+	gap: 0.5rem;
 }
 
 .slot-desc {
-  flex: 1;
-  min-width: 160px;
+	flex: 1;
+	min-width: 160px;
 }
 
 .slot-remove {
-  align-self: flex-end;
-  margin-bottom: 0.1rem;
+	align-self: flex-end;
+	margin-bottom: 0.1rem;
 }
 
 .slot-preview {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin-top: 0.6rem;
-  font-size: 0.82rem;
-  color: $text-muted;
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	margin-top: 0.6rem;
+	font-size: 0.82rem;
+	color: $text-muted;
 }
 
 .slot-preview-label {
-  font-style: italic;
+	font-style: italic;
 }
 
 // Retry badge
 .retry-badge {
-  display: inline-block;
-  min-width: 1.5rem;
-  text-align: center;
-  background: $surface2;
-  border: 1px solid $border;
-  border-radius: 4px;
-  padding: 0.1rem 0.4rem;
-  font-size: 0.82rem;
-  font-family: monospace;
+	display: inline-block;
+	min-width: 1.5rem;
+	text-align: center;
+	background: $surface2;
+	border: 1px solid $border;
+	border-radius: 4px;
+	padding: 0.1rem 0.4rem;
+	font-size: 0.82rem;
+	font-family: monospace;
 }

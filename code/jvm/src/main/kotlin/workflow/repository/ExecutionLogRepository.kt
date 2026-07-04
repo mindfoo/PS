@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 import org.springframework.stereotype.Repository
+import org.springframework.transaction.annotation.Transactional
 import org.workflow.entity.Execution
 import java.util.UUID
 
@@ -37,4 +38,18 @@ interface ExecutionLogRepository : JpaRepository<Execution, UUID> {
     @Modifying
     @Query("delete from Execution e where e.workflow.id = :workflowId")
     fun deleteAllByWorkflowId(workflowId: UUID)
+
+    /**
+     * Atomically sets [Execution.cancelRequested] to true only while the execution is still
+     * active. Returns the number of rows updated — 0 means the execution already reached a
+     * terminal state and the cancel signal was ignored.
+     */
+    @Modifying
+    @Transactional
+    @Query("UPDATE Execution e SET e.cancelRequested = true WHERE e.id = :id AND e.status IN ('PENDING', 'RUNNING')")
+    fun requestCancellation(@Param("id") id: UUID): Int
+
+    /** Lightweight check used by [ExecutionService] between stages to honour a pending cancel. */
+    @Query("SELECT e.cancelRequested FROM Execution e WHERE e.id = :id")
+    fun isCancelRequested(@Param("id") id: UUID): Boolean
 }

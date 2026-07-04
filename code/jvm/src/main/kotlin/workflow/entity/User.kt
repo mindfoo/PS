@@ -16,7 +16,6 @@ class User(
     @Column(nullable = false, length = 256)
     var passwordValidation: String,
 
-    // Role assigned to this user access level
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "role_id", nullable = false)
     var role: Roles

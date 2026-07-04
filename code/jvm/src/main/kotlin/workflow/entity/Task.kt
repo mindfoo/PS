@@ -34,5 +34,9 @@ class Task(
 
     /** When true, only the creator and admins can view this task. */
     @Column(nullable = false)
-    var isPrivate: Boolean = false
+    var isPrivate: Boolean = false,
+
+    /** Original filename of the uploaded script, if any. Null when no script has been uploaded. */
+    @Column(name = "script_file_name", length = 255)
+    var scriptFileName: String? = null
 ) : Timestamp()

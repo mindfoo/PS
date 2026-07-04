@@ -1,6 +1,7 @@
 # Workflow Platform
 
-A full-stack workflow orchestration platform. The backend is a Spring Boot 3 REST API that lets users create, manage, and monitor configurable pipelines composed of ordered tasks — with RBAC, execution logging, retry policies, alerting, and cron scheduling. The frontend is a React SPA that consumes the API.
+A workflow orchestration platform. The backend is a Spring Boot REST API that lets users create, manage, and monitor configurable pipelines composed of ordered tasks — with RBAC, execution logging, retry policies and cron scheduling. 
+The frontend is a React SPA that consumes the API.
 
 ---
 
@@ -11,58 +12,22 @@ PS/
 ├── package.json          # Root scripts — run/test both modules at once
 ├── code/
 │   ├── jvm/              # Backend — Kotlin + Spring Boot 3 + PostgreSQL
-│   │   ├── build.gradle.kts
-│   │   ├── gradlew
-│   │   └── src/
-│   │       ├── docker-compose.yml   # PostgreSQL 15 container
-│   │       └── main/kotlin/workflow/
-│   │           ├── controller/
-│   │           ├── service/
-│   │           ├── repository/
-│   │           ├── entity/
-│   │           ├── dto/
-│   │           └── security/
 │   └── js/               # Frontend — React 18 + TypeScript + Vite
-│       ├── package.json
-│       └── src/
-│           ├── api/
-│           ├── pages/
-│           ├── components/
-│           └── contexts/
-└── docs/
-    └── DOC.md
+
 ```
-
-### Tech Stack
-
-| Layer     | Technology                                      |
-|-----------|-------------------------------------------------|
-| Backend   | Kotlin, Spring Boot 3.5, Spring Security, Spring Data JPA |
-| Database  | PostgreSQL 15 (Docker)                          |
-| Frontend  | React 18, TypeScript, Vite 6, React Router 6    |
-| Auth      | Cookie-based opaque tokens                      |
-| Build     | Gradle (Kotlin DSL), npm                        |
-| Tests     | JUnit 5, MockK, JaCoCo · Vitest, Testing Library, Playwright |
-
 ---
 
 ## Prerequisites
 
 - **Java 25** (JDK)
-- **Node.js 20+** and **npm**
-- **Docker Desktop** (must be running before starting the backend)
-
-### Check Docker is running
-
-```bash
-docker info
-```
+- **Node.js 20+** 
+- **Docker** 
 
 ---
 
 ## Running the Project
 
-### Option 1 — Both modules from the root (recommended)
+### Option 1 — Both modules from the root 
 
 Install root dependencies once:
 
@@ -76,13 +41,10 @@ Then start everything with a single command:
 npm run dev
 ```
 
-This runs `./gradlew dev` (backend) and `npm run dev` (frontend) in parallel via `concurrently`.  
-Output is colour-coded: **cyan = JVM**, **magenta = JS**.
-
 | URL | Description |
-|-----|-------------|
+|-----|------------|
 | `http://localhost:8080` | REST API |
-| `http://localhost:5173` | Frontend (proxies `/api` → `8080`) |
+| `http://localhost:5173` | Frontend |
 
 ---
 
@@ -92,25 +54,18 @@ Output is colour-coded: **cyan = JVM**, **magenta = JS**.
 
 ```bash
 cd code/jvm
-
-# 1. Start PostgreSQL and wait until healthy, then boot Spring Boot
 ./gradlew dev
-
-# — or run each step manually —
-./gradlew dbUp          # start the DB container
-./gradlew bootRun       # start Spring Boot (assumes DB is already up)
 ```
 
 #### Frontend
 
 ```bash
 cd code/js
-npm install             # first time only
+npm install            
 npm run dev             # starts Vite dev server on http://localhost:5173
 ```
 
 ---
-
 
 > If you need to reset the database to a clean state:
 > ```bash
@@ -121,21 +76,47 @@ npm run dev             # starts Vite dev server on http://localhost:5173
 
 ---
 
-## Useful DB Commands
+## Database Schema Management
 
-All run from `code/jvm/`:
+### 🔄 Automatic (Hibernate DDL - Current Mode)
 
-```bash
-./gradlew dbUp      # start the PostgreSQL container
-./gradlew dbDown    # stop the container (data is preserved in the volume)
-./gradlew dbReset   # stop + delete the volume (all data is lost)
-./gradlew dbLogs    # tail the PostgreSQL container logs
+The application uses **Hibernate's auto-update mode** for development convenience:
+
+```properties
+# code/jvm/src/main/resources/application.properties
+spring.jpa.hibernate.ddl-auto=update
 ```
 
-Connect directly with psql:
+**What this means:**
+- ✅ **Tables are created automatically** from `@Entity` classes on first startup
+- ✅ **Your data is SAFE** - `update` mode never drops tables or deletes data
+- ✅ **Schema changes are applied automatically** when you add new fields to entities
+- ✅ **Initial data is seeded** by `DataInitializer.kt` (only on first run)
+
+### 📝 Manual (SQL Scripts - Best Practice)
+
+For production or when you want explicit control, SQL scripts are available in `code/jvm/src/main/resources/db/`:
+
+| Script | Purpose |
+|--------|---------|
+| `schema.sql` | Complete DDL (tables, indexes, constraints) |
+| `data-seed.sql` | Initial data (roles, permissions, admin user) |
+
+#### Execute scripts manually:
 
 ```bash
-docker exec -it workflow-postgres psql -U admin -d workflow_db
+cd code/jvm
+
+# Option 1: Initialize from scratch (schema + seed data)
+./gradlew dbInit
+
+# Option 2: Run scripts individually
+./gradlew dbSchema    # create tables only
+./gradlew dbSeed      # populate initial data only
+
+# Option 3: Using psql directly
+docker exec -i workflow-postgres psql -U admin -d workflow_db < src/main/resources/db/schema.sql
+docker exec -i workflow-postgres psql -U admin -d workflow_db < src/main/resources/db/data-seed.sql
 ```
 
 ---
@@ -162,67 +143,12 @@ cd code/js
 npm test
 ```
 
-
 ### End-to-end tests (Playwright — requires the app to be running)
 
 ```bash
 cd code/js
 npm run test:e2e
 ```
-
----
-
-## Coverage
-
-### Backend (JaCoCo — 80% line coverage gate)
-
-```bash
-cd code/jvm
-./gradlew test jacocoTestReport
-```
-
-HTML report: `code/jvm/build/reports/jacoco/test/html/index.html`
-
-> The build fails if line coverage drops below 80%. The gate is enforced by `jacocoTestCoverageVerification`.
-
-### Frontend (Vitest + v8 — 80% line threshold)
-
-```bash
-cd code/js
-npm run test:coverage
-```
-
-HTML report: `code/js/coverage/index.html`
-
-### Both together from the root
-
-```bash
-npm run test:coverage
-```
-
----
-
-## Troubleshooting
-
-### Port 8080 already in use
-
-Find and kill whatever is holding the port:
-
-```bash
-# show the process
-lsof -i tcp:8080
-
-# kill it
-kill -9 $(lsof -ti tcp:8080)
-```
-
-### Port 5173 already in use (frontend)
-
-```bash
-kill -9 $(lsof -ti tcp:5173)
-```
-
----
 
 ## API Overview
 

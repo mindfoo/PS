@@ -10,7 +10,6 @@ import org.workflow.dto.WorkflowCreateRequest
 import org.workflow.dto.WorkflowResponse
 import org.workflow.dto.WorkflowUpdateRequest
 import org.workflow.entity.Workflow
-import org.workflow.repository.AlertRepository
 import org.workflow.repository.ExecutionLogRepository
 import org.workflow.repository.ScheduleRepository
 import org.workflow.repository.TaskRepository
@@ -30,7 +29,6 @@ class WorkflowService(
     private val executionLogRepository: ExecutionLogRepository,
     private val scheduleRepository: ScheduleRepository,
     private val taskRepository: TaskRepository,
-    private val alertRepository: AlertRepository,
     private val helpers: ServiceHelpers
 ) {
 
@@ -39,9 +37,10 @@ class WorkflowService(
         val currentUser = findCurrentUser(authenticationName)
             ?: return failure(WorkflowError.UserNotFound)
 
+        val userId = currentUser.id ?: return failure(WorkflowError.UserNotFound)
         val workflows = if (isAdmin(currentUser)) workflowRepository.findAll()
-                         else workflowRepository.findAllVisible(currentUser.id!!)
-        return success(workflows.map { toResponse(it) })
+                         else workflowRepository.findAllVisible(userId)
+        return success(workflows.map { it.toResponse() })
     }
 
     @Transactional(readOnly = true)
@@ -54,7 +53,7 @@ class WorkflowService(
         if (!isAdmin(currentUser) && workflow.isPrivate && workflow.createdBy.id != currentUser.id) {
             return failure(WorkflowError.AccessDenied)
         }
-        return success(toResponse(workflow))
+        return success(workflow.toResponse())
     }
 
     @Transactional
@@ -70,7 +69,7 @@ class WorkflowService(
             )
         )
 
-        return success(toResponse(saved))
+        return success(saved.toResponse())
     }
 
     @Transactional
@@ -82,15 +81,13 @@ class WorkflowService(
         val currentUser = findCurrentUser(authenticationName)
             ?: return failure(WorkflowError.UserNotFound)
 
-        val workflow = if (isAdmin(currentUser)) {
-            workflowRepository.findById(workflowId).orElse(null)
-        } else {
-            workflowRepository.findByIdAndOwnerId(workflowId, currentUser.id!!)
-        } ?: return failure(WorkflowError.WorkflowNotFound)
+        val userId = currentUser.id ?: return failure(WorkflowError.UserNotFound)
+        val workflow = findOwnedWorkflow(workflowId, currentUser, userId)
+            ?: return failure(WorkflowError.WorkflowNotFound)
 
         workflow.name = request.name
         workflow.isPrivate = request.isPrivate
-        return success(toResponse(workflowRepository.save(workflow)))
+        return success(workflowRepository.save(workflow).toResponse())
     }
 
     @Transactional
@@ -98,19 +95,16 @@ class WorkflowService(
         val currentUser = findCurrentUser(authenticationName)
             ?: return failure(WorkflowError.UserNotFound)
 
-        val workflow = if (isAdmin(currentUser)) {
-            workflowRepository.findById(workflowId).orElse(null)
-        } else {
-            workflowRepository.findByIdAndOwnerId(workflowId, currentUser.id!!)
-        } ?: return failure(WorkflowError.WorkflowNotFound)
+        val userId = currentUser.id ?: return failure(WorkflowError.UserNotFound)
+        val workflow = findOwnedWorkflow(workflowId, currentUser, userId)
+            ?: return failure(WorkflowError.WorkflowNotFound)
 
-        // Cascade-delete in FK dependency order:
-        // alerts → executions → schedules → workflow_tasks_order → tasks → workflow
-        alertRepository.deleteAllByWorkflowId(workflow.id!!)
-        executionLogRepository.deleteAllByWorkflowId(workflow.id!!)
-        scheduleRepository.deleteAllByWorkflowId(workflow.id!!)
-        workflowTaskOrderRepository.deleteAllByWorkflowId(workflow.id!!)
-        taskRepository.deleteAllByWorkflowId(workflow.id!!)
+        val wid = workflow.id ?: return failure(WorkflowError.WorkflowNotFound)
+        /* Cascade-delete in FK dependency order: executions → schedules → workflow_tasks_order → tasks → workflow */
+        executionLogRepository.deleteAllByWorkflowId(wid)
+        scheduleRepository.deleteAllByWorkflowId(wid)
+        workflowTaskOrderRepository.deleteAllByWorkflowId(wid)
+        taskRepository.deleteAllByWorkflowId(wid)
 
         workflowRepository.delete(workflow)
         return success(Unit)
@@ -125,18 +119,17 @@ class WorkflowService(
         val currentUser = findCurrentUser(authenticationName)
             ?: return failure(WorkflowError.UserNotFound)
 
-        val workflow = if (isAdmin(currentUser)) {
-            workflowRepository.findById(workflowId).orElse(null)
-        } else {
-            workflowRepository.findByIdAndOwnerId(workflowId, currentUser.id!!)
-        } ?: return failure(WorkflowError.WorkflowNotFound)
+        val userId = currentUser.id ?: return failure(WorkflowError.UserNotFound)
+        val workflow = findOwnedWorkflow(workflowId, currentUser, userId)
+            ?: return failure(WorkflowError.WorkflowNotFound)
 
-        val orderRows = workflowTaskOrderRepository.findAllByWorkflowIdOrderByTaskOrderAsc(workflow.id!!)
-            .associateBy { it.id!! }
+        val wid = workflow.id ?: return failure(WorkflowError.WorkflowNotFound)
+        val orderRows = workflowTaskOrderRepository.findAllByWorkflowIdOrderByTaskOrderAsc(wid)
+            .associateBy { it.id ?: return failure(WorkflowError.WorkflowNotFound) }
 
         request.items.forEach { item ->
             val row = orderRows[item.orderId]
-                ?: throw NoSuchElementException("WorkflowTaskOrder '${item.orderId}' not found in workflow '${workflowId}'")
+                ?: return failure(WorkflowError.WorkflowNotFound)
             row.taskOrder = item.taskOrder
         }
 
@@ -154,14 +147,13 @@ class WorkflowService(
         val currentUser = findCurrentUser(authenticationName)
             ?: return failure(WorkflowError.UserNotFound)
 
-        val workflow = if (isAdmin(currentUser)) {
-            workflowRepository.findById(workflowId).orElse(null)
-        } else {
-            workflowRepository.findByIdAndOwnerId(workflowId, currentUser.id!!)
-        } ?: return failure(WorkflowError.WorkflowNotFound)
-
-        val orderRow = workflowTaskOrderRepository.findByWorkflowIdAndTaskId(workflow.id!!, taskId)
+        val userId = currentUser.id ?: return failure(WorkflowError.UserNotFound)
+        val workflow = findOwnedWorkflow(workflowId, currentUser, userId)
             ?: return failure(WorkflowError.WorkflowNotFound)
+
+        val wid = workflow.id ?: return failure(WorkflowError.WorkflowNotFound)
+        val orderRow = workflowTaskOrderRepository.findByWorkflowIdAndTaskId(wid, taskId)
+            ?: return failure(WorkflowError.TaskNotLinked)
 
         orderRow.retryPolicy = request.retryPolicy
         workflowTaskOrderRepository.save(orderRow)
@@ -174,10 +166,11 @@ class WorkflowService(
         findCurrentUser(authenticationName) ?: return failure(WorkflowError.UserNotFound)
 
         val ex = executionLogRepository.findById(executionId).orElse(null)
-            ?: return failure(WorkflowError.WorkflowNotFound)
+            ?: return failure(WorkflowError.ExecutionNotFound)
 
+        val exId = ex.id ?: return failure(WorkflowError.ExecutionNotFound)
         val taskExecs = executionLogRepository
-            .findAllByParentExecutionIdOrderByStartedAtAsc(ex.id!!)
+            .findAllByParentExecutionIdOrderByStartedAtAsc(exId)
             .map { child ->
                 TaskExecutionSummary(
                     executionId = child.id,
@@ -214,10 +207,12 @@ class WorkflowService(
         val workflow = workflowRepository.findById(workflowId).orElse(null)
             ?: return failure(WorkflowError.WorkflowNotFound)
 
-        val executions = executionLogRepository.findTopLevelByWorkflowIdOrderByStartedAtDesc(workflow.id!!)
+        val wid = workflow.id ?: return failure(WorkflowError.WorkflowNotFound)
+        val executions = executionLogRepository.findTopLevelByWorkflowIdOrderByStartedAtDesc(wid)
             .map { ex ->
+                val exId = ex.id ?: return failure(WorkflowError.WorkflowNotFound)
                 val taskExecs = executionLogRepository
-                    .findAllByParentExecutionIdOrderByStartedAtAsc(ex.id!!)
+                    .findAllByParentExecutionIdOrderByStartedAtAsc(exId)
                     .map { child ->
                         TaskExecutionSummary(
                             executionId = child.id,
@@ -249,15 +244,20 @@ class WorkflowService(
     private fun findCurrentUser(username: String) = helpers.findUser(username)
     private fun isAdmin(user: org.workflow.entity.User) = helpers.isAdmin(user)
 
-    private fun toResponse(workflow: Workflow): WorkflowResponse {
-        val lastStatus = executionLogRepository.findLatestByWorkflowId(workflow.id!!)?.status
+    /** Admins can access any workflow by ID; other users only their own. */
+    private fun findOwnedWorkflow(workflowId: UUID, currentUser: org.workflow.entity.User, userId: UUID): Workflow? =
+        if (isAdmin(currentUser)) workflowRepository.findById(workflowId).orElse(null)
+        else workflowRepository.findByIdAndOwnerId(workflowId, userId)
+
+    private fun Workflow.toResponse(): WorkflowResponse {
+        val lastStatus = id?.let { executionLogRepository.findLatestByWorkflowId(it)?.status }
         return WorkflowResponse(
-            id = workflow.id,
-            name = workflow.name,
-            ownerId = workflow.createdBy.id,
-            ownerUsername = workflow.createdBy.username,
+            id = id,
+            name = name,
+            ownerId = createdBy.id,
+            ownerUsername = createdBy.username,
             lastRunStatus = lastStatus,
-            isPrivate = workflow.isPrivate
+            isPrivate = isPrivate
         )
     }
 }

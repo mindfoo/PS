@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.*
 import org.workflow.dto.ScheduleCreateRequest
 import org.workflow.dto.ScheduleUpdateRequest
+import org.workflow.entity.enums.RoleType
 import org.workflow.entity.Roles
 import org.workflow.entity.Schedule
 import org.workflow.entity.User
@@ -36,7 +37,7 @@ class ScheduleServiceTest {
     private val validCron    = "0 0 9 * * MON"  // Spring 6-field cron (sec min hr dom mon dow)
     private val invalidCron  = "INVALID_CRON"
 
-    private fun role() = Roles(id = UUID.randomUUID(), name = "WRITER")
+    private fun role() = Roles(id = UUID.randomUUID(), name = RoleType.WRITER)
     private fun user() = User(id = UUID.randomUUID(), username = "alice", passwordValidation = "h", role = role())
     private fun workflow(owner: User) = Workflow(id = wfId, name = "WF", createdBy = owner)
     private fun schedule(owner: User, wf: Workflow) = Schedule(
@@ -50,7 +51,7 @@ class ScheduleServiceTest {
         workflowRepository = mockk()
         executionService   = mockk()
         helpers            = mockk()
-        every { helpers.isAdmin(any()) } answers { firstArg<User>().role.name.equals("ADMIN", ignoreCase = true) }
+        every { helpers.isAdmin(any()) } answers { firstArg<User>().role.name == RoleType.ADMIN }
         service = ScheduleService(scheduleRepository, workflowRepository, executionService, helpers)
     }
 
@@ -59,7 +60,7 @@ class ScheduleServiceTest {
     @Test
     fun `list returns all schedules for admin`() {
         val admin = User(id = UUID.randomUUID(), username = "admin", passwordValidation = "h",
-            role = Roles(id = UUID.randomUUID(), name = "ADMIN"))
+            role = Roles(id = UUID.randomUUID(), name = RoleType.ADMIN))
         every { helpers.findUser("admin") } returns admin
         every { scheduleRepository.findAll() } returns listOf(schedule(admin, workflow(admin)))
 

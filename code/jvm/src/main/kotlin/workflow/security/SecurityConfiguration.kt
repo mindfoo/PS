@@ -13,7 +13,6 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.security.web.SecurityFilterChain
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter
-import org.springframework.web.client.RestTemplate
 import org.springframework.web.servlet.config.annotation.CorsRegistry
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer
 import org.workflow.security.pipeline.RequestTokenProcessor
@@ -21,24 +20,15 @@ import org.workflow.security.pipeline.RequestTokenProcessor
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
-/**
- * Single authentication strategy: [CookieAuthenticationFilter] reads the `token` cookie on every
- * request, validates it against the database and populates the Spring Security [SecurityContextHolder]
- * so [@PreAuthorize] annotations work on all controllers.
- */
-class SecurityConfig(
+class SecurityConfiguration(
     @Lazy private val requestTokenProcessor: RequestTokenProcessor,
     @Lazy private val customUserDetailsService: CustomUserDetailsService,
     @Value("\${app.cors.allowed-origins:http://localhost:5173}") private val allowedOrigins: String
 ) : WebMvcConfigurer {
 
-    /** Exposed as a bean so [org.workflow.service.AuthService] can inject it for BCrypt hashing. */
+    /** BCrypt password encoder — injected into AuthService for hashing and verification. */
     @Bean
     fun passwordEncoder(): PasswordEncoder = BCryptPasswordEncoder()
-
-    /** Exposed as a bean so [org.workflow.service.ExecutionService] can be tested with a mock. */
-    @Bean
-    fun restTemplate(): RestTemplate = RestTemplate()
 
     @Bean
     fun cookieAuthenticationFilter(): CookieAuthenticationFilter =
@@ -47,35 +37,36 @@ class SecurityConfig(
     @Bean
     fun filterChain(http: HttpSecurity): SecurityFilterChain {
         http
-            .csrf { it.disable() }
+            /* No server-side session — each request is authenticated from its cookie alone. */
             .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
+            /* Disable Spring's built-in form login and HTTP Basic — we handle auth ourselves. */
             .httpBasic { it.disable() }
             .formLogin { it.disable() }
+            /* Run our cookie filter before Spring's default username/password filter. */
             .addFilterBefore(cookieAuthenticationFilter(), UsernamePasswordAuthenticationFilter::class.java)
             .authorizeHttpRequests { auth ->
-                // ASYNC and ERROR dispatches come from Tomcat's internal async/error handling
-                // (e.g., SSE completion, timeout). No security context is available on those
-                // threads, so permit them unconditionally — @PreAuthorize on each handler
-                // already enforces fine-grained access on the original request.
+                /* ASYNC and ERROR dispatches are internal Tomcat callbacks (e.g., SSE completion).
+                   They run on a different thread where the security context is not available,
+                   so we permit them here — the original HTTP request was already authenticated. */
                 auth.dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
 
+                /* Public endpoints — no cookie required. */
                 auth.requestMatchers(
                     "/api/auth/**",
                     "/swagger-ui/**",
                     "/v3/api-docs/**"
                 ).permitAll()
 
-                auth.requestMatchers("/api/workflows/**").hasAnyRole("ADMIN", "WRITER", "READER", "DEV")
-                auth.requestMatchers("/api/tasks/**").hasAnyRole("ADMIN", "WRITER", "READER", "DEV")
-                auth.requestMatchers("/api/schedules/**").hasAnyRole("ADMIN", "WRITER", "READER")
-                auth.requestMatchers("/api/logs/**").hasAnyRole("ADMIN", "WRITER", "READER", "DEV")
-
+                /* All other API endpoints require a valid cookie.
+                   Fine-grained authority checks (e.g. workflow:read) are on each controller method
+                   via @PreAuthorize — keeping the rules close to the code that uses them. */
                 auth.anyRequest().authenticated()
             }
 
         return http.build()
     }
 
+    /** Allow the frontend Vite dev server (or the configured origin) to call the API. */
     override fun addCorsMappings(registry: CorsRegistry) {
         registry.addMapping("/api/**")
             .allowedOrigins(allowedOrigins)

@@ -16,7 +16,7 @@ import java.util.UUID
 
 @Entity
 @Table(name = "permission")
-/** Granular permission cataloguing which action is allowed on which resource. */
+/** Granular permission mapping which action is allowed on which resource. */
 class Permission(
     @Id @GeneratedValue(strategy = GenerationType.UUID)
     var id: UUID? = null,
@@ -31,7 +31,7 @@ class Permission(
 ) : Timestamp() {
 
     /**
-     * Human-readable slug derived from resource and action (e.g. `workflow:read`).
+     * Readable slug derived from resource and action (e.g. `workflow:read`).
      * Not persisted — computed at runtime. Used by [org.workflow.security.CustomUserDetailsService].
      */
     @get:Transient

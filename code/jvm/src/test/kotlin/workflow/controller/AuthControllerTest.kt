@@ -13,8 +13,10 @@ import org.workflow.dto.LoginRequest
 import org.workflow.dto.ProfileResponse
 import org.workflow.dto.RegisterRequest
 import org.workflow.dto.TokenResponse
+import org.workflow.entity.enums.RoleType
 import org.workflow.service.AuthService
-import org.workflow.service.utils.AuthError
+import org.workflow.service.utils.AuthLoginError
+import org.workflow.service.utils.AuthRegisterError
 import org.workflow.utils.failure
 import org.workflow.utils.success
 import java.util.UUID
@@ -34,7 +36,7 @@ class AuthControllerTest {
 
     @Test
     fun `register returns 201 when user is created successfully`() {
-        val profileResponse = ProfileResponse(id = UUID.randomUUID(), username = "alice", role = "READER")
+        val profileResponse = ProfileResponse(id = UUID.randomUUID(), username = "alice", role = RoleType.READER)
         every { authService.register(any()) } returns success(profileResponse)
 
         val response = controller.register(RegisterRequest(username = "alice", password = "Secret1!"))
@@ -44,7 +46,7 @@ class AuthControllerTest {
 
     @Test
     fun `register returns 409 when username is already taken`() {
-        every { authService.register(any()) } returns failure(AuthError.UsernameAlreadyTaken)
+        every { authService.register(any()) } returns failure(AuthRegisterError.UsernameAlreadyTaken)
 
         val response = controller.register(RegisterRequest(username = "alice", password = "Secret1!"))
 
@@ -53,7 +55,7 @@ class AuthControllerTest {
 
     @Test
     fun `register returns 400 when role is not found`() {
-        every { authService.register(any()) } returns failure(AuthError.RoleNotFound)
+        every { authService.register(any()) } returns failure(AuthRegisterError.RoleNotFound)
 
         val response = controller.register(RegisterRequest(username = "alice", password = "Secret1!", roleName = "GHOST"))
 
@@ -73,7 +75,7 @@ class AuthControllerTest {
 
     @Test
     fun `login returns 401 on invalid credentials`() {
-        every { authService.login(any()) } returns failure(AuthError.InvalidCredentials)
+        every { authService.login(any()) } returns failure(AuthLoginError.InvalidCredentials)
 
         val response = controller.login(LoginRequest(username = "alice", password = "wrong"))
 
@@ -101,7 +103,7 @@ class AuthControllerTest {
     fun `me returns 200 with user profile when authenticated`() {
         val auth = mockk<Authentication>()
         every { auth.name } returns "alice"
-        every { authService.profile("alice") } returns success(ProfileResponse(id = UUID.randomUUID(), username = "alice", role = "READER"))
+        every { authService.profile("alice") } returns success(ProfileResponse(id = UUID.randomUUID(), username = "alice", role = RoleType.READER))
 
         val response = controller.profile(auth)
 
@@ -112,7 +114,7 @@ class AuthControllerTest {
     fun `me returns 404 when user not found`() {
         val auth = mockk<Authentication>()
         every { auth.name } returns "ghost"
-        every { authService.profile("ghost") } returns failure(AuthError.UserNotFound)
+        every { authService.profile("ghost") } returns failure(AuthLoginError.UserNotFound)
 
         val response = controller.profile(auth)
 

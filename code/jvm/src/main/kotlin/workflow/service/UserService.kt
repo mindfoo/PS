@@ -8,6 +8,7 @@ import org.workflow.dto.UserRoleUpdateRequest
 import org.workflow.entity.User
 import org.workflow.repository.RoleRepository
 import org.workflow.repository.UserRepository
+import org.workflow.entity.enums.RoleType
 import org.workflow.service.utils.UserError
 import org.workflow.utils.Either
 import org.workflow.utils.failure
@@ -22,7 +23,7 @@ class UserService(
 
     @Transactional(readOnly = true)
     fun listUsers(): List<UserAdminResponse> =
-        userRepository.findAllWithRoleAndPermissions().map { toAdminResponse(it) }
+        userRepository.findAllWithRoleAndPermissions().map { it.toAdminResponse() }
 
     @Transactional(readOnly = true)
     fun listRoles(): List<RoleSummaryResponse> =
@@ -38,19 +39,21 @@ class UserService(
         val user = userRepository.findByIdWithRoleAndPermissions(userId)
             ?: return failure(UserError.UserNotFound)
 
-        val role = roleRepository.findByNameWithPermissions(request.roleName.uppercase())
+        val roleType = RoleType.fromString(request.roleName)
+            ?: return failure(UserError.RoleNotFound)
+        val role = roleRepository.findByNameWithPermissions(roleType)
             ?: return failure(UserError.RoleNotFound)
 
         user.role = role
         val saved = userRepository.save(user)
-        return success(toAdminResponse(saved))
+        return success(saved.toAdminResponse())
     }
 
-    private fun toAdminResponse(user: User): UserAdminResponse =
+    private fun User.toAdminResponse(): UserAdminResponse =
         UserAdminResponse(
-            id = user.id,
-            username = user.username,
-            role = user.role.name,
-            permissions = user.role.permissions.map { it.slug }.sorted()
+            id = id,
+            username = username,
+            role = role.name,
+            permissions = role.permissions.map { it.slug }.sorted()
         )
 }

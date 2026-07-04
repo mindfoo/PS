@@ -26,7 +26,7 @@ class CustomUserDetailsService(
             ?: throw UsernameNotFoundException("User '$username' not found")
 
         val role = user.role
-        val roleName = role.name.uppercase()
+        val roleName = role.name
 
         // authority: ROLE_ADMIN, ROLE_WRITER, ROLE_READER, ROLE_DEV
         val roleAuthority = SimpleGrantedAuthority("ROLE_$roleName")

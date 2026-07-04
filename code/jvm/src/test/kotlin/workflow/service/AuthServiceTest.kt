@@ -3,25 +3,24 @@ package workflow.service
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.Assertions.*
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.workflow.dto.LoginRequest
 import org.workflow.dto.RegisterRequest
 import org.workflow.entity.Roles
 import org.workflow.entity.User
-import org.workflow.entity.UserToken
+import org.workflow.entity.enums.RoleType
 import org.workflow.repository.RoleRepository
 import org.workflow.repository.UserRepository
 import org.workflow.repository.UserTokenRepository
-import org.workflow.security.TokenUtils
 import org.workflow.service.AuthService
-import org.workflow.service.utils.AuthError
+import org.workflow.service.utils.AuthLoginError
+import org.workflow.service.utils.AuthRegisterError
 import org.workflow.utils.Failure
 import org.workflow.utils.Success
-import java.time.LocalDateTime
-import java.util.UUID
+import java.util.*
 
 class AuthServiceTest {
 
@@ -31,7 +30,7 @@ class AuthServiceTest {
     private lateinit var passwordEncoder: PasswordEncoder
     private lateinit var service: AuthService
 
-    private fun readerRole() = Roles(id = UUID.randomUUID(), name = "READER")
+    private fun readerRole() = Roles(id = UUID.randomUUID(), name = RoleType.READER)
     private fun user(role: Roles = readerRole()) = User(
         id = UUID.randomUUID(), username = "alice",
         passwordValidation = "hashed", role = role
@@ -53,7 +52,7 @@ class AuthServiceTest {
         val role = readerRole()
         val u    = user(role)
         every { userRepository.findByUsername("alice") } returns null
-        every { roleRepository.findByName("READER") } returns role
+        every { roleRepository.findByName(RoleType.READER) } returns role
         every { passwordEncoder.encode(any()) } returns "hashed"
         every { userRepository.save(any()) } returns u
 
@@ -70,18 +69,17 @@ class AuthServiceTest {
         val result = service.register(RegisterRequest("alice", "Secret1!Aa"))
 
         assertTrue(result is Failure)
-        assertEquals(AuthError.UsernameAlreadyTaken, (result as Failure).value)
+        assertEquals(AuthRegisterError.UsernameAlreadyTaken, (result as Failure).value)
     }
 
     @Test
     fun `register fails with RoleNotFound when role does not exist`() {
         every { userRepository.findByUsername("new") } returns null
-        every { roleRepository.findByName("GHOST") } returns null
 
         val result = service.register(RegisterRequest("new", "Secret1!Aa", roleName = "GHOST"))
 
         assertTrue(result is Failure)
-        assertEquals(AuthError.RoleNotFound, (result as Failure).value)
+        assertEquals(AuthRegisterError.RoleNotFound, (result as Failure).value)
     }
 
     @Test
@@ -89,7 +87,7 @@ class AuthServiceTest {
         val result = service.register(RegisterRequest("alice", "weakpass"))
 
         assertTrue(result is Failure)
-        assertEquals(AuthError.InsecurePassword, (result as Failure).value)
+        assertEquals(AuthRegisterError.InsecurePassword, (result as Failure).value)
     }
 
     // login
@@ -114,7 +112,7 @@ class AuthServiceTest {
         val result = service.login(LoginRequest("ghost", "anything"))
 
         assertTrue(result is Failure)
-        assertEquals(AuthError.InvalidCredentials, (result as Failure).value)
+        assertEquals(AuthLoginError.InvalidCredentials, (result as Failure).value)
     }
 
     @Test
@@ -126,7 +124,7 @@ class AuthServiceTest {
         val result = service.login(LoginRequest("alice", "wrong"))
 
         assertTrue(result is Failure)
-        assertEquals(AuthError.InvalidCredentials, (result as Failure).value)
+        assertEquals(AuthLoginError.InvalidCredentials, (result as Failure).value)
     }
 
     @Test
@@ -134,7 +132,7 @@ class AuthServiceTest {
         val result = service.login(LoginRequest("", "Secret1!Aa"))
 
         assertTrue(result is Failure)
-        assertEquals(AuthError.InvalidCredentials, (result as Failure).value)
+        assertEquals(AuthLoginError.InvalidCredentials, (result as Failure).value)
     }
 
     // logout
@@ -167,6 +165,6 @@ class AuthServiceTest {
         val result = service.profile("ghost")
 
         assertTrue(result is Failure)
-        assertEquals(AuthError.UserNotFound, (result as Failure<AuthError>).value)
+        assertEquals(AuthLoginError.UserNotFound, (result as Failure<AuthLoginError>).value)
     }
 }

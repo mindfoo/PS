@@ -20,6 +20,7 @@ import org.workflow.service.TaskService
 import org.workflow.service.WorkflowService
 import org.workflow.service.utils.WorkflowError
 import org.workflow.service.utils.TaskError
+import org.workflow.service.utils.ExecutionError
 import org.workflow.utils.failure
 import org.workflow.utils.success
 import java.util.UUID
@@ -122,10 +123,21 @@ class WorkflowControllerTest {
 
     @Test
     fun `runNow returns 202 with execution id`() {
-        every { executionService.triggerManualWorkflow(wfId, "alice") } returns execId
+        every { executionService.triggerManualWorkflow(wfId, "alice") } returns success(execId)
         val response = controller.runNow(wfId, auth)
         assertEquals(202, response.statusCode.value())
-        assertEquals("STARTED", response.body!!.status)
+    }
+
+    @Test
+    fun `runNow returns 404 when user not found`() {
+        every { executionService.triggerManualWorkflow(wfId, "alice") } returns failure(ExecutionError.UserNotFound)
+        assertEquals(404, controller.runNow(wfId, auth).statusCode.value())
+    }
+
+    @Test
+    fun `runNow returns 404 when workflow not found`() {
+        every { executionService.triggerManualWorkflow(wfId, "alice") } returns failure(ExecutionError.WorkflowNotFound)
+        assertEquals(404, controller.runNow(wfId, auth).statusCode.value())
     }
 
     // listExecutions
@@ -172,13 +184,13 @@ class WorkflowControllerTest {
 
     @Test
     fun `cancelExecution returns 204 when execution is canceled`() {
-        every { executionService.cancelExecution(execId, "alice") } returns true
+        every { executionService.cancelExecution(execId, "alice") } returns success(Unit)
         assertEquals(204, controller.cancelExecution(execId, auth).statusCode.value())
     }
 
     @Test
     fun `cancelExecution returns 409 when execution is not cancelable`() {
-        every { executionService.cancelExecution(execId, "alice") } returns false
+        every { executionService.cancelExecution(execId, "alice") } returns failure(ExecutionError.NotCancelable)
         assertEquals(409, controller.cancelExecution(execId, auth).statusCode.value())
     }
 

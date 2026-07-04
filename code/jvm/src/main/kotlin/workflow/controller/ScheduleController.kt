@@ -43,17 +43,12 @@ class ScheduleController(
         ApiResponse(responseCode = "200", description = "Schedule list returned",
             content = [Content(schema = Schema(implementation = ScheduleResponse::class))]),
         ApiResponse(responseCode = "404", description = "User not found",
-            content = [Content(mediaType = Problem.MEDIA_TYPE)])
+            content = [Content(mediaType = Problem.PROB_TYPE)])
     )
     fun list(authentication: Authentication): ResponseEntity<Any> =
         when (val result = scheduleService.list(authentication.name)) {
             is Success -> ResponseEntity.ok(result.value)
-            is Failure -> when (result.value) {
-                ScheduleError.UserNotFound -> Problem.response(404, Problem.userNotFound)
-                ScheduleError.ScheduleNotFound -> Problem.response(404, Problem.scheduleNotFound)
-                ScheduleError.WorkflowNotFound -> Problem.response(404, Problem.workflowNotFound)
-                ScheduleError.InvalidCronExpression -> Problem.response(400, Problem.invalidCronExpression)
-            }
+            is Failure -> result.value.toResponse()
         }
 
     @GetMapping(Uris.Schedules.BY_ID)
@@ -63,7 +58,7 @@ class ScheduleController(
         ApiResponse(responseCode = "200", description = "Schedule found",
             content = [Content(schema = Schema(implementation = ScheduleResponse::class))]),
         ApiResponse(responseCode = "404", description = "Schedule not found",
-            content = [Content(mediaType = Problem.MEDIA_TYPE)])
+            content = [Content(mediaType = Problem.PROB_TYPE)])
     )
     fun getById(
         @PathVariable id: UUID,
@@ -71,12 +66,7 @@ class ScheduleController(
     ): ResponseEntity<Any> =
         when (val result = scheduleService.getById(id, authentication.name)) {
             is Success -> ResponseEntity.ok(result.value)
-            is Failure -> when (result.value) {
-                ScheduleError.UserNotFound -> Problem.response(404, Problem.userNotFound)
-                ScheduleError.ScheduleNotFound -> Problem.response(404, Problem.scheduleNotFound)
-                ScheduleError.WorkflowNotFound -> Problem.response(404, Problem.workflowNotFound)
-                ScheduleError.InvalidCronExpression -> Problem.response(400, Problem.invalidCronExpression)
-            }
+            is Failure -> result.value.toResponse()
         }
 
     @PostMapping(Uris.Schedules.BASE)
@@ -86,22 +76,21 @@ class ScheduleController(
         ApiResponse(responseCode = "201", description = "Schedule created",
             content = [Content(schema = Schema(implementation = ScheduleResponse::class))]),
         ApiResponse(responseCode = "400", description = "Invalid cron expression",
-            content = [Content(mediaType = Problem.MEDIA_TYPE)]),
+            content = [Content(mediaType = Problem.PROB_TYPE)]),
         ApiResponse(responseCode = "404", description = "Workflow or user not found",
-            content = [Content(mediaType = Problem.MEDIA_TYPE)])
+            content = [Content(mediaType = Problem.PROB_TYPE)])
     )
     fun create(
         @Valid @RequestBody request: ScheduleCreateRequest,
         authentication: Authentication
     ): ResponseEntity<Any> =
         when (val result = scheduleService.create(request, authentication.name)) {
-            is Success -> ResponseEntity.status(HttpStatus.CREATED).body(result.value)
-            is Failure -> when (result.value) {
-                ScheduleError.UserNotFound -> Problem.response(404, Problem.userNotFound)
-                ScheduleError.ScheduleNotFound -> Problem.response(404, Problem.scheduleNotFound)
-                ScheduleError.WorkflowNotFound -> Problem.response(404, Problem.workflowNotFound)
-                ScheduleError.InvalidCronExpression -> Problem.response(400, Problem.invalidCronExpression)
+            is Success -> {
+                val builder = ResponseEntity.status(HttpStatus.CREATED)
+                result.value.id?.let { builder.location(Uris.Schedules.byId(it)) }
+                builder.body(result.value)
             }
+            is Failure -> result.value.toResponse()
         }
 
     @PutMapping(Uris.Schedules.BY_ID)
@@ -111,9 +100,9 @@ class ScheduleController(
         ApiResponse(responseCode = "200", description = "Schedule updated",
             content = [Content(schema = Schema(implementation = ScheduleResponse::class))]),
         ApiResponse(responseCode = "400", description = "Invalid cron expression",
-            content = [Content(mediaType = Problem.MEDIA_TYPE)]),
+            content = [Content(mediaType = Problem.PROB_TYPE)]),
         ApiResponse(responseCode = "404", description = "Schedule not found",
-            content = [Content(mediaType = Problem.MEDIA_TYPE)])
+            content = [Content(mediaType = Problem.PROB_TYPE)])
     )
     fun update(
         @PathVariable id: UUID,
@@ -122,12 +111,7 @@ class ScheduleController(
     ): ResponseEntity<Any> =
         when (val result = scheduleService.update(id, request, authentication.name)) {
             is Success -> ResponseEntity.ok(result.value)
-            is Failure -> when (result.value) {
-                ScheduleError.UserNotFound -> Problem.response(404, Problem.userNotFound)
-                ScheduleError.ScheduleNotFound -> Problem.response(404, Problem.scheduleNotFound)
-                ScheduleError.WorkflowNotFound -> Problem.response(404, Problem.workflowNotFound)
-                ScheduleError.InvalidCronExpression -> Problem.response(400, Problem.invalidCronExpression)
-            }
+            is Failure -> result.value.toResponse()
         }
 
     @DeleteMapping(Uris.Schedules.BY_ID)
@@ -136,7 +120,7 @@ class ScheduleController(
     @ApiResponses(
         ApiResponse(responseCode = "204", description = "Schedule deleted"),
         ApiResponse(responseCode = "404", description = "Schedule not found",
-            content = [Content(mediaType = Problem.MEDIA_TYPE)])
+            content = [Content(mediaType = Problem.PROB_TYPE)])
     )
     fun delete(
         @PathVariable id: UUID,
@@ -144,11 +128,13 @@ class ScheduleController(
     ): ResponseEntity<Any> =
         when (val result = scheduleService.delete(id, authentication.name)) {
             is Success -> ResponseEntity.noContent().build()
-            is Failure -> when (result.value) {
-                ScheduleError.UserNotFound -> Problem.response(404, Problem.userNotFound)
-                ScheduleError.ScheduleNotFound -> Problem.response(404, Problem.scheduleNotFound)
-                ScheduleError.WorkflowNotFound -> Problem.response(404, Problem.workflowNotFound)
-                ScheduleError.InvalidCronExpression -> Problem.response(400, Problem.invalidCronExpression)
-            }
+            is Failure -> result.value.toResponse()
         }
+
+    private fun ScheduleError.toResponse(): ResponseEntity<Any> = when (this) {
+        ScheduleError.UserNotFound          -> Problem.response(404, Problem.userNotFound)
+        ScheduleError.ScheduleNotFound      -> Problem.response(404, Problem.scheduleNotFound)
+        ScheduleError.WorkflowNotFound      -> Problem.response(404, Problem.workflowNotFound)
+        ScheduleError.InvalidCronExpression -> Problem.response(400, Problem.invalidCronExpression)
+    }
 }

@@ -1,6 +1,8 @@
 package org.workflow.dto
 
 import jakarta.validation.constraints.NotBlank
+import org.workflow.entity.Roles
+import org.workflow.entity.enums.RoleType
 import java.util.UUID
 
 /** Request payload used to register a new user account. */
@@ -29,6 +31,6 @@ data class TokenResponse(
 data class ProfileResponse(
     val id: UUID?,
     val username: String,
-    val role: String
+    val role: RoleType
 )
 

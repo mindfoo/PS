@@ -48,6 +48,8 @@ object Uris {
         const val BASE = "$PREFIX/tasks"
         const val BY_ID = "$PREFIX/tasks/{id}"
         const val RUN = "$PREFIX/tasks/{id}/run"
+        const val SCRIPT = "$PREFIX/tasks/{id}/script"
+        const val SCRIPT_INFO = "$PREFIX/tasks/{id}/script-info"
 
         fun byId(id: UUID): URI = UriTemplate(BY_ID).expand(id)
     }

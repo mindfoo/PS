@@ -13,6 +13,7 @@ import org.workflow.entity.Execution
 import org.workflow.entity.ExecutionStatus
 import org.workflow.entity.ExecutionTriggerType
 import org.workflow.entity.ExecutionType
+import org.workflow.entity.enums.RoleType
 import org.workflow.entity.Roles
 import org.workflow.entity.Task
 import org.workflow.entity.User
@@ -46,9 +47,9 @@ class ExecutionServiceTest {
     private val taskId  = UUID.randomUUID()
     private val execId  = UUID.randomUUID()
 
-    private fun role(name: String = "WRITER") = Roles(id = UUID.randomUUID(), name = name)
+    private fun role(type: RoleType = RoleType.WRITER) = Roles(id = UUID.randomUUID(), name = type)
     private fun user(r: Roles = role()) = User(id = userId, username = "alice", passwordValidation = "h", role = r)
-    private fun adminUser() = User(id = UUID.randomUUID(), username = "admin", passwordValidation = "h", role = role("ADMIN"))
+    private fun adminUser() = User(id = UUID.randomUUID(), username = "admin", passwordValidation = "h", role = role(RoleType.ADMIN))
     private fun bob()       = User(id = bobId,  username = "bob",   passwordValidation = "h", role = role())
 
     private fun task(owner: User) = Task(id = taskId, name = "MyTask", type = "SCRIPT", config = emptyMap(), createdBy = owner)
@@ -72,7 +73,7 @@ class ExecutionServiceTest {
         restTemplate           = mockk()
         helpers                = mockk()
         jdbcTemplate           = mockk(relaxed = true)
-        every { helpers.isAdmin(any()) } answers { firstArg<User>().role.name.equals("ADMIN", ignoreCase = true) }
+        every { helpers.isAdmin(any()) } answers { firstArg<User>().role.name == RoleType.ADMIN }
         service = ExecutionService(
             executionLogRepository, workflowRepository, wtoRepository, taskRepository,
             restTemplate, helpers,
@@ -85,69 +86,73 @@ class ExecutionServiceTest {
     // cancelExecution
 
     @Test
-    fun `cancelExecution returns true and marks execution CANCELED for owner`() {
+    fun `cancelExecution returns success and marks execution CANCELED for owner`() {
         val alice = user()
         val exec  = execution(alice, ExecutionStatus.RUNNING)
         every { helpers.findUser("alice") } returns alice
         every { executionLogRepository.findById(execId) } returns Optional.of(exec)
+        every { executionLogRepository.requestCancellation(execId) } returns 1
         every { executionLogRepository.findAllByParentExecutionIdOrderByStartedAtAsc(execId) } returns emptyList()
-        every { executionLogRepository.save(exec) } returns exec
 
         val result = service.cancelExecution(execId, "alice")
 
-        assertTrue(result)
-        assertEquals(ExecutionStatus.CANCELED, exec.status)
-        verify(exactly = 1) { executionLogRepository.save(exec) }
+        assertInstanceOf(Success::class.java, result)
+        verify(exactly = 1) { executionLogRepository.requestCancellation(execId) }
     }
 
     @Test
-    fun `cancelExecution returns true for admin canceling another users execution`() {
+    fun `cancelExecution returns success for admin canceling another users execution`() {
         val alice = user()
         val admin = adminUser()
         val exec  = execution(alice, ExecutionStatus.RUNNING)
         every { helpers.findUser("admin") } returns admin
         every { executionLogRepository.findById(execId) } returns Optional.of(exec)
+        every { executionLogRepository.requestCancellation(execId) } returns 1
         every { executionLogRepository.findAllByParentExecutionIdOrderByStartedAtAsc(execId) } returns emptyList()
-        every { executionLogRepository.save(exec) } returns exec
 
-        assertTrue(service.cancelExecution(execId, "admin"))
+        assertInstanceOf(Success::class.java, service.cancelExecution(execId, "admin"))
     }
 
     @Test
-    fun `cancelExecution returns false when execution is already finished`() {
+    fun `cancelExecution returns NotCancelable when execution is already finished`() {
         val alice = user()
         val exec  = execution(alice, ExecutionStatus.SUCCESS)
         every { helpers.findUser("alice") } returns alice
         every { executionLogRepository.findById(execId) } returns Optional.of(exec)
+        every { executionLogRepository.requestCancellation(execId) } returns 0
 
-        assertFalse(service.cancelExecution(execId, "alice"))
+        val result = service.cancelExecution(execId, "alice")
+        assertEquals(ExecutionError.NotCancelable, (result as Failure).value)
     }
 
     @Test
-    fun `cancelExecution returns false when user not found`() {
+    fun `cancelExecution returns UserNotFound when user not found`() {
         every { helpers.findUser("ghost") } returns null
 
-        assertFalse(service.cancelExecution(execId, "ghost"))
+        val result = service.cancelExecution(execId, "ghost")
+        assertEquals(ExecutionError.UserNotFound, (result as Failure).value)
     }
 
     @Test
-    fun `cancelExecution returns false when execution not found`() {
+    fun `cancelExecution returns NotCancelable when execution not found`() {
         val alice = user()
         every { helpers.findUser("alice") } returns alice
         every { executionLogRepository.findById(execId) } returns Optional.empty()
 
-        assertFalse(service.cancelExecution(execId, "alice"))
+        val result = service.cancelExecution(execId, "alice")
+        assertEquals(ExecutionError.NotCancelable, (result as Failure).value)
     }
 
     @Test
-    fun `cancelExecution returns false when non-admin cancels another users execution`() {
+    fun `cancelExecution returns NotCancelable when non-admin cancels another users execution`() {
         val alice = user()
         val bob   = bob()
-        val exec  = execution(alice, ExecutionStatus.RUNNING)  // owned by alice
+        val exec  = execution(alice, ExecutionStatus.RUNNING)
         every { helpers.findUser("bob") } returns bob
         every { executionLogRepository.findById(execId) } returns Optional.of(exec)
 
-        assertFalse(service.cancelExecution(execId, "bob"))
+        val result = service.cancelExecution(execId, "bob")
+        assertEquals(ExecutionError.NotCancelable, (result as Failure).value)
     }
 
     // triggerManualTask

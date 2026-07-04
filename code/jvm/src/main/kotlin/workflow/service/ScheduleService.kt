@@ -19,6 +19,7 @@ import org.workflow.utils.failure
 import org.workflow.utils.success
 import java.time.LocalDateTime
 import java.time.ZoneId
+import java.time.ZoneOffset
 import java.time.ZonedDateTime
 import java.util.UUID
 
@@ -36,12 +37,13 @@ class ScheduleService(
         val user = findUser(authenticationName)
             ?: return failure(ScheduleError.UserNotFound)
 
+        val userId = user.id ?: return failure(ScheduleError.UserNotFound)
         val schedules = if (isAdmin(user)) {
             scheduleRepository.findAll()
         } else {
-            scheduleRepository.findAllByOwnerId(user.id!!)
+            scheduleRepository.findAllByOwnerId(userId)
         }
-        return success(schedules.map { toResponse(it) })
+        return success(schedules.map { it.toResponse() })
     }
 
     @Transactional(readOnly = true)
@@ -49,13 +51,10 @@ class ScheduleService(
         val user = findUser(authenticationName)
             ?: return failure(ScheduleError.UserNotFound)
 
-        val schedule = if (isAdmin(user)) {
-            scheduleRepository.findById(scheduleId).orElse(null)
-        } else {
-            scheduleRepository.findByIdAndOwnerId(scheduleId, user.id!!)
-        } ?: return failure(ScheduleError.ScheduleNotFound)
+        val schedule = findOwnedSchedule(scheduleId, user)
+            ?: return failure(ScheduleError.ScheduleNotFound)
 
-        return success(toResponse(schedule))
+        return success(schedule.toResponse())
     }
 
     @Transactional
@@ -63,10 +62,11 @@ class ScheduleService(
         val user = findUser(authenticationName)
             ?: return failure(ScheduleError.UserNotFound)
 
+        val userId = user.id ?: return failure(ScheduleError.UserNotFound)
         val workflow = if (isAdmin(user)) {
             workflowRepository.findById(request.workflowId).orElse(null)
         } else {
-            workflowRepository.findByIdAndOwnerId(request.workflowId, user.id!!)
+            workflowRepository.findByIdAndOwnerId(request.workflowId, userId)
         } ?: return failure(ScheduleError.WorkflowNotFound)
 
         val nextRun = computeNextRun(request.cronExpression, request.timezone)
@@ -82,7 +82,7 @@ class ScheduleService(
             description = request.description
         )
 
-        return success(toResponse(scheduleRepository.save(schedule)))
+        return success(scheduleRepository.save(schedule).toResponse())
     }
 
     @Transactional
@@ -94,11 +94,8 @@ class ScheduleService(
         val user = findUser(authenticationName)
             ?: return failure(ScheduleError.UserNotFound)
 
-        val schedule = if (isAdmin(user)) {
-            scheduleRepository.findById(scheduleId).orElse(null)
-        } else {
-            scheduleRepository.findByIdAndOwnerId(scheduleId, user.id!!)
-        } ?: return failure(ScheduleError.ScheduleNotFound)
+        val schedule = findOwnedSchedule(scheduleId, user)
+            ?: return failure(ScheduleError.ScheduleNotFound)
 
         val nextRun = computeNextRun(request.cronExpression, request.timezone)
             ?: return failure(ScheduleError.InvalidCronExpression)
@@ -109,7 +106,7 @@ class ScheduleService(
         schedule.nextRunAt = nextRun
         schedule.description = request.description
 
-        return success(toResponse(scheduleRepository.save(schedule)))
+        return success(scheduleRepository.save(schedule).toResponse())
     }
 
     @Transactional
@@ -117,11 +114,8 @@ class ScheduleService(
         val user = findUser(authenticationName)
             ?: return failure(ScheduleError.UserNotFound)
 
-        val schedule = if (isAdmin(user)) {
-            scheduleRepository.findById(scheduleId).orElse(null)
-        } else {
-            scheduleRepository.findByIdAndOwnerId(scheduleId, user.id!!)
-        } ?: return failure(ScheduleError.ScheduleNotFound)
+        val schedule = findOwnedSchedule(scheduleId, user)
+            ?: return failure(ScheduleError.ScheduleNotFound)
 
         scheduleRepository.delete(schedule)
         return success(Unit)
@@ -129,7 +123,7 @@ class ScheduleService(
 
     @Transactional
     fun dispatchDueSchedules() {
-        val now = LocalDateTime.now()
+        val now = LocalDateTime.now(ZoneOffset.UTC)
         val dueSchedules = scheduleRepository.findDueSchedulesForUpdate(now)
 
         dueSchedules.forEach { schedule ->
@@ -138,8 +132,6 @@ class ScheduleService(
             val executionId = executionService.createCronExecution(schedule.workflow, schedule.createdBy)
 
             // Dispatch AFTER this transaction commits: createCronExecution saves the execution
-            // record inside this transaction, so runExecution's findById would fail with
-            // READ_COMMITTED isolation if called before the commit.
             TransactionSynchronizationManager.registerSynchronization(object : TransactionSynchronization {
                 override fun afterCommit() {
                     CompletableFuture.runAsync { executionService.runExecution(executionId) }
@@ -158,8 +150,7 @@ class ScheduleService(
             val zone = ZoneId.of(timezone)
             val cron = CronExpression.parse(cronExpression)
             val nextInZone = cron.next(ZonedDateTime.now(zone))
-
-            nextInZone?.withZoneSameInstant(ZoneId.systemDefault())?.toLocalDateTime()
+            nextInZone?.withZoneSameInstant(ZoneOffset.UTC)?.toLocalDateTime()
         } catch (_: Exception) {
             null
         }
@@ -168,16 +159,23 @@ class ScheduleService(
     private fun findUser(username: String) = helpers.findUser(username)
     private fun isAdmin(user: User) = helpers.isAdmin(user)
 
-    private fun toResponse(schedule: Schedule): ScheduleResponse =
+    /** Admins can access any schedule by ID; other users only their own. */
+    private fun findOwnedSchedule(scheduleId: UUID, user: User): Schedule? {
+        if (isAdmin(user)) return scheduleRepository.findById(scheduleId).orElse(null)
+        val userId = user.id ?: return null
+        return scheduleRepository.findByIdAndOwnerId(scheduleId, userId)
+    }
+
+    private fun Schedule.toResponse(): ScheduleResponse =
         ScheduleResponse(
-            id = schedule.id,
-            workflowId = schedule.workflow.id,
-            workflowName = schedule.workflow.name,
-            cronExpression = schedule.cronExpression,
-            timezone = schedule.timezone,
-            enabled = schedule.enabled,
-            nextRunAt = schedule.nextRunAt,
-            lastRunAt = schedule.lastRunAt,
-            description = schedule.description
+            id = id,
+            workflowId = workflow.id,
+            workflowName = workflow.name,
+            cronExpression = cronExpression,
+            timezone = timezone,
+            enabled = enabled,
+            nextRunAt = nextRunAt,
+            lastRunAt = lastRunAt,
+            description = description
         )
 }

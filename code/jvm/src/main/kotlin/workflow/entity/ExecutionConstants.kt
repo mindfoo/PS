@@ -13,7 +13,6 @@ object ExecutionStatus {
 object ExecutionTriggerType {
     const val MANUAL = "MANUAL"
     const val CRON   = "CRON"
-    const val EVENT  = "EVENT"
 }
 
 /** Valid values for [Execution.type]. */

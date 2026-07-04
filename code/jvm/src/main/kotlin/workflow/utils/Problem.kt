@@ -12,12 +12,12 @@ import org.springframework.http.ResponseEntity
 data class Problem(val title: String) {
 
     companion object {
-        const val MEDIA_TYPE = "application/problem+json"
+        const val PROB_TYPE = "application/problem+json"
 
         /** Builds a [ResponseEntity] that carries the problem as its body. */
         fun response(status: Int, problem: Problem): ResponseEntity<Any> =
             ResponseEntity.status(status)
-                .header("Content-Type", MEDIA_TYPE)
+                .header("Content-Type", PROB_TYPE)
                 .body(problem)
 
         /* Auth */
@@ -25,7 +25,7 @@ data class Problem(val title: String) {
         val roleNotFound = Problem("The specified role does not exist.")
         val invalidCredentials = Problem("The provided credentials are invalid.")
         val userNotFound = Problem("The requested user was not found.")
-        val insecurePassword = Problem("Password must be at least 10 characters and include uppercase, lowercase, digit, and symbol.")
+        val insecurePassword = Problem("Password must be at least 10 characters and include uppercase, lowercase, and a symbol.")
 
         /* Workflows */
         val workflowNotFound = Problem("The requested workflow was not found.")
@@ -34,6 +34,9 @@ data class Problem(val title: String) {
         val taskNotFound = Problem("The requested task was not found.")
         val taskAlreadyLinked = Problem("The task is already linked to this workflow.")
         val taskNotLinked = Problem("The task is not linked to this workflow.")
+        val invalidFileType = Problem("File type not allowed. Permitted extensions: .py, .js, .sh, .bash, .ts.")
+        val fileTooLarge = Problem("The uploaded file exceeds the maximum allowed size.")
+        val scriptNotFound = Problem("No script has been uploaded for this task.")
 
         /* Schedules */
         val scheduleNotFound = Problem("The requested schedule was not found.")
@@ -44,6 +47,8 @@ data class Problem(val title: String) {
         val internalError = Problem("An unexpected error occurred.")
         val notCancelable = Problem("Execution cannot be canceled: it is already finished, not found, or not owned by you.")
         val badRequest = Problem("Bad request.")
+        val executionNotFound = Problem("The requested execution was not found.")
+        val resourceNotFound = Problem("The requested resource was not found.")
     }
 }
 

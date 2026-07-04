@@ -12,7 +12,7 @@ import java.util.UUID
 @Repository
 interface WorkflowTaskOrderRepository : JpaRepository<WorkflowTaskOrder, UUID> {
 
-    @Query("select wto from WorkflowTaskOrder wto where wto.workflow.id = :workflowId order by wto.taskOrder asc")
+    @Query("select wto from WorkflowTaskOrder wto join fetch wto.task where wto.workflow.id = :workflowId order by wto.taskOrder asc")
     fun findAllByWorkflowIdOrderByTaskOrderAsc(@Param("workflowId") workflowId: UUID): List<WorkflowTaskOrder>
 
     @Query("select wto from WorkflowTaskOrder wto where wto.task.id = :taskId")

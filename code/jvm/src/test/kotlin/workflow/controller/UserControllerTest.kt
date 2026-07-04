@@ -6,9 +6,10 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.workflow.controller.UserController
+import org.workflow.dto.RoleSummaryResponse
 import org.workflow.dto.UserAdminResponse
 import org.workflow.dto.UserRoleUpdateRequest
-import org.workflow.dto.RoleSummaryResponse
+import org.workflow.entity.enums.RoleType
 import org.workflow.service.UserService
 import org.workflow.service.utils.UserError
 import org.workflow.utils.failure
@@ -31,8 +32,8 @@ class UserControllerTest {
     @Test
     fun `listUsers returns 200 with all users`() {
         val users = listOf(
-            UserAdminResponse(UUID.randomUUID(), "alice", "ADMIN", listOf("workflow:read")),
-            UserAdminResponse(UUID.randomUUID(), "bob",   "READER", listOf("workflow:read"))
+            UserAdminResponse(UUID.randomUUID(), "alice", RoleType.ADMIN, listOf("workflow:read")),
+            UserAdminResponse(UUID.randomUUID(), "bob",   RoleType.READER, listOf("workflow:read"))
         )
         every { userService.listUsers() } returns users
 
@@ -57,8 +58,8 @@ class UserControllerTest {
     @Test
     fun `listRoles returns 200 with role catalog`() {
         val roles = listOf(
-            RoleSummaryResponse("ADMIN", listOf("workflow:read", "workflow:write")),
-            RoleSummaryResponse("READER", listOf("workflow:read"))
+            RoleSummaryResponse(RoleType.ADMIN, listOf("workflow:read", "workflow:write")),
+            RoleSummaryResponse(RoleType.READER, listOf("workflow:read"))
         )
         every { userService.listRoles() } returns roles
 
@@ -73,7 +74,7 @@ class UserControllerTest {
     @Test
     fun `updateUserRole returns 200 on success`() {
         val userId = UUID.randomUUID()
-        val updated = UserAdminResponse(userId, "alice", "WRITER", listOf("workflow:read", "workflow:write"))
+        val updated = UserAdminResponse(userId, "alice", RoleType.WRITER, listOf("workflow:read", "workflow:write"))
         every { userService.updateUserRole(userId, any()) } returns success(updated)
 
         val response = controller.updateUserRole(userId, UserRoleUpdateRequest("WRITER"))

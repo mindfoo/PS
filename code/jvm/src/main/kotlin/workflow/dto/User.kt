@@ -1,12 +1,13 @@
 package org.workflow.dto
 
+import org.workflow.entity.enums.RoleType
 import java.util.UUID
 
 /** Admin-facing user payload used by management endpoints. */
 data class UserAdminResponse(
     val id: UUID?,
     val username: String,
-    val role: String,
+    val role: RoleType,
     val permissions: List<String>
 )
 
@@ -17,6 +18,6 @@ data class UserRoleUpdateRequest(
 
 /** Role catalog entry with effective permission slugs. */
 data class RoleSummaryResponse(
-    val name: String,
+    val name: RoleType,
     val permissions: List<String>
 )

@@ -6,6 +6,7 @@ import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.tags.Tag
+import jakarta.validation.Valid
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -37,9 +38,9 @@ class UserController(private val userService: UserService) {
         ApiResponse(responseCode = "200", description = "Users returned",
             content = [Content(schema = Schema(implementation = UserAdminResponse::class))]),
         ApiResponse(responseCode = "401", description = "Not authenticated",
-            content = [Content(mediaType = Problem.MEDIA_TYPE)]),
+            content = [Content(mediaType = Problem.PROB_TYPE)]),
         ApiResponse(responseCode = "403", description = "Insufficient permissions — user:manage required",
-            content = [Content(mediaType = Problem.MEDIA_TYPE)])
+            content = [Content(mediaType = Problem.PROB_TYPE)])
     )
     fun listUsers(): ResponseEntity<List<UserAdminResponse>> =
         ResponseEntity.ok(userService.listUsers())
@@ -51,9 +52,9 @@ class UserController(private val userService: UserService) {
         ApiResponse(responseCode = "200", description = "Roles returned",
             content = [Content(schema = Schema(implementation = RoleSummaryResponse::class))]),
         ApiResponse(responseCode = "401", description = "Not authenticated",
-            content = [Content(mediaType = Problem.MEDIA_TYPE)]),
+            content = [Content(mediaType = Problem.PROB_TYPE)]),
         ApiResponse(responseCode = "403", description = "Insufficient permissions — user:manage required",
-            content = [Content(mediaType = Problem.MEDIA_TYPE)])
+            content = [Content(mediaType = Problem.PROB_TYPE)])
     )
     fun listRoles(): ResponseEntity<List<RoleSummaryResponse>> =
         ResponseEntity.ok(userService.listRoles())
@@ -65,17 +66,17 @@ class UserController(private val userService: UserService) {
         ApiResponse(responseCode = "200", description = "Role updated",
             content = [Content(schema = Schema(implementation = UserAdminResponse::class))]),
         ApiResponse(responseCode = "400", description = "Role not found",
-            content = [Content(mediaType = Problem.MEDIA_TYPE)]),
+            content = [Content(mediaType = Problem.PROB_TYPE)]),
         ApiResponse(responseCode = "401", description = "Not authenticated",
-            content = [Content(mediaType = Problem.MEDIA_TYPE)]),
+            content = [Content(mediaType = Problem.PROB_TYPE)]),
         ApiResponse(responseCode = "403", description = "Insufficient permissions — user:manage required",
-            content = [Content(mediaType = Problem.MEDIA_TYPE)]),
+            content = [Content(mediaType = Problem.PROB_TYPE)]),
         ApiResponse(responseCode = "404", description = "User not found",
-            content = [Content(mediaType = Problem.MEDIA_TYPE)])
+            content = [Content(mediaType = Problem.PROB_TYPE)])
     )
     fun updateUserRole(
         @PathVariable("id") userId: UUID,
-        @RequestBody request: UserRoleUpdateRequest
+        @Valid @RequestBody request: UserRoleUpdateRequest
     ): ResponseEntity<Any> =
         when (val result = userService.updateUserRole(userId, request)) {
             is Success -> ResponseEntity.ok(result.value)

@@ -1,161 +1,171 @@
 // Tables
-@use 'variables' as *;
+@use "variables" as *;
 
-.table-wrapper { overflow-x: auto; margin: 1rem 0; }
+.table-wrapper {
+	overflow-x: auto;
+	margin: 1rem 0;
+}
 
 .table {
-  width: 100%;
-  border-collapse: collapse;
-  background: $surface;
-  border-radius: $radius;
-  overflow: hidden;
+	width: 100%;
+	border-collapse: collapse;
+	background: $surface;
+	border-radius: $radius;
+	overflow: hidden;
 
-  th,
-  td {
-    padding: 0.7rem 1rem;
-    text-align: left;
-    border-bottom: 1px solid $border;
-  }
+	th,
+	td {
+		padding: 0.7rem 1rem;
+		text-align: left;
+		border-bottom: 1px solid $border;
+	}
 
-  th {
-    font-size: 0.8rem;
-    text-transform: uppercase;
-    color: $text-muted;
-    letter-spacing: 0.05em;
-  }
+	th {
+		font-size: 0.8rem;
+		text-transform: uppercase;
+		color: $text-muted;
+		letter-spacing: 0.05em;
+	}
 
-  tr:last-child td { border-bottom: none;  padding: 0.7rem 1rem;}
-  tr:hover td { background: $surface2; }
+	tr:last-child td {
+		border-bottom: none;
+		padding: 0.7rem 1rem;
+	}
+	tr:hover td {
+		background: $surface2;
+	}
 }
 
 .actions-cell {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: nowrap;
-  white-space: nowrap;
+	display: flex;
+	gap: 0.5rem;
+	flex-wrap: nowrap;
+	white-space: nowrap;
 }
 
 .config-preview {
-  font-size: 0.75rem;
-  color: $text-muted;
-  max-width: 200px;
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+	font-size: 0.75rem;
+	color: $text-muted;
+	max-width: 200px;
+	display: block;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 // Stage badge (parallel group indicator)
 .stage-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 2rem;
-  padding: 0.15rem 0.5rem;
-  border-radius: $radius;
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: $white;
-  user-select: none;
-  transition: opacity 0.15s;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 2rem;
+	padding: 0.15rem 0.5rem;
+	border-radius: $radius;
+	font-size: 0.78rem;
+	font-weight: 600;
+	color: $white;
+	user-select: none;
+	transition: opacity 0.15s;
 
-  &:hover { opacity: 0.85; }
+	&:hover {
+		opacity: 0.85;
+	}
 }
 
 .stage-input {
-  background: $surface2;
-  border: 1px solid $primary;
-  border-radius: $radius;
-  color: $text;
-  padding: 0.2rem 0.4rem;
-  font-size: 0.85rem;
-  outline: none;
-  width: 3.5rem;
+	background: $surface2;
+	border: 1px solid $primary;
+	border-radius: $radius;
+	color: $text;
+	padding: 0.2rem 0.4rem;
+	font-size: 0.85rem;
+	outline: none;
+	width: 3.5rem;
 }
 
 // Permission badges in admin table — adds gap between badges
 .permissions-cell .badge {
-  margin-right: 0.35rem;
+	margin-right: 0.35rem;
 }
 
 // WorkflowDetailPage — tasks table
 .th-drag-handle {
-  width: 1.5rem;
+	width: 1.5rem;
 }
 
 // WorkflowDetailPage — execution history table
 .execution-row {
-  cursor: pointer;
+	cursor: pointer;
 }
 
 .execution-row td.td-timestamp {
-  font-size: 0.82rem;
+	font-size: 0.82rem;
 }
 
 .td-expand {
-  color: $text-muted;
-  width: 1.5rem;
-  text-align: center;
+	color: $text-muted;
+	width: 1.5rem;
+	text-align: center;
 }
 
 .execution-detail-cell {
-  background: $bg;
-  padding: 0.75rem 1rem;
+	background: $bg;
+	padding: 0.75rem 1rem;
 }
 
 .execution-subtable {
-  font-size: 0.8rem;
-  margin: 0;
+	font-size: 0.8rem;
+	margin: 0;
 }
 
 .execution-subtable td.td-timestamp {
-  font-size: 0.75rem;
+	font-size: 0.75rem;
 }
 
 .execution-output-pre {
-  margin: 0;
-  font-size: 0.72rem;
-  color: $text;
-  white-space: pre-wrap;
-  word-break: break-word;
-  max-height: 6rem;
-  overflow: auto;
+	margin: 0;
+	font-size: 0.72rem;
+	color: $text;
+	white-space: pre-wrap;
+	word-break: break-word;
+	max-height: 6rem;
+	overflow: auto;
 }
 
 .execution-output-pre--full {
-  margin: 0;
-  font-size: 0.78rem;
-  color: $text;
-  white-space: pre-wrap;
-  word-break: break-word;
+	margin: 0;
+	font-size: 0.78rem;
+	color: $text;
+	white-space: pre-wrap;
+	word-break: break-word;
 }
 
 // WorkflowDetailPage — task row controls
 .td-drag-handle {
-  cursor: grab;
-  color: $text-muted;
-  user-select: none;
+	cursor: grab;
+	color: $text-muted;
+	user-select: none;
 }
 
 .stage-input {
-  width: 3rem;
+	width: 3rem;
 }
 
 .retry-badge--clickable {
-  cursor: pointer;
+	cursor: pointer;
 }
 
 .task-hint {
-  font-size: 0.8rem;
-  margin-bottom: 0.75rem;
+	font-size: 0.8rem;
+	margin-bottom: 0.75rem;
 }
 
 .saving-indicator {
-  font-size: 0.8rem;
+	font-size: 0.8rem;
 }
 
-.background-wrapper{
-  background: rgba($surface, 0.84);
-  padding: 1rem;
-  border-radius: 5px;
+.background-wrapper {
+	background: rgba($surface, 0.84);
+	padding: 1rem;
+	border-radius: 5px;
 }

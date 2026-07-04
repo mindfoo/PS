@@ -1,39 +1,75 @@
 // Badges
-@use 'variables' as *;
-@use 'sass:color';
+@use "variables" as *;
+@use "sass:color";
 
 .badge {
-  display: inline-block;
-  padding: 0.2rem 0.55rem;
-  border-radius: 99px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  background: $surface2;
-  color: $text;
+	display: inline-block;
+	padding: 0.2rem 0.55rem;
+	border-radius: 99px;
+	font-size: 0.75rem;
+	font-weight: 600;
+	background: $surface2;
+	color: $text;
 
-  &-success { background: color.adjust($success, $alpha: -0.85); color: $success; }
-  &-muted   { background: $surface2; color: $text-muted; }
+	&-success {
+		background: color.adjust($success, $alpha: -0.85);
+		color: $success;
+	}
+	&-muted {
+		background: $surface2;
+		color: $text-muted;
+	}
 
-  // Execution status variants
-  &-status-success  { background: color.adjust($success,  $alpha: -0.85); color: $success;  }
-  &-status-error    { background: color.adjust($danger,   $alpha: -0.85); color: $danger;   }
-  &-status-running  { background: color.adjust($primary,  $alpha: -0.85); color: $primary;  }
-  &-status-pending  { background: color.adjust($warning,  $alpha: -0.85); color: $warning;  }
-  &-status-canceled { background: color.adjust($slate,    $alpha: -0.85); color: $slate;    }
+	// Execution status variants
+	&-status-success {
+		background: color.adjust($success, $alpha: -0.85);
+		color: $success;
+	}
+	&-status-error {
+		background: color.adjust($danger, $alpha: -0.85);
+		color: $danger;
+	}
+	&-status-running {
+		background: color.adjust($primary, $alpha: -0.85);
+		color: $primary;
+	}
+	&-status-pending {
+		background: color.adjust($warning, $alpha: -0.85);
+		color: $warning;
+	}
+	&-status-canceled {
+		background: color.adjust($slate, $alpha: -0.85);
+		color: $slate;
+	}
 }
 
 .role-badge {
-  display: inline-block;
-  padding: 0.15rem 0.5rem;
-  border-radius: 99px;
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+	display: inline-block;
+	padding: 0.15rem 0.5rem;
+	border-radius: 99px;
+	font-size: 0.7rem;
+	font-weight: 700;
+	letter-spacing: 0.04em;
 }
 
-.role-admin  { background: color.adjust($danger,   $alpha: -0.8);  color: color.scale($danger,   $lightness: 20%); }
-.role-writer { background: color.adjust($primary,  $alpha: -0.8);  color: color.scale($primary,  $lightness: 20%); }
-.role-reader { background: color.adjust($success,  $alpha: -0.85); color: color.scale($success,  $lightness: 20%); }
-.role-dev    { background: color.adjust($warning,  $alpha: -0.85); color: color.scale($warning,  $lightness: 20%); }
+.role-admin {
+	background: color.adjust($danger, $alpha: -0.8);
+	color: color.scale($danger, $lightness: 20%);
+}
+.role-writer {
+	background: color.adjust($primary, $alpha: -0.8);
+	color: color.scale($primary, $lightness: 20%);
+}
+.role-reader {
+	background: color.adjust($success, $alpha: -0.85);
+	color: color.scale($success, $lightness: 20%);
+}
+.role-dev {
+	background: color.adjust($warning, $alpha: -0.85);
+	color: color.scale($warning, $lightness: 20%);
+}
 
-.badge-private { background: color.adjust($purple, $alpha: -0.85); color: color.scale($purple, $lightness: 30%); }
+.badge-private {
+	background: color.adjust($purple, $alpha: -0.85);
+	color: color.scale($purple, $lightness: 30%);
+}

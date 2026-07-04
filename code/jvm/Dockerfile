@@ -1,4 +1,3 @@
-# ── Build stage ──────────────────────────────────────────────────────────────
 FROM eclipse-temurin:25-jdk AS builder
 WORKDIR /app
 
@@ -10,7 +9,6 @@ RUN ./gradlew dependencies --no-daemon --quiet || true
 COPY src/ src/
 RUN ./gradlew bootJar --no-daemon -x test
 
-# ── Runtime stage ─────────────────────────────────────────────────────────────
 FROM eclipse-temurin:25-jre AS runtime
 WORKDIR /app
 

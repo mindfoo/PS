@@ -22,15 +22,16 @@ import org.workflow.dto.LoginRequest
 import org.workflow.dto.ProfileResponse
 import org.workflow.dto.RegisterRequest
 import org.workflow.service.AuthService
-import org.workflow.service.utils.AuthError
 import org.workflow.utils.Failure
 import org.workflow.utils.Problem
 import org.workflow.utils.Success
 import org.workflow.utils.Uris
 import org.workflow.security.CookieAuthenticationFilter.Companion.COOKIE_NAME
 import org.workflow.security.CookieAuthenticationFilter.Companion.USERNAME_COOKIE_NAME
+import org.workflow.service.utils.AuthLoginError
+import org.workflow.service.utils.AuthRegisterError
 
-/** Exposes cookie-based authentication endpoints. */
+/* Exposes cookie-based authentication endpoints. */
 @RestController
 @Tag(name = "Auth", description = "Registration, login, logout and profile endpoints")
 class AuthController(
@@ -43,22 +44,19 @@ class AuthController(
         ApiResponse(responseCode = "201", description = "User registered successfully",
             content = [Content(schema = Schema(implementation = ProfileResponse::class))]),
         ApiResponse(responseCode = "409", description = "Username already taken",
-            content = [Content(mediaType = Problem.MEDIA_TYPE)]),
-        ApiResponse(responseCode = "400", description = "Insecure password, role not found, or invalid input",
-            content = [Content(mediaType = Problem.MEDIA_TYPE)])
+            content = [Content(mediaType = Problem.PROB_TYPE)]),
+        ApiResponse(responseCode = "400", description = "Insecure password or invalid input",
+            content = [Content(mediaType = Problem.PROB_TYPE)])
     )
     fun register(@Valid @RequestBody request: RegisterRequest): ResponseEntity<Any> =
         when (val result = authService.register(request)) {
             is Success -> ResponseEntity.status(HttpStatus.CREATED)
-                .header("Location", "${Uris.Auth.PROFILE}")
+                .header(HttpHeaders.LOCATION, Uris.Auth.PROFILE)
                 .body(result.value)
             is Failure -> when (result.value) {
-                AuthError.UsernameAlreadyTaken  -> Problem.response(409, Problem.usernameAlreadyTaken)
-                AuthError.RoleNotFound          -> Problem.response(400, Problem.roleNotFound)
-                AuthError.InsecurePassword      -> Problem.response(400, Problem.insecurePassword)
-                // These cases cannot occur during registration but are listed explicitly
-                AuthError.InvalidCredentials    -> Problem.response(500, Problem.internalError)
-                AuthError.UserNotFound          -> Problem.response(500, Problem.internalError)
+                AuthRegisterError.UsernameAlreadyTaken  -> Problem.response(409, Problem.usernameAlreadyTaken)
+                AuthRegisterError.RoleNotFound          -> Problem.response(400, Problem.roleNotFound)
+                AuthRegisterError.InsecurePassword      -> Problem.response(400, Problem.insecurePassword)
             }
         }
 
@@ -67,7 +65,7 @@ class AuthController(
     @ApiResponses(
         ApiResponse(responseCode = "200", description = "Authentication successful — cookie set"),
         ApiResponse(responseCode = "401", description = "Invalid credentials",
-            content = [Content(mediaType = Problem.MEDIA_TYPE)])
+            content = [Content(mediaType = Problem.PROB_TYPE)])
     )
     fun login(@Valid @RequestBody request: LoginRequest): ResponseEntity<Any> =
         when (val result = authService.login(request)) {
@@ -94,12 +92,8 @@ class AuthController(
                     .body(mapOf("message" to "Logged in successfully"))
             }
             is Failure -> when (result.value) {
-                AuthError.InvalidCredentials    -> Problem.response(401, Problem.invalidCredentials)
-                // These cases cannot occur during login but are listed explicitly
-                AuthError.UsernameAlreadyTaken  -> Problem.response(500, Problem.internalError)
-                AuthError.RoleNotFound          -> Problem.response(500, Problem.internalError)
-                AuthError.InsecurePassword      -> Problem.response(500, Problem.internalError)
-                AuthError.UserNotFound          -> Problem.response(500, Problem.internalError)
+                AuthLoginError.InvalidCredentials    -> Problem.response(401, Problem.invalidCredentials)
+                AuthLoginError.UserNotFound          -> Problem.response(500, Problem.internalError)
             }
         }
 
@@ -109,7 +103,7 @@ class AuthController(
     @ApiResponses(
         ApiResponse(responseCode = "204", description = "Logged out — cookies cleared"),
         ApiResponse(responseCode = "401", description = "Not authenticated",
-            content = [Content(mediaType = Problem.MEDIA_TYPE)])
+            content = [Content(mediaType = Problem.PROB_TYPE)])
     )
     fun logout(request: HttpServletRequest): ResponseEntity<Any> {
         val tokenValue = request.cookies?.find { it.name == COOKIE_NAME }?.value
@@ -146,9 +140,9 @@ class AuthController(
         ApiResponse(responseCode = "200", description = "Profile retrieved",
             content = [Content(schema = Schema(implementation = ProfileResponse::class))]),
         ApiResponse(responseCode = "401", description = "Not authenticated",
-            content = [Content(mediaType = Problem.MEDIA_TYPE)]),
+            content = [Content(mediaType = Problem.PROB_TYPE)]),
         ApiResponse(responseCode = "404", description = "User not found",
-            content = [Content(mediaType = Problem.MEDIA_TYPE)])
+            content = [Content(mediaType = Problem.PROB_TYPE)])
     )
     fun profile(authentication: Authentication): ResponseEntity<Any> =
         when (val result = authService.profile(authentication.name)) {

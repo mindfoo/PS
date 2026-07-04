@@ -14,7 +14,7 @@ class Execution(
     var id: UUID? = null,
 
     @Column(nullable = false, length = 64)
-    var triggeredType: String, // MANUAL, CRON, EVENT
+    var triggeredType: String, // MANUAL | CRON
 
     @Column(nullable = false, length = 64)
     var type: String, // TASK, WORKFLOW
@@ -34,7 +34,7 @@ class Execution(
     @Column(nullable = false)
     var retryCount: Int = 0,
 
-    @ManyToOne(fetch = FetchType.EAGER)
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "triggered_by", nullable = false)
     var triggeredBy: User,
 
@@ -53,5 +53,9 @@ class Execution(
 
     /** Snapshot of the task name at execution time (useful after task renames/deletes). */
     @Column(name = "task_name", length = 128)
-    var taskName: String? = null
+    var taskName: String? = null,
+
+    /** Signals that a cancel was requested while the execution was PENDING or RUNNING. */
+    @Column(nullable = false)
+    var cancelRequested: Boolean = false
 ) : Timestamp()

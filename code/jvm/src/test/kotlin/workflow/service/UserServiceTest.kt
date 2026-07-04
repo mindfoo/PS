@@ -7,6 +7,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.*
 import org.workflow.dto.UserRoleUpdateRequest
+import org.workflow.entity.enums.RoleType
 import org.workflow.entity.Roles
 import org.workflow.entity.User
 import org.workflow.repository.RoleRepository
@@ -23,7 +24,7 @@ class UserServiceTest {
     private lateinit var roleRepository: RoleRepository
     private lateinit var service: UserService
 
-    private fun role(name: String = "READER") = Roles(id = UUID.randomUUID(), name = name)
+    private fun role(type: RoleType = RoleType.READER) = Roles(id = UUID.randomUUID(), name = type)
     private fun user(role: Roles = role()) = User(
         id = UUID.randomUUID(), username = "alice",
         passwordValidation = "hashed", role = role
@@ -53,7 +54,7 @@ class UserServiceTest {
 
     @Test
     fun `listRoles returns all roles`() {
-        every { roleRepository.findAllWithPermissions() } returns listOf(role("ADMIN"), role("READER"))
+        every { roleRepository.findAllWithPermissions() } returns listOf(role(RoleType.ADMIN), role(RoleType.READER))
 
         val result = service.listRoles()
 
@@ -65,16 +66,16 @@ class UserServiceTest {
     @Test
     fun `updateUserRole returns updated user on success`() {
         val userId    = UUID.randomUUID()
-        val adminRole = role("ADMIN")
+        val adminRole = role(RoleType.ADMIN)
         val u         = user(role())
         every { userRepository.findByIdWithRoleAndPermissions(userId) } returns u
-        every { roleRepository.findByNameWithPermissions("ADMIN") } returns adminRole
+        every { roleRepository.findByNameWithPermissions(RoleType.ADMIN) } returns adminRole
         every { userRepository.save(any()) } returns u.apply { role = adminRole }
 
         val result = service.updateUserRole(userId, UserRoleUpdateRequest("ADMIN"))
 
         assertTrue(result is Success)
-        assertEquals("ADMIN", (result as Success).value.role)
+        assertEquals(RoleType.ADMIN, (result as Success).value.role)
     }
 
     @Test
@@ -92,7 +93,6 @@ class UserServiceTest {
     fun `updateUserRole returns RoleNotFound when role missing`() {
         val userId = UUID.randomUUID()
         every { userRepository.findByIdWithRoleAndPermissions(userId) } returns user()
-        every { roleRepository.findByNameWithPermissions("GHOST") } returns null
 
         val result = service.updateUserRole(userId, UserRoleUpdateRequest("GHOST"))
 

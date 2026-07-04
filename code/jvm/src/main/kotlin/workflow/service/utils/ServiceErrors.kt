@@ -3,21 +3,23 @@ package org.workflow.service.utils
 /** Auth */
 
 /** All typed failure cases that [org.workflow.service.AuthService] can produce. */
-sealed class AuthError {
+sealed class AuthRegisterError {
     /** The username is already registered. */
-    object UsernameAlreadyTaken : AuthError()
+    object UsernameAlreadyTaken : AuthRegisterError()
 
     /** The requested role does not exist in the database. */
-    object RoleNotFound : AuthError()
-
-    /** The supplied username/password pair is incorrect. */
-    object InvalidCredentials : AuthError()
-
-    /** No user with the given username exists. */
-    object UserNotFound : AuthError()
+    object RoleNotFound : AuthRegisterError()
 
     /** The password does not meet the minimum security requirements. */
-    object InsecurePassword : AuthError()
+    object InsecurePassword : AuthRegisterError()
+}
+
+sealed class AuthLoginError {
+    /** The supplied username/password pair is incorrect. */
+    object InvalidCredentials : AuthLoginError()
+
+    /** No user with the given username exists. */
+    object UserNotFound : AuthLoginError()
 }
 
 /** Workflow */
@@ -30,6 +32,10 @@ sealed class WorkflowError {
     object UserNotFound : WorkflowError()
     /** The workflow is private and the caller is neither its owner nor an admin. */
     object AccessDenied : WorkflowError()
+    /** The task is not linked to the workflow (WorkflowTaskOrder row missing). */
+    object TaskNotLinked : WorkflowError()
+    /** The execution record does not exist. */
+    object ExecutionNotFound : WorkflowError()
 }
 
 /** Task */
@@ -48,6 +54,12 @@ sealed class TaskError {
     object NotLinked : TaskError()
     /** The task is private and the caller is neither its owner nor an admin. */
     object AccessDenied : TaskError()
+    /** The uploaded file has an extension that is not on the allowlist. */
+    object InvalidFileType : TaskError()
+    /** The uploaded file exceeds the configured size limit. */
+    object FileTooLarge : TaskError()
+    /** No script has been uploaded for this task yet. */
+    object ScriptNotFound : TaskError()
 }
 
 /** User */
@@ -81,5 +93,7 @@ sealed class ExecutionError {
     object TaskNotFound : ExecutionError()
     object WorkflowNotFound : ExecutionError()
     object UserNotFound : ExecutionError()
+    /** The execution cannot be canceled — already finished, not found, or not owned by caller. */
+    object NotCancelable : ExecutionError()
 }
 

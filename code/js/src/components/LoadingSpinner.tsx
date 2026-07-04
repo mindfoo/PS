@@ -1,7 +1,7 @@
 interface LoadingSpinnerProps {
-  message?: string
+	message?: string;
 }
 
-export function LoadingSpinner({ message = 'Loading…' }: LoadingSpinnerProps) {
-  return <div className="loading">{message}</div>
+export function LoadingSpinner({ message = "Loading…" }: LoadingSpinnerProps) {
+	return <div className="loading">{message}</div>;
 }
