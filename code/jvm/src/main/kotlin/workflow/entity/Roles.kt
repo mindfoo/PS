@@ -3,8 +3,6 @@ package org.workflow.entity
 import jakarta.persistence.*
 import org.workflow.entity.enums.RoleType
 import java.util.UUID
-import jakarta.persistence.EnumType
-import jakarta.persistence.Enumerated
 
 @Entity
 @Table(name = "roles")
@@ -23,7 +21,6 @@ class Roles(
         joinColumns = [JoinColumn(name = "role_id")],
         inverseJoinColumns = [JoinColumn(name = "permission_id")]
     )
-    @Suppress("unused")
     val permissions: MutableSet<Permission> = mutableSetOf()
 
 ): Timestamp()

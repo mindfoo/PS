@@ -34,9 +34,6 @@ data class Problem(val title: String) {
         val taskNotFound = Problem("The requested task was not found.")
         val taskAlreadyLinked = Problem("The task is already linked to this workflow.")
         val taskNotLinked = Problem("The task is not linked to this workflow.")
-        val invalidFileType = Problem("File type not allowed. Permitted extensions: .py, .js, .sh, .bash, .ts.")
-        val fileTooLarge = Problem("The uploaded file exceeds the maximum allowed size.")
-        val scriptNotFound = Problem("No script has been uploaded for this task.")
 
         /* Schedules */
         val scheduleNotFound = Problem("The requested schedule was not found.")
@@ -48,7 +45,6 @@ data class Problem(val title: String) {
         val notCancelable = Problem("Execution cannot be canceled: it is already finished, not found, or not owned by you.")
         val badRequest = Problem("Bad request.")
         val executionNotFound = Problem("The requested execution was not found.")
-        val resourceNotFound = Problem("The requested resource was not found.")
     }
 }
 

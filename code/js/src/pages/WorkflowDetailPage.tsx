@@ -1,9 +1,15 @@
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
 import { workflowApi, type TaskOrderItem } from "../api/workflows";
 import { taskApi, type WorkflowTaskEntry, type TaskResponse } from "../api/tasks";
-import { executionApi, isActiveExecutionStatus, type ExecutionSummaryResponse } from "../api/executions";
+import {
+	executionApi,
+	isActiveExecutionStatus,
+	ExecutionTriggerType,
+	ExecutionStatus,
+	type ExecutionSummaryResponse,
+} from "../api/executions";
 import { usePermissions } from "../contexts/AuthContext";
 import { Layout } from "../components/Layout";
 import type { WorkflowResponse } from "../api/workflows";
@@ -11,7 +17,6 @@ import { StatusBadge } from "../components/StatusBadge";
 import { EmptyState } from "../components/EmptyState";
 import { LoadingSpinner } from "../components/LoadingSpinner";
 import { configSummary } from "../utils/task";
-import { useExecutionSubscription } from "../hooks/useExecutionSubscription";
 
 const STAGE_COLOURS = ["#6366f1", "#22c55e", "#f59e0b", "#ef4444", "#06b6d4", "#a855f7"];
 
@@ -53,7 +58,7 @@ export function WorkflowDetailPage() {
 	const [executions, setExecutions] = useState<ExecutionSummaryResponse[]>([]);
 	const [execLoading, setExecLoading] = useState(false);
 	const [execOpen, setExecOpen] = useState(true);
-	const [taskStatuses, setTaskStatuses] = useState<Record<string, string>>({});
+	const [taskStatuses, setTaskStatuses] = useState<Record<string, ExecutionStatus>>({});
 
 	// --- Core API Data Loaders ---
 	const loadExecutions = useCallback(async () => {
@@ -92,30 +97,50 @@ export function WorkflowDetailPage() {
 		};
 	}, [id, loadExecutions]);
 
-	// --- SSE Tracking Monitor ---
-	const { subscribe, unsubscribe } = useExecutionSubscription((event) => {
-		setTaskStatuses((prev) => ({ ...prev, ...event.taskStatuses }));
-		setExecutions((prev) =>
-			prev.map((ex) => (ex.id === event.executionId ? { ...ex, status: event.status } : ex)),
-		);
-		if (event.terminal) void loadExecutions();
-	});
+	useEffect(() => {
+		if (!id || !execOpen) return;
+		const interval = setInterval(() => {
+			executionApi
+				.listByWorkflow(id)
+				.then(setExecutions)
+				.catch(() => {});
+		}, 20_000);
+		return () => clearInterval(interval);
+	}, [id, execOpen]);
 
-	// Starts following a just-triggered execution. Subscribes first so no
-	// status change is missed, then double-checks via a direct fetch in case
-	// the execution had already finished before the subscription was set up.
-	const subscribeAndMonitor = useCallback(
+	// --- SSE Tracking Monitor ---
+	const unsubscribeRef = useRef<(() => void) | null>(null);
+
+	const stopMonitoring = useCallback(() => {
+		unsubscribeRef.current?.();
+		unsubscribeRef.current = null;
+	}, []);
+
+	const monitorExecution = useCallback(
 		(execId: string) => {
-			subscribe(execId);
+			stopMonitoring();
+			unsubscribeRef.current = executionApi.subscribeToExecution(execId, (event) => {
+				setTaskStatuses((prev) => ({ ...prev, ...event.taskStatuses }));
+				setExecutions((prev) =>
+					prev.map((ex) => (ex.id === event.executionId ? { ...ex, status: event.status } : ex)),
+				);
+				if (!isActiveExecutionStatus(event.status)) {
+					stopMonitoring();
+					void loadExecutions();
+				}
+			});
+
 			void executionApi.getById(execId).then((ex) => {
 				if (!isActiveExecutionStatus(ex.status)) {
-					unsubscribe();
+					stopMonitoring();
 					setExecutions((prev) => prev.map((e) => (e.id === execId ? ex : e)));
 				}
 			});
 		},
-		[subscribe, unsubscribe],
+		[stopMonitoring, loadExecutions],
 	);
+
+	useEffect(() => stopMonitoring, [stopMonitoring]);
 
 	// --- Task & Order Persisters ---
 	async function persistOrder(updated: WorkflowTaskEntry[]) {
@@ -199,8 +224,8 @@ export function WorkflowDetailPage() {
 	async function handleRunTask(taskId: string) {
 		try {
 			const res = await taskApi.run(taskId);
-			setTaskStatuses((prev) => ({ ...prev, [taskId]: "RUNNING" }));
-			subscribeAndMonitor(res.executionId);
+			setTaskStatuses((prev) => ({ ...prev, [taskId]: ExecutionStatus.RUNNING }));
+			monitorExecution(res.executionId);
 			void loadExecutions();
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Run failed");
@@ -212,13 +237,13 @@ export function WorkflowDetailPage() {
 		setRunning(true);
 		setError("");
 		try {
-			const pending: Record<string, string> = {};
+			const pending: Record<string, ExecutionStatus> = {};
 			tasks.forEach((t) => {
-				if (t.taskId) pending[t.taskId] = "PENDING";
+				if (t.taskId) pending[t.taskId] = ExecutionStatus.PENDING;
 			});
 			setTaskStatuses(pending);
 			const res = await workflowApi.run(id);
-			subscribeAndMonitor(res.executionId);
+			monitorExecution(res.executionId);
 			void loadExecutions();
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Run failed");
@@ -595,7 +620,7 @@ export function WorkflowDetailPage() {
 							</button>
 						</div>
 						{linkLoading ? (
-							<div className="loading">Loading tasks…</div>
+							<LoadingSpinner message="Loading tasks…" />
 						) : allTasks.length === 0 ? (
 							<p className="text-muted">
 								No available tasks to link. <Link to="/tasks/new">Create one</Link> first.
@@ -643,15 +668,19 @@ export function WorkflowDetailPage() {
 						{executions.length > 0 && (
 							<div className="exec-run-stats">
 								<span className="badge badge-muted">
-									{executions.filter((e) => e.triggeredType === "MANUAL").length} manual{" "}
-									{executions.filter((e) => e.triggeredType === "MANUAL").length === 1
+									{executions.filter((e) => e.triggeredType === ExecutionTriggerType.MANUAL).length}{" "}
+									manual{" "}
+									{executions.filter((e) => e.triggeredType === ExecutionTriggerType.MANUAL)
+										.length === 1
 										? "run"
 										: "runs"}
 								</span>
-								{executions.some((e) => e.triggeredType === "CRON") && (
+								{executions.some((e) => e.triggeredType === ExecutionTriggerType.CRON) && (
 									<span className="badge badge-muted">
-										{executions.filter((e) => e.triggeredType === "CRON").length} cron{" "}
-										{executions.filter((e) => e.triggeredType === "CRON").length === 1
+										{executions.filter((e) => e.triggeredType === ExecutionTriggerType.CRON).length}{" "}
+										cron{" "}
+										{executions.filter((e) => e.triggeredType === ExecutionTriggerType.CRON)
+											.length === 1
 											? "run"
 											: "runs"}
 									</span>
@@ -707,15 +736,14 @@ export function WorkflowDetailPage() {
 												>
 													Details
 												</Link>
-												{(ex.status === "PENDING" || ex.status === "RUNNING") &&
-													perms.canExecuteWorkflows && (
-														<button
-															className="btn btn-sm btn-danger"
-															onClick={() => void handleCancelExecution(ex.id)}
-														>
-															Cancel
-														</button>
-													)}
+												{isActiveExecutionStatus(ex.status) && perms.canExecuteWorkflows && (
+													<button
+														className="btn btn-sm btn-danger"
+														onClick={() => void handleCancelExecution(ex.id)}
+													>
+														Cancel
+													</button>
+												)}
 											</td>
 										</tr>
 									))}

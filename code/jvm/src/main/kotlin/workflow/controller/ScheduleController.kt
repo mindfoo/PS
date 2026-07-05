@@ -21,12 +21,12 @@ import org.springframework.web.bind.annotation.RestController
 import org.workflow.dto.ScheduleCreateRequest
 import org.workflow.dto.ScheduleResponse
 import org.workflow.dto.ScheduleUpdateRequest
-import org.workflow.service.utils.ScheduleError
 import org.workflow.service.ScheduleService
 import org.workflow.utils.Failure
 import org.workflow.utils.Problem
 import org.workflow.utils.Success
 import org.workflow.utils.Uris
+import org.workflow.utils.toResponse
 import java.util.UUID
 
 /** Exposes schedule CRUD endpoints used to manage cron execution settings. */
@@ -130,11 +130,4 @@ class ScheduleController(
             is Success -> ResponseEntity.noContent().build()
             is Failure -> result.value.toResponse()
         }
-
-    private fun ScheduleError.toResponse(): ResponseEntity<Any> = when (this) {
-        ScheduleError.UserNotFound          -> Problem.response(404, Problem.userNotFound)
-        ScheduleError.ScheduleNotFound      -> Problem.response(404, Problem.scheduleNotFound)
-        ScheduleError.WorkflowNotFound      -> Problem.response(404, Problem.workflowNotFound)
-        ScheduleError.InvalidCronExpression -> Problem.response(400, Problem.invalidCronExpression)
-    }
 }

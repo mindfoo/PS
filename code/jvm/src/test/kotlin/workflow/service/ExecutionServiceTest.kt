@@ -4,10 +4,12 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.*
 import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.web.client.RestTemplate
 import org.workflow.entity.Execution
 import org.workflow.entity.ExecutionStatus
@@ -81,6 +83,12 @@ class ExecutionServiceTest {
             jdbcTemplate,
             ObjectMapper()
         )
+        TransactionSynchronizationManager.initSynchronization()
+    }
+
+    @AfterEach
+    fun tearDown() {
+        TransactionSynchronizationManager.clearSynchronization()
     }
 
     // cancelExecution

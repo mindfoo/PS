@@ -38,7 +38,6 @@ object Uris {
     }
 
     object Executions {
-        const val BASE = "$PREFIX/executions"
         const val BY_ID = "$PREFIX/executions/{id}"
         const val CANCEL = "$PREFIX/executions/{id}/cancel"
         const val EVENTS = "$PREFIX/executions/{id}/events"
@@ -48,8 +47,7 @@ object Uris {
         const val BASE = "$PREFIX/tasks"
         const val BY_ID = "$PREFIX/tasks/{id}"
         const val RUN = "$PREFIX/tasks/{id}/run"
-        const val SCRIPT = "$PREFIX/tasks/{id}/script"
-        const val SCRIPT_INFO = "$PREFIX/tasks/{id}/script-info"
+        const val AVAILABLE_SCRIPTS = "$PREFIX/tasks/scripts"
 
         fun byId(id: UUID): URI = UriTemplate(BY_ID).expand(id)
     }

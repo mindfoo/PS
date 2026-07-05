@@ -81,9 +81,8 @@ class UserController(private val userService: UserService) {
         when (val result = userService.updateUserRole(userId, request)) {
             is Success -> ResponseEntity.ok(result.value)
             is Failure -> when (result.value) {
-                UserError.RoleNotFound         -> Problem.response(400, Problem.roleNotFound)
-                UserError.UserNotFound         -> Problem.response(404, Problem.userNotFound)
-                UserError.UsernameAlreadyTaken -> Problem.response(409, Problem.usernameAlreadyTaken)
+                UserError.RoleNotFound -> Problem.response(400, Problem.roleNotFound)
+                UserError.UserNotFound -> Problem.response(404, Problem.userNotFound)
             }
         }
 }

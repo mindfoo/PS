@@ -10,11 +10,14 @@ import org.springframework.http.HttpMethod
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.support.TransactionSynchronization
+import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.web.client.RestTemplate
 import org.workflow.entity.Execution
 import org.workflow.entity.ExecutionStatus
 import org.workflow.entity.ExecutionTriggerType
 import org.workflow.entity.ExecutionType
+import org.workflow.entity.TaskType
 import org.workflow.entity.Task
 import org.workflow.entity.User
 import org.workflow.entity.Workflow
@@ -55,8 +58,6 @@ class ExecutionService(
         private val WHITESPACE = Regex("\\s+")
     }
 
-    // ---------- Public API ----------
-
     /** Cancels a PENDING/RUNNING execution. Non-admins can only cancel their own. */
     @Transactional
     fun cancelExecution(executionId: UUID, authenticationName: String): Either<ExecutionError, Unit> {
@@ -82,10 +83,10 @@ class ExecutionService(
         val user = helpers.findUser(authenticationName)
             ?: return failure(ExecutionError.UserNotFound)
 
-        val userId = user.id ?: return failure(ExecutionError.UserNotFound)
-        val workflow = (if (isAdmin(user)) workflowRepository.findByIdOrNull(workflowId)
-                        else workflowRepository.findByIdAndOwnerId(workflowId, userId))
-            ?: return failure(ExecutionError.WorkflowNotFound)
+        val workflow = findOwned(isAdmin(user), user.id,
+            byId = { workflowRepository.findByIdOrNull(workflowId) },
+            byOwner = { workflowRepository.findByIdAndOwnerId(workflowId, it) }
+        ) ?: return failure(ExecutionError.WorkflowNotFound)
 
         val execution = executionLogRepository.save(
             Execution(
@@ -98,10 +99,15 @@ class ExecutionService(
             )
         )
 
-        val executionId = checkNotNull(execution.id) { "Execution id null after save — data integrity violation" }
+        val executionId = checkNotNull(execution.id) { "Something went wrong saving the execution" }
 
-        // Runs on a virtual thread so this call returns immediately; the client tracks progress via SSE.
-        CompletableFuture.runAsync({ runExecution(executionId) }, executionExecutor)
+        // Dispatch AFTER this transaction commits: runExecution reads the execution back by id,
+        // and would find nothing if it ran before the save above is visible to other connections.
+        TransactionSynchronizationManager.registerSynchronization(object : TransactionSynchronization {
+            override fun afterCommit() {
+                CompletableFuture.runAsync({ runExecution(executionId) }, executionExecutor)
+            }
+        })
         return success(executionId)
     }
 
@@ -118,10 +124,8 @@ class ExecutionService(
                 workflow = workflow
             )
         )
-        return checkNotNull(execution.id) { "Execution id null after save — data integrity violation" }
+        return checkNotNull(execution.id) { "Something went wrong saving the execution" }
     }
-
-    // ---------- Workflow execution engine ----------
 
     /** Runs a workflow's stages in order; tasks in the same stage run in parallel. Called on a virtual thread. */
     fun runExecution(executionId: UUID) {
@@ -143,7 +147,6 @@ class ExecutionService(
         executionLogRepository.save(execution)
         notifyStatusChange(executionId, ExecutionStatus.RUNNING)
 
-        val logLines = mutableListOf("[${LocalDateTime.now()}] Execution $executionId started for workflow '${workflow.name}'")
         var wasCanceled = false
 
         try {
@@ -178,8 +181,6 @@ class ExecutionService(
                     break
                 }
 
-                logLines += "[${LocalDateTime.now()}] Stage $stage — ${tasksInStage.size} task(s)"
-
                 val results = tasksInStage.mapNotNull { task ->
                     val taskId = task.id ?: return@mapNotNull null
                     val childId = taskExecIds[taskId] ?: return@mapNotNull null
@@ -191,7 +192,6 @@ class ExecutionService(
 
                 results.forEach { (task, output) ->
                     taskOutputs += output
-                    logLines += formatTaskLog(task, output)
                     task.id?.let { taskStatusMap[it.toString()] = (output["status"] as? String) ?: ExecutionStatus.ERROR }
                 }
                 totalExecuted += results.size
@@ -226,15 +226,11 @@ class ExecutionService(
                 "error" to (ex.message ?: "Unknown execution error"),
                 "retryCount" to execution.retryCount
             )
-            logLines += "[${LocalDateTime.now()}] ERROR: ${ex.message}"
             log.error("Execution {} failed: {}", executionId, ex.message, ex)
         }
 
         executionLogRepository.save(execution)
-        logLines += "[${LocalDateTime.now()}] Execution finished — status: ${execution.status}"
         log.info("Execution {} finished — status: {}", executionId, execution.status)
-
-        writeLogFile("execution-$executionId", logLines)
         notifyStatusChange(executionId, execution.status, emptyMap(), terminal = true)
     }
 
@@ -244,10 +240,10 @@ class ExecutionService(
         val user = helpers.findUser(authenticationName)
             ?: return failure(ExecutionError.UserNotFound)
 
-        val userId = user.id ?: return failure(ExecutionError.UserNotFound)
-        val task = (if (isAdmin(user)) taskRepository.findByIdOrNull(taskId)
-                    else taskRepository.findByIdAndOwnerId(taskId, userId))
-            ?: return failure(ExecutionError.TaskNotFound)
+        val task = findOwned(isAdmin(user), user.id,
+            byId = { taskRepository.findByIdOrNull(taskId) },
+            byOwner = { taskRepository.findByIdAndOwnerId(taskId, it) }
+        ) ?: return failure(ExecutionError.TaskNotFound)
 
         val execution = executionLogRepository.save(
             Execution(
@@ -263,11 +259,15 @@ class ExecutionService(
         )
 
         val executionId = checkNotNull(execution.id) { "Execution id null after save — data integrity violation" }
-        CompletableFuture.runAsync({ runManualTask(executionId, task) }, executionExecutor)
+
+        // Dispatch AFTER this transaction commits — see triggerManualWorkflow for why.
+        TransactionSynchronizationManager.registerSynchronization(object : TransactionSynchronization {
+            override fun afterCommit() {
+                CompletableFuture.runAsync({ runManualTask(executionId, task) }, executionExecutor)
+            }
+        })
         return success(executionId)
     }
-
-    // ---------- Single task execution ----------
 
     /** Runs a single manually-triggered task and records its outcome. Runs on a virtual thread. */
     private fun runManualTask(executionId: UUID, task: Task) {
@@ -293,12 +293,6 @@ class ExecutionService(
         execRecord.output = output
         executionLogRepository.save(execRecord)
         notifyStatusChange(executionId, execRecord.status, terminal = true)
-
-        writeLogFile("task-${task.id}-$executionId", listOf(
-            "[${LocalDateTime.now()}] Task '${task.name}' (${task.id}) — manual run",
-            "[${LocalDateTime.now()}] Status: ${execRecord.status}",
-            output["stdout"]?.toString() ?: output["body"]?.toString() ?: ""
-        ))
     }
 
     private fun createPendingTaskExecution(parent: Execution, task: Task): UUID {
@@ -380,26 +374,11 @@ class ExecutionService(
         return output
     }
 
-    private fun formatTaskLog(task: Task, output: Map<String, Any>): String =
-        "[${LocalDateTime.now()}] Task '${task.name}' (${task.id}) — status: ${output["status"]} | " +
-        (output["stdout"]?.toString()?.take(200) ?: output["body"]?.toString()?.take(200) ?: "")
-
-    private fun writeLogFile(name: String, lines: List<String>) {
-        try {
-            val dir = File("logs").apply { mkdirs() }
-            File(dir, "$name.log").writeText(lines.joinToString("\n"))
-        } catch (ex: Exception) {
-            log.warn("Could not write log file for {}: {}", name, ex.message)
-        }
-    }
-
-    // ---------- Task runners (SCRIPT / HTTP) ----------
-
     private fun runTask(task: Task): Map<String, Any> {
         return when (task.type.uppercase()) {
-            "SCRIPT" -> runScriptTask(task)
-            "HTTP"   -> runHttpTask(task)
-            else     -> mapOf("taskId" to task.id.toString(), "type" to task.type, "status" to "SKIPPED", "reason" to "Unsupported task type")
+            TaskType.SCRIPT -> runScriptTask(task)
+            TaskType.HTTP   -> runHttpTask(task)
+            else -> mapOf("taskId" to task.id.toString(), "type" to task.type, "status" to ExecutionStatus.ERROR, "error" to "Unsupported task type")
         }
     }
 
@@ -413,7 +392,7 @@ class ExecutionService(
         val rawArgs   = config["args"]
 
         val allowedCommands = setOf("node", "python3", "bash", "sh", "python")
-        if (command !in allowedCommands || command.contains('/') || command.contains('\\')) {
+        if (command !in allowedCommands) {
             log.warn("Task '{}' blocked — command '{}' is not on the allowlist", task.id, command)
             return mapOf(
                 "taskId"   to task.id.toString(),
@@ -454,7 +433,7 @@ class ExecutionService(
         return mapOf(
             "taskId"   to task.id.toString(),
             "taskName" to task.name,
-            "type"     to "SCRIPT",
+            "type"     to TaskType.SCRIPT,
             "command"  to cmd.joinToString(" "),
             "exitCode" to exitCode,
             "stdout"   to stdout,
@@ -484,7 +463,7 @@ class ExecutionService(
         return mapOf(
             "taskId"     to task.id.toString(),
             "taskName"   to task.name,
-            "type"       to "HTTP",
+            "type"       to TaskType.HTTP,
             "url"        to rawUrl,
             "method"     to method,
             "statusCode" to response.statusCode.value(),

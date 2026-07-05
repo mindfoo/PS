@@ -20,3 +20,8 @@ object ExecutionType {
     const val TASK     = "TASK"
     const val WORKFLOW = "WORKFLOW"
 }
+
+object TaskType {
+    const val SCRIPT = "SCRIPT"
+    const val HTTP   = "HTTP"
+}

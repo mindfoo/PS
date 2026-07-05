@@ -72,9 +72,7 @@ export function TasksPage() {
 			/>
 
 			{tasks.length === 0 ? (
-				<EmptyState
-					message="No tasks yet."
-				/>
+				<EmptyState message="No tasks yet." />
 			) : (
 				<div className="table-wrapper">
 					<table className="table">

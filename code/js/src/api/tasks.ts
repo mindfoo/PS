@@ -38,8 +38,11 @@ export const taskApi = {
 		config?: Record<string, unknown>;
 		isPrivate?: boolean;
 	}) => api.post<TaskResponse>("/tasks", body),
-	update: (id: string, body: { name: string; type: TaskType; config?: Record<string, unknown>; isPrivate?: boolean }) =>
-		api.put<TaskResponse>(`/tasks/${id}`, body),
+	update: (
+		id: string,
+		body: { name: string; type: TaskType; config?: Record<string, unknown>; isPrivate?: boolean },
+	) => api.put<TaskResponse>(`/tasks/${id}`, body),
 	delete: (id: string) => api.delete<void>(`/tasks/${id}`),
 	run: (id: string) => api.post<{ executionId: string; status: ExecutionStatus }>(`/tasks/${id}/run`, {}),
+	listAvailableScripts: () => api.get<string[]>("/tasks/scripts"),
 };

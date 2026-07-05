@@ -17,7 +17,7 @@ function writeCollapsed(value: boolean): void {
 	try {
 		localStorage.setItem(STORAGE_KEY, String(value));
 	} catch {
-		console.error("Couldn't set localstorage")
+		console.error("Couldn't set localstorage");
 	}
 }
 

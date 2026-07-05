@@ -24,9 +24,6 @@ interface ExecutionLogRepository : JpaRepository<Execution, UUID> {
     @Query("select e from Execution e where e.workflow.id = :workflowId and e.parentExecutionId is null order by e.startedAt desc limit 1")
     fun findLatestByWorkflowId(workflowId: UUID): Execution?
 
-    /** All executions for a given task (single-task runs), most recent first. */
-    fun findAllByTaskIdAndParentExecutionIdIsNullOrderByStartedAtDesc(taskId: UUID): List<Execution>
-
     /**
      * Returns (taskId, status) pairs for all child task-level executions of a workflow execution.
      * Used by [ExecutionEventService] to build the catch-up event payload on SSE subscribe.

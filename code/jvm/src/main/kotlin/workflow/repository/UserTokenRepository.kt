@@ -1,7 +1,6 @@
 package org.workflow.repository
 
 import org.springframework.data.jpa.repository.JpaRepository
-import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 import org.springframework.stereotype.Repository
@@ -25,9 +24,5 @@ interface UserTokenRepository : JpaRepository<UserToken, UUID> {
     fun findByTokenHashWithUser(@Param("hash") hash: String): UserToken?
 
     fun deleteByTokenHash(tokenHash: String)
-
-    @Modifying
-    @Query("DELETE FROM UserToken t WHERE t.user.id = :userId")
-    fun deleteAllByUserId(@Param("userId") userId: UUID)
 }
 

@@ -4,8 +4,6 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import org.springframework.web.multipart.MultipartFile
-import org.workflow.dto.ScriptInfoResponse
 import org.workflow.dto.TaskCreateRequest
 import org.workflow.dto.TaskResponse
 import org.workflow.dto.TaskUpdateRequest
@@ -24,20 +22,15 @@ import java.nio.file.Files
 import java.nio.file.Paths
 import java.util.UUID
 
-/** Implements task CRUD, workflow-link operations, and script upload management. */
+/** Implements task CRUD and workflow-link operations. */
 @Service
 class TaskService(
     private val taskRepository: TaskRepository,
     private val workflowRepository: WorkflowRepository,
     private val workflowTaskOrderRepository: WorkflowTaskOrderRepository,
     private val helpers: ServiceHelpers,
-    @Value("\${app.scripts.base-dir:./scripts}") private val scriptsBaseDir: String,
-    @Value("\${app.scripts.max-size-mb:10}") private val maxScriptSizeMb: Long
+    @Value("\${app.scripts.base-dir:./scripts}") private val scriptsBaseDir: String
 ) {
-
-    companion object {
-        private val ALLOWED_EXTENSIONS = setOf("py", "js", "ts", "sh", "bash")
-    }
 
     // List
 
@@ -246,93 +239,33 @@ class TaskService(
         return success(Unit)
     }
 
-    // Script upload
+    /** Filenames sitting in [scriptsBaseDir] — placed there manually by DEV/ADMIN — offered as choices when configuring a SCRIPT task. */
+    fun listAvailableScripts(): List<String> {
+        val dir = Paths.get(scriptsBaseDir)
+        if (!Files.isDirectory(dir)) return emptyList()
 
-    /**
-     * Saves the uploaded file to [scriptsBaseDir]/{taskId}/ and updates the task's config so
-     * the executor picks it up automatically on the next run.
-     * Only ADMIN and DEV (task:upload authority) reach this method; access is enforced by the controller.
-     */
-    @Transactional
-    fun uploadScript(
-        taskId: UUID,
-        file: MultipartFile,
-        authenticationName: String
-    ): Either<TaskError, ScriptInfoResponse> {
-        val currentUser = findCurrentUser(authenticationName) ?: return failure(TaskError.UserNotFound)
-        val task = taskRepository.findByIdOrNull(taskId) ?: return failure(TaskError.TaskNotFound)
-
-        if (task.isPrivate && !isAdmin(currentUser) && task.createdBy?.id != currentUser.id) {
-            return failure(TaskError.AccessDenied)
+        return Files.list(dir).use { files ->
+            files.filter { Files.isRegularFile(it) }
+                .map { it.fileName.toString() }
+                .sorted()
+                .toList()
         }
-
-        val originalName = file.originalFilename?.takeIf { it.isNotBlank() }
-            ?: return failure(TaskError.InvalidFileType)
-
-        /* Strip any path components — prevents path traversal attacks.
-           A name like "../../etc/evil.py" would pass extension check but resolve outside scriptsBaseDir.
-           Paths.get(...).fileName gives only the last segment, e.g. "evil.py". */
-        val safeName = Paths.get(originalName).fileName?.toString()
-            ?: return failure(TaskError.InvalidFileType)
-
-        val extension = safeName.substringAfterLast('.', "").lowercase()
-        if (extension !in ALLOWED_EXTENSIONS) return failure(TaskError.InvalidFileType)
-
-        if (file.size > maxScriptSizeMb * 1024 * 1024) return failure(TaskError.FileTooLarge)
-
-        val dir = Paths.get(scriptsBaseDir, taskId.toString())
-
-        /* Commit the DB record first. If the file write fails afterward the DB row is inconsistent
-           but there are no orphaned files. The reverse order (file first, then DB) would leave
-           a file on disk with no DB record if the transaction rolls back. */
-        val updatedConfig = task.config.toMutableMap()
-        updatedConfig["fileName"] = safeName
-        updatedConfig["directory"] = dir.toAbsolutePath().toString()
-        task.config = updatedConfig
-        task.scriptFileName = safeName
-        val saved = taskRepository.save(task)
-
-        Files.createDirectories(dir)
-        file.transferTo(dir.resolve(safeName))
-
-        return success(ScriptInfoResponse(taskId = taskId, fileName = safeName,
-            sizeBytes = file.size, uploadedAt = saved.lastUpdated))
-    }
-
-    /** Returns metadata for the script uploaded to a task without exposing file contents. */
-    @Transactional(readOnly = true)
-    fun getScriptInfo(taskId: UUID, authenticationName: String): Either<TaskError, ScriptInfoResponse> {
-        val currentUser = findCurrentUser(authenticationName) ?: return failure(TaskError.UserNotFound)
-        val task = taskRepository.findByIdOrNull(taskId) ?: return failure(TaskError.TaskNotFound)
-
-        if (task.isPrivate && !isAdmin(currentUser) && task.createdBy?.id != currentUser.id) {
-            return failure(TaskError.AccessDenied)
-        }
-
-        val fileName = task.scriptFileName ?: return failure(TaskError.ScriptNotFound)
-        val file = Paths.get(scriptsBaseDir, taskId.toString(), fileName).toFile()
-
-        /* scriptFileName in DB but no file on disk is a data integrity anomaly — treat as not found. */
-        if (!file.exists()) return failure(TaskError.ScriptNotFound)
-
-        return success(ScriptInfoResponse(taskId = taskId, fileName = fileName,
-            sizeBytes = file.length(), uploadedAt = task.lastUpdated))
     }
 
     // Helpers
 
-    private fun findAccessibleWorkflow(workflowId: UUID, user: User): org.workflow.entity.Workflow? {
-        if (isAdmin(user)) return workflowRepository.findByIdOrNull(workflowId)
-        val userId = user.id ?: return null
-        return workflowRepository.findByIdAndOwnerId(workflowId, userId)
-    }
+    private fun findAccessibleWorkflow(workflowId: UUID, user: User): org.workflow.entity.Workflow? =
+        findOwned(isAdmin(user), user.id,
+            byId = { workflowRepository.findByIdOrNull(workflowId) },
+            byOwner = { workflowRepository.findByIdAndOwnerId(workflowId, it) }
+        )
 
     /** Admins can access any task by ID; other users only their own. */
-    private fun findOwnedTask(taskId: UUID, user: User): Task? {
-        if (isAdmin(user)) return taskRepository.findByIdOrNull(taskId)
-        val userId = user.id ?: return null
-        return taskRepository.findByIdAndOwnerId(taskId, userId)
-    }
+    private fun findOwnedTask(taskId: UUID, user: User): Task? =
+        findOwned(isAdmin(user), user.id,
+            byId = { taskRepository.findByIdOrNull(taskId) },
+            byOwner = { taskRepository.findByIdAndOwnerId(taskId, it) }
+        )
 
     private fun findCurrentUser(username: String) = helpers.findUser(username)
     private fun isAdmin(user: User) = helpers.isAdmin(user)
@@ -344,7 +277,6 @@ class TaskService(
             type = type,
             config = config,
             workflowId = effectiveWorkflowId,
-            isPrivate = isPrivate,
-            scriptFileName = scriptFileName
+            isPrivate = isPrivate
         )
 }

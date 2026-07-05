@@ -26,16 +26,15 @@ import org.workflow.dto.TriggerWorkflowResponse
 import org.workflow.dto.WorkflowCreateRequest
 import org.workflow.dto.WorkflowResponse
 import org.workflow.dto.WorkflowUpdateRequest
+import org.workflow.entity.ExecutionStatus
 import org.workflow.service.ExecutionService
 import org.workflow.service.TaskService
-import org.workflow.service.utils.TaskError
-import org.workflow.service.utils.WorkflowError
-import org.workflow.service.utils.ExecutionError
 import org.workflow.service.WorkflowService
 import org.workflow.utils.Failure
 import org.workflow.utils.Problem
 import org.workflow.utils.Success
 import org.workflow.utils.Uris
+import org.workflow.utils.toResponse
 import java.util.UUID
 
 /** Handles workflow CRUD operations, manual execution triggers, and task linking. */
@@ -167,7 +166,7 @@ class WorkflowController(
     ): ResponseEntity<Any> =
         when (val result = executionService.triggerManualWorkflow(id, authentication.name)) {
             is Success -> ResponseEntity.status(HttpStatus.ACCEPTED)
-                .body(TriggerWorkflowResponse(executionId = result.value, status = "STARTED"))
+                .body(TriggerWorkflowResponse(executionId = result.value, status = ExecutionStatus.PENDING))
             is Failure -> result.value.toResponse()
         }
 
@@ -312,31 +311,4 @@ class WorkflowController(
             is Success -> ResponseEntity.noContent().build()
             is Failure -> result.value.toResponse()
         }
-
-    private fun WorkflowError.toResponse(): ResponseEntity<Any> = when (this) {
-        WorkflowError.UserNotFound      -> Problem.response(404, Problem.userNotFound)
-        WorkflowError.WorkflowNotFound  -> Problem.response(404, Problem.workflowNotFound)
-        WorkflowError.AccessDenied      -> Problem.response(403, Problem.accessDenied)
-        WorkflowError.TaskNotLinked     -> Problem.response(404, Problem.taskNotLinked)
-        WorkflowError.ExecutionNotFound -> Problem.response(404, Problem.executionNotFound)
-    }
-
-    private fun ExecutionError.toResponse(): ResponseEntity<Any> = when (this) {
-        ExecutionError.UserNotFound     -> Problem.response(404, Problem.userNotFound)
-        ExecutionError.WorkflowNotFound -> Problem.response(404, Problem.workflowNotFound)
-        ExecutionError.TaskNotFound     -> Problem.response(404, Problem.taskNotFound)
-        ExecutionError.NotCancelable    -> Problem.response(409, Problem.notCancelable)
-    }
-
-    private fun TaskError.toResponse(): ResponseEntity<Any> = when (this) {
-        TaskError.UserNotFound     -> Problem.response(404, Problem.userNotFound)
-        TaskError.WorkflowNotFound -> Problem.response(404, Problem.workflowNotFound)
-        TaskError.TaskNotFound     -> Problem.response(404, Problem.taskNotFound)
-        TaskError.AlreadyLinked    -> Problem.response(409, Problem.taskAlreadyLinked)
-        TaskError.NotLinked        -> Problem.response(404, Problem.taskNotLinked)
-        TaskError.AccessDenied     -> Problem.response(403, Problem.accessDenied)
-        TaskError.InvalidFileType  -> Problem.response(400, Problem.invalidFileType)
-        TaskError.FileTooLarge     -> Problem.response(413, Problem.fileTooLarge)
-        TaskError.ScriptNotFound   -> Problem.response(404, Problem.scriptNotFound)
-    }
 }

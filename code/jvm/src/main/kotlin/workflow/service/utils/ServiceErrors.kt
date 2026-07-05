@@ -54,21 +54,12 @@ sealed class TaskError {
     object NotLinked : TaskError()
     /** The task is private and the caller is neither its owner nor an admin. */
     object AccessDenied : TaskError()
-    /** The uploaded file has an extension that is not on the allowlist. */
-    object InvalidFileType : TaskError()
-    /** The uploaded file exceeds the configured size limit. */
-    object FileTooLarge : TaskError()
-    /** No script has been uploaded for this task yet. */
-    object ScriptNotFound : TaskError()
 }
 
 /** User */
 
 /** All typed failure cases that [org.workflow.service.UserService] can produce. */
 sealed class UserError {
-    /** The username is already registered. */
-    object UsernameAlreadyTaken : UserError()
-
     /** The requested role does not exist in the database. */
     object RoleNotFound : UserError()
 

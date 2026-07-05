@@ -82,8 +82,7 @@ class WorkflowService(
         val currentUser = findCurrentUser(authenticationName)
             ?: return failure(WorkflowError.UserNotFound)
 
-        val userId = currentUser.id ?: return failure(WorkflowError.UserNotFound)
-        val workflow = findOwnedWorkflow(workflowId, currentUser, userId)
+        val workflow = findOwnedWorkflow(workflowId, currentUser)
             ?: return failure(WorkflowError.WorkflowNotFound)
 
         workflow.name = request.name
@@ -96,8 +95,7 @@ class WorkflowService(
         val currentUser = findCurrentUser(authenticationName)
             ?: return failure(WorkflowError.UserNotFound)
 
-        val userId = currentUser.id ?: return failure(WorkflowError.UserNotFound)
-        val workflow = findOwnedWorkflow(workflowId, currentUser, userId)
+        val workflow = findOwnedWorkflow(workflowId, currentUser)
             ?: return failure(WorkflowError.WorkflowNotFound)
 
         val wid = workflow.id ?: return failure(WorkflowError.WorkflowNotFound)
@@ -120,8 +118,7 @@ class WorkflowService(
         val currentUser = findCurrentUser(authenticationName)
             ?: return failure(WorkflowError.UserNotFound)
 
-        val userId = currentUser.id ?: return failure(WorkflowError.UserNotFound)
-        val workflow = findOwnedWorkflow(workflowId, currentUser, userId)
+        val workflow = findOwnedWorkflow(workflowId, currentUser)
             ?: return failure(WorkflowError.WorkflowNotFound)
 
         val wid = workflow.id ?: return failure(WorkflowError.WorkflowNotFound)
@@ -148,8 +145,7 @@ class WorkflowService(
         val currentUser = findCurrentUser(authenticationName)
             ?: return failure(WorkflowError.UserNotFound)
 
-        val userId = currentUser.id ?: return failure(WorkflowError.UserNotFound)
-        val workflow = findOwnedWorkflow(workflowId, currentUser, userId)
+        val workflow = findOwnedWorkflow(workflowId, currentUser)
             ?: return failure(WorkflowError.WorkflowNotFound)
 
         val wid = workflow.id ?: return failure(WorkflowError.WorkflowNotFound)
@@ -246,9 +242,11 @@ class WorkflowService(
     private fun isAdmin(user: org.workflow.entity.User) = helpers.isAdmin(user)
 
     /** Admins can access any workflow by ID; other users only their own. */
-    private fun findOwnedWorkflow(workflowId: UUID, currentUser: org.workflow.entity.User, userId: UUID): Workflow? =
-        if (isAdmin(currentUser)) workflowRepository.findByIdOrNull(workflowId)
-        else workflowRepository.findByIdAndOwnerId(workflowId, userId)
+    private fun findOwnedWorkflow(workflowId: UUID, currentUser: org.workflow.entity.User): Workflow? =
+        findOwned(isAdmin(currentUser), currentUser.id,
+            byId = { workflowRepository.findByIdOrNull(workflowId) },
+            byOwner = { workflowRepository.findByIdAndOwnerId(workflowId, it) }
+        )
 
     private fun Workflow.toResponse(): WorkflowResponse {
         val lastStatus = id?.let { executionLogRepository.findLatestByWorkflowId(it)?.status }

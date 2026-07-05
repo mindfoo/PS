@@ -11,10 +11,6 @@ import java.util.UUID
 @Repository
 interface WorkflowRepository : JpaRepository<Workflow, UUID> {
 
-    /** All workflows owned by a specific user — used for legacy admin queries. */
-    @Query("select w from Workflow w where w.createdBy.id = :userId")
-    fun findAllByOwnerId(@Param("userId") userId: UUID): List<Workflow>
-
     /** Ownership-scoped fetch — used in update/delete when the caller is not an admin. */
     @Query("select w from Workflow w where w.id = :workflowId and w.createdBy.id = :userId")
     fun findByIdAndOwnerId(

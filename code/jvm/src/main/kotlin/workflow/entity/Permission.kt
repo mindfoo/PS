@@ -35,7 +35,6 @@ class Permission(
      * Not persisted — computed at runtime. Used by [org.workflow.security.CustomUserDetailsService].
      */
     @get:Transient
-    @Suppress("unused")
     val slug: String
         get() = "${resource.name.lowercase()}:${action.name.lowercase()}"
 }

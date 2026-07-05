@@ -27,6 +27,9 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/workflow_db
       DB_USERNAME: admin
       DB_PASSWORD: 1234
+      SCRIPTS_DIR: /app/scripts
+    volumes:
+      - ./code/jvm/scripts:/app/scripts
     ports:
       - "8080:8080"
     depends_on:

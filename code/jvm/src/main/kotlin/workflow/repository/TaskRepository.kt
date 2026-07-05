@@ -16,12 +16,6 @@ interface TaskRepository : JpaRepository<Task, UUID> {
     @Query("select t from Task t where t.workflow.id = :workflowId")
     fun findAllByWorkflowId(@Param("workflowId") workflowId: UUID): List<Task>
 
-    @Query("select t from Task t where t.id = :taskId and t.workflow.id = :workflowId")
-    fun findByIdAndWorkflowId(
-        @Param("taskId") taskId: UUID,
-        @Param("workflowId") workflowId: UUID
-    ): Task?
-
     /** Ownership check via createdBy (standalone tasks) or via workflow owner (workflow-scoped tasks). */
     @Query("""
         select t from Task t
@@ -32,14 +26,6 @@ interface TaskRepository : JpaRepository<Task, UUID> {
         @Param("taskId") taskId: UUID,
         @Param("userId") userId: UUID
     ): Task?
-
-    /** All tasks created by a specific user — used in admin list path; non-admins use findAllVisible. */
-    @Query("select t from Task t where t.createdBy.id = :userId")
-    fun findAllByCreatedById(@Param("userId") userId: UUID): List<Task>
-
-    /** All tasks linked to a workflow via WorkflowTaskOrder. */
-    @Query("select wto.task from WorkflowTaskOrder wto where wto.workflow.id = :workflowId")
-    fun findAllLinkedToWorkflow(@Param("workflowId") workflowId: UUID): List<Task>
 
     /** Delete tasks that are directly scoped to the workflow. */
     @Modifying

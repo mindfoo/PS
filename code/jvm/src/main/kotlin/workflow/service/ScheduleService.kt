@@ -161,11 +161,11 @@ class ScheduleService(
     private fun isAdmin(user: User) = helpers.isAdmin(user)
 
     /** Admins can access any schedule by ID; other users only their own. */
-    private fun findOwnedSchedule(scheduleId: UUID, user: User): Schedule? {
-        if (isAdmin(user)) return scheduleRepository.findByIdOrNull(scheduleId);
-        val userId = user.id ?: return null
-        return scheduleRepository.findByIdAndOwnerId(scheduleId, userId)
-    }
+    private fun findOwnedSchedule(scheduleId: UUID, user: User): Schedule? =
+        findOwned(isAdmin(user), user.id,
+            byId = { scheduleRepository.findByIdOrNull(scheduleId) },
+            byOwner = { scheduleRepository.findByIdAndOwnerId(scheduleId, it) }
+        )
 
     private fun Schedule.toResponse(): ScheduleResponse =
         ScheduleResponse(

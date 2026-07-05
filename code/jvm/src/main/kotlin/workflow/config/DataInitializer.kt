@@ -54,7 +54,6 @@ class DataInitializer(
         val tWrite   = save(ResourceType.TASK,      ActionType.WRITE)
         val tDelete  = save(ResourceType.TASK,      ActionType.DELETE)
         val tExecute = save(ResourceType.TASK,      ActionType.EXECUTE)
-        val tUpload  = save(ResourceType.TASK,      ActionType.UPLOAD)
         // s - schedules
         val sRead    = save(ResourceType.SCHEDULE,  ActionType.READ)
         val sWrite   = save(ResourceType.SCHEDULE,  ActionType.WRITE)
@@ -72,11 +71,11 @@ class DataInitializer(
             it.permissions.addAll(setOf(wRead, wWrite, wDelete, tRead, tWrite, tDelete, sRead, sWrite, sDelete, eRead))
         }
         val dev = Roles(name = RoleType.DEV).also {
-            it.permissions.addAll(setOf(wRead, wExecute, tRead, tExecute, tUpload, eRead))
+            it.permissions.addAll(setOf(wRead, wExecute, tRead, tExecute, eRead))
         }
         val admin = Roles(name = RoleType.ADMIN).also {
             it.permissions.addAll(setOf(wRead, wWrite, wDelete, wExecute,
-                                        tRead, tWrite, tDelete, tExecute, tUpload,
+                                        tRead, tWrite, tDelete, tExecute,
                                         sRead, sWrite, sDelete,
                                         eRead, uManage))
         }
@@ -92,7 +91,6 @@ class DataInitializer(
                     role = admin
                 )
             )
-            log.warn("DataInitializer: default admin created. Username: admin — change password immediately on first login.")
         }
 
         log.info("DataInitializer: seeding complete — roles and its permissions.")

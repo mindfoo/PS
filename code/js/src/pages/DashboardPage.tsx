@@ -71,9 +71,7 @@ export function DashboardPage() {
 			{loading ? (
 				<LoadingSpinner />
 			) : workflows.length === 0 ? (
-				<EmptyState
-					message="No workflows yet."
-				/>
+				<EmptyState message="No workflows yet." />
 			) : (
 				<div className="card-grid">
 					{workflows.map((w) => (

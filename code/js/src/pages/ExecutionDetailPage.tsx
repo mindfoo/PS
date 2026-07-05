@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import {
 	executionApi,
 	isActiveExecutionStatus,
+	ExecutionStatus,
+	ExecutionType,
 	type ExecutionEvent,
 	type ExecutionSummaryResponse,
 	type TaskExecutionSummary,
@@ -13,23 +15,15 @@ import { usePermissions } from "../contexts/AuthContext";
 import { Layout } from "../components/Layout";
 import { StatusBadge } from "../components/StatusBadge";
 import { LoadingSpinner } from "../components/LoadingSpinner";
-import { useExecutionSubscription } from "../hooks/useExecutionSubscription";
 
-/**
- * The SSE event only carries statuses (not timestamps/output), so this just
- * patches the execution's own status and each task's status in place.
- */
-function applyStatusEvent(
-	execution: ExecutionSummaryResponse,
-	event: ExecutionEvent,
-): ExecutionSummaryResponse {
+function applyStatusEvent(execution: ExecutionSummaryResponse, event: ExecutionEvent): ExecutionSummaryResponse {
 	return {
 		...execution,
 		status: event.status,
 		taskExecutions:
 			execution.taskExecutions?.map((te) => ({
 				...te,
-				status: (event.taskStatuses[te.taskId ?? ""] as typeof te.status) ?? te.status,
+				status: event.taskStatuses[te.taskId ?? ""] ?? te.status,
 			})) ?? null,
 	};
 }
@@ -45,28 +39,18 @@ export function ExecutionDetailPage() {
 	const [cancelling, setCancelling] = useState(false);
 	const [retrying, setRetrying] = useState(false);
 
-	const handleLiveEvent = useCallback((event: ExecutionEvent) => {
-		setExecution((prev) => (prev ? applyStatusEvent(prev, event) : prev));
-
-		if (event.terminal) {
-			// The event only carries statuses; re-fetch once for the final
-			// timestamps and output that only exist once the execution has ended.
-			void executionApi.getById(event.executionId).then(setExecution);
-		}
-	}, []);
-
-	const { subscribe, unsubscribe } = useExecutionSubscription(handleLiveEvent);
-
 	useEffect(() => {
 		if (!executionId) return;
 
 		let cancelled = false;
 
-		// Subscribe before fetching the current state so we can't miss a status
-		// change that happens in the gap between the two calls. If the fetch
-		// below finds the execution already finished, there's nothing left to
-		// stream, so we close the subscription right away.
-		subscribe(executionId);
+		const unsubscribe = executionApi.subscribeToExecution(executionId, (event: ExecutionEvent) => {
+			setExecution((prev) => (prev ? applyStatusEvent(prev, event) : prev));
+			if (!isActiveExecutionStatus(event.status)) {
+				unsubscribe();
+				void executionApi.getById(event.executionId).then(setExecution);
+			}
+		});
 
 		executionApi
 			.getById(executionId)
@@ -84,8 +68,9 @@ export function ExecutionDetailPage() {
 
 		return () => {
 			cancelled = true;
+			unsubscribe();
 		};
-	}, [executionId, subscribe, unsubscribe]);
+	}, [executionId]);
 
 	async function handleCancel() {
 		if (!executionId || !confirm("Cancel this execution?")) return;
@@ -93,7 +78,7 @@ export function ExecutionDetailPage() {
 		setError("");
 		try {
 			await executionApi.cancel(executionId);
-			setExecution((prev) => (prev ? { ...prev, status: "CANCELED" } : prev));
+			setExecution((prev) => (prev ? { ...prev, status: ExecutionStatus.CANCELED } : prev));
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Cancel failed");
 		} finally {
@@ -107,7 +92,7 @@ export function ExecutionDetailPage() {
 		setError("");
 		try {
 			const res =
-				execution?.type === "TASK" && execution.taskExecutions?.[0]?.taskId
+				execution?.type === ExecutionType.TASK && execution.taskExecutions?.[0]?.taskId
 					? await taskApi.run(execution.taskExecutions[0].taskId)
 					: await workflowApi.run(workflowId);
 			navigate(`/workflows/${workflowId}/executions/${res.executionId}`);
@@ -155,7 +140,7 @@ export function ExecutionDetailPage() {
 						Execution <code className="execution-id">{execution.id.slice(0, 8)}…</code>
 					</h1>
 					<p className="text-muted">
-						{execution.type === "WORKFLOW" ? "Full workflow run" : "Single task run"}
+						{execution.type === ExecutionType.WORKFLOW ? "Full workflow run" : "Single task run"}
 						{" · by "}
 						<strong>{execution.triggeredBy}</strong>
 					</p>

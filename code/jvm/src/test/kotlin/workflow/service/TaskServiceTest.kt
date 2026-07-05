@@ -1,15 +1,12 @@
 package workflow.service
 
 import io.mockk.every
-import io.mockk.just
 import io.mockk.mockk
-import io.mockk.Runs
 import io.mockk.verify
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.io.TempDir
-import org.springframework.web.multipart.MultipartFile
 import org.workflow.dto.TaskCreateRequest
 import org.workflow.dto.TaskUpdateRequest
 import org.workflow.entity.enums.RoleType
@@ -61,8 +58,7 @@ class TaskServiceTest {
         every { helpers.isAdmin(any()) } answers { firstArg<User>().role.name == RoleType.ADMIN }
         service = TaskService(
             taskRepository, workflowRepository, wtoRepository, helpers,
-            scriptsBaseDir = tempDir.toString(),
-            maxScriptSizeMb = 10L
+            scriptsBaseDir = tempDir.toString()
         )
     }
 
@@ -454,194 +450,32 @@ class TaskServiceTest {
         assertEquals(TaskError.UserNotFound, (result as Failure).value)
     }
 
-    // uploadScript
+    // listAvailableScripts
 
     @Test
-    fun `uploadScript saves file and returns 201 metadata`() {
-        val alice = user()
-        val t     = task(alice)
-        val file  = mockk<MultipartFile>()
-        every { file.originalFilename } returns "script.py"
-        every { file.size } returns 100L
-        every { file.transferTo(any<Path>()) } just Runs
-        every { helpers.findUser("alice") } returns alice
-        every { taskRepository.findById(t.id!!) } returns Optional.of(t)
-        every { taskRepository.save(any()) } returns t
+    fun `listAvailableScripts returns sorted filenames directly in scriptsBaseDir`() {
+        Files.createFile(tempDir.resolve("b.py"))
+        Files.createFile(tempDir.resolve("a.sh"))
 
-        val result = service.uploadScript(t.id!!, file, "alice")
-
-        assertTrue(result is Success)
-        assertEquals("script.py", (result as Success).value.fileName)
-        verify(exactly = 1) { taskRepository.save(any()) }
+        assertEquals(listOf("a.sh", "b.py"), service.listAvailableScripts())
     }
 
     @Test
-    fun `uploadScript returns UserNotFound when user missing`() {
-        every { helpers.findUser("ghost") } returns null
+    fun `listAvailableScripts excludes subdirectories`() {
+        val subDir = Files.createDirectory(tempDir.resolve("subdir"))
+        Files.createFile(subDir.resolve("nested.py"))
+        Files.createFile(tempDir.resolve("shared.py"))
 
-        val result = service.uploadScript(UUID.randomUUID(), mockk(), "ghost")
-
-        assertTrue(result is Failure)
-        assertEquals(TaskError.UserNotFound, (result as Failure).value)
+        assertEquals(listOf("shared.py"), service.listAvailableScripts())
     }
 
     @Test
-    fun `uploadScript returns TaskNotFound when task missing`() {
-        val alice = user()
-        val id    = UUID.randomUUID()
-        every { helpers.findUser("alice") } returns alice
-        every { taskRepository.findById(id) } returns Optional.empty()
+    fun `listAvailableScripts returns empty list when directory does not exist`() {
+        service = TaskService(
+            taskRepository, workflowRepository, wtoRepository, helpers,
+            scriptsBaseDir = tempDir.resolve("does-not-exist").toString()
+        )
 
-        val result = service.uploadScript(id, mockk(), "alice")
-
-        assertTrue(result is Failure)
-        assertEquals(TaskError.TaskNotFound, (result as Failure).value)
-    }
-
-    @Test
-    fun `uploadScript returns AccessDenied for private task owned by another user`() {
-        val alice = user()
-        val bob   = User(id = UUID.randomUUID(), username = "bob", passwordValidation = "h", role = role())
-        val t     = Task(id = UUID.randomUUID(), name = "T", type = "SCRIPT",
-                         config = emptyMap(), workflow = null, createdBy = bob, isPrivate = true)
-        every { helpers.findUser("alice") } returns alice
-        every { taskRepository.findById(t.id!!) } returns Optional.of(t)
-
-        val result = service.uploadScript(t.id!!, mockk(), "alice")
-
-        assertTrue(result is Failure)
-        assertEquals(TaskError.AccessDenied, (result as Failure).value)
-    }
-
-    @Test
-    fun `uploadScript returns InvalidFileType when filename is blank`() {
-        val alice = user()
-        val t     = task(alice)
-        val file  = mockk<MultipartFile>()
-        every { file.originalFilename } returns ""
-        every { helpers.findUser("alice") } returns alice
-        every { taskRepository.findById(t.id!!) } returns Optional.of(t)
-
-        val result = service.uploadScript(t.id!!, file, "alice")
-
-        assertTrue(result is Failure)
-        assertEquals(TaskError.InvalidFileType, (result as Failure).value)
-    }
-
-    @Test
-    fun `uploadScript returns InvalidFileType when extension is not allowed`() {
-        val alice = user()
-        val t     = task(alice)
-        val file  = mockk<MultipartFile>()
-        every { file.originalFilename } returns "virus.exe"
-        every { file.size } returns 100L
-        every { helpers.findUser("alice") } returns alice
-        every { taskRepository.findById(t.id!!) } returns Optional.of(t)
-
-        val result = service.uploadScript(t.id!!, file, "alice")
-
-        assertTrue(result is Failure)
-        assertEquals(TaskError.InvalidFileType, (result as Failure).value)
-    }
-
-    @Test
-    fun `uploadScript returns FileTooLarge when file exceeds limit`() {
-        val alice = user()
-        val t     = task(alice)
-        val file  = mockk<MultipartFile>()
-        every { file.originalFilename } returns "script.py"
-        every { file.size } returns 11L * 1024 * 1024  // 11 MB > 10 MB limit
-        every { helpers.findUser("alice") } returns alice
-        every { taskRepository.findById(t.id!!) } returns Optional.of(t)
-
-        val result = service.uploadScript(t.id!!, file, "alice")
-
-        assertTrue(result is Failure)
-        assertEquals(TaskError.FileTooLarge, (result as Failure).value)
-    }
-
-    // getScriptInfo
-
-    @Test
-    fun `getScriptInfo returns metadata when script exists on disk`() {
-        val alice = user()
-        val t     = task(alice).also { it.scriptFileName = "script.py" }
-        /* Create the actual file in the temp dir so file.exists() returns true */
-        val scriptDir = tempDir.resolve(t.id.toString())
-        Files.createDirectories(scriptDir)
-        Files.writeString(scriptDir.resolve("script.py"), "print('hello')")
-        every { helpers.findUser("alice") } returns alice
-        every { taskRepository.findById(t.id!!) } returns Optional.of(t)
-
-        val result = service.getScriptInfo(t.id!!, "alice")
-
-        assertTrue(result is Success)
-        assertEquals("script.py", (result as Success).value.fileName)
-        assertTrue((result).value.sizeBytes > 0)
-    }
-
-    @Test
-    fun `getScriptInfo returns ScriptNotFound when no scriptFileName in DB`() {
-        val alice = user()
-        val t     = task(alice) // scriptFileName is null
-        every { helpers.findUser("alice") } returns alice
-        every { taskRepository.findById(t.id!!) } returns Optional.of(t)
-
-        val result = service.getScriptInfo(t.id!!, "alice")
-
-        assertTrue(result is Failure)
-        assertEquals(TaskError.ScriptNotFound, (result as Failure).value)
-    }
-
-    @Test
-    fun `getScriptInfo returns ScriptNotFound when file missing from disk`() {
-        val alice = user()
-        val t     = task(alice).also { it.scriptFileName = "script.py" }
-        // No file created in tempDir — disk is empty
-        every { helpers.findUser("alice") } returns alice
-        every { taskRepository.findById(t.id!!) } returns Optional.of(t)
-
-        val result = service.getScriptInfo(t.id!!, "alice")
-
-        assertTrue(result is Failure)
-        assertEquals(TaskError.ScriptNotFound, (result as Failure).value)
-    }
-
-    @Test
-    fun `getScriptInfo returns UserNotFound when user missing`() {
-        every { helpers.findUser("ghost") } returns null
-
-        val result = service.getScriptInfo(UUID.randomUUID(), "ghost")
-
-        assertTrue(result is Failure)
-        assertEquals(TaskError.UserNotFound, (result as Failure).value)
-    }
-
-    @Test
-    fun `getScriptInfo returns TaskNotFound when task missing`() {
-        val alice = user()
-        val id    = UUID.randomUUID()
-        every { helpers.findUser("alice") } returns alice
-        every { taskRepository.findById(id) } returns Optional.empty()
-
-        val result = service.getScriptInfo(id, "alice")
-
-        assertTrue(result is Failure)
-        assertEquals(TaskError.TaskNotFound, (result as Failure).value)
-    }
-
-    @Test
-    fun `getScriptInfo returns AccessDenied for private task owned by another user`() {
-        val alice = user()
-        val bob   = User(id = UUID.randomUUID(), username = "bob", passwordValidation = "h", role = role())
-        val t     = Task(id = UUID.randomUUID(), name = "T", type = "SCRIPT",
-                         config = emptyMap(), workflow = null, createdBy = bob, isPrivate = true)
-        every { helpers.findUser("alice") } returns alice
-        every { taskRepository.findById(t.id!!) } returns Optional.of(t)
-
-        val result = service.getScriptInfo(t.id!!, "alice")
-
-        assertTrue(result is Failure)
-        assertEquals(TaskError.AccessDenied, (result as Failure).value)
+        assertEquals(emptyList<String>(), service.listAvailableScripts())
     }
 }

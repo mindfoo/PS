@@ -42,6 +42,7 @@ class SecurityConfiguration(
             /* Disable Spring's built-in form login and HTTP Basic — we handle auth ourselves. */
             .httpBasic { it.disable() }
             .formLogin { it.disable() }
+            .csrf { it.disable() }
             /* Run our cookie filter before Spring's default username/password filter. */
             .addFilterBefore(cookieAuthenticationFilter(), UsernamePasswordAuthenticationFilter::class.java)
             .authorizeHttpRequests { auth ->

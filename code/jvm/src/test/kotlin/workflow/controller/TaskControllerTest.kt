@@ -6,9 +6,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.springframework.security.core.Authentication
-import org.springframework.web.multipart.MultipartFile
 import org.workflow.controller.TaskController
-import org.workflow.dto.ScriptInfoResponse
 import org.workflow.dto.TaskCreateRequest
 import org.workflow.dto.TaskResponse
 import org.workflow.dto.TaskUpdateRequest
@@ -32,7 +30,6 @@ class TaskControllerTest {
     private val wfId   = UUID.randomUUID()
 
     private fun taskResponse() = TaskResponse(taskId, "My Task", "SCRIPT", emptyMap(), wfId)
-    private fun scriptInfo()   = ScriptInfoResponse(taskId, "script.py", 100L, null)
 
     @BeforeEach
     fun setup() {
@@ -160,79 +157,11 @@ class TaskControllerTest {
         assertEquals(403, controller.delete(taskId, auth).statusCode.value())
     }
 
-    // uploadScript
+    // listAvailableScripts
 
     @Test
-    fun `uploadScript returns 201 when script is uploaded`() {
-        val file = mockk<MultipartFile>()
-        every { taskService.uploadScript(taskId, file, "alice") } returns success(scriptInfo())
-        assertEquals(201, controller.uploadScript(taskId, file, auth).statusCode.value())
-    }
-
-    @Test
-    fun `uploadScript returns 404 when task not found`() {
-        val file = mockk<MultipartFile>()
-        every { taskService.uploadScript(taskId, file, "alice") } returns failure(TaskError.TaskNotFound)
-        assertEquals(404, controller.uploadScript(taskId, file, auth).statusCode.value())
-    }
-
-    @Test
-    fun `uploadScript returns 403 when task is private`() {
-        val file = mockk<MultipartFile>()
-        every { taskService.uploadScript(taskId, file, "alice") } returns failure(TaskError.AccessDenied)
-        assertEquals(403, controller.uploadScript(taskId, file, auth).statusCode.value())
-    }
-
-    @Test
-    fun `uploadScript returns 400 when file type is invalid`() {
-        val file = mockk<MultipartFile>()
-        every { taskService.uploadScript(taskId, file, "alice") } returns failure(TaskError.InvalidFileType)
-        assertEquals(400, controller.uploadScript(taskId, file, auth).statusCode.value())
-    }
-
-    @Test
-    fun `uploadScript returns 413 when file is too large`() {
-        val file = mockk<MultipartFile>()
-        every { taskService.uploadScript(taskId, file, "alice") } returns failure(TaskError.FileTooLarge)
-        assertEquals(413, controller.uploadScript(taskId, file, auth).statusCode.value())
-    }
-
-    @Test
-    fun `uploadScript returns 404 when user not found`() {
-        val file = mockk<MultipartFile>()
-        every { taskService.uploadScript(taskId, file, "alice") } returns failure(TaskError.UserNotFound)
-        assertEquals(404, controller.uploadScript(taskId, file, auth).statusCode.value())
-    }
-
-    // getScriptInfo
-
-    @Test
-    fun `getScriptInfo returns 200 with script metadata`() {
-        every { taskService.getScriptInfo(taskId, "alice") } returns success(scriptInfo())
-        assertEquals(200, controller.getScriptInfo(taskId, auth).statusCode.value())
-    }
-
-    @Test
-    fun `getScriptInfo returns 404 when task not found`() {
-        every { taskService.getScriptInfo(taskId, "alice") } returns failure(TaskError.TaskNotFound)
-        assertEquals(404, controller.getScriptInfo(taskId, auth).statusCode.value())
-    }
-
-    @Test
-    fun `getScriptInfo returns 404 when no script uploaded`() {
-        every { taskService.getScriptInfo(taskId, "alice") } returns failure(TaskError.ScriptNotFound)
-        assertEquals(404, controller.getScriptInfo(taskId, auth).statusCode.value())
-    }
-
-    @Test
-    fun `getScriptInfo returns 403 when task is private`() {
-        every { taskService.getScriptInfo(taskId, "alice") } returns failure(TaskError.AccessDenied)
-        assertEquals(403, controller.getScriptInfo(taskId, auth).statusCode.value())
-    }
-
-    @Test
-    fun `getScriptInfo returns 404 when user not found`() {
-        every { taskService.getScriptInfo(taskId, "alice") } returns failure(TaskError.UserNotFound)
-        assertEquals(404, controller.getScriptInfo(taskId, auth).statusCode.value())
+    fun `listAvailableScripts returns 200 with filenames`() {
+        every { taskService.listAvailableScripts() } returns listOf("a.py", "b.sh")
+        assertEquals(200, controller.listAvailableScripts().statusCode.value())
     }
 }

@@ -130,6 +130,14 @@ function TaskForm({
 	const navigate = useNavigate();
 	const backUrl = workflowId ? `/workflows/${workflowId}` : "/tasks";
 	const [isPrivate, setIsPrivate] = useState(initialIsPrivate);
+	const [availableScripts, setAvailableScripts] = useState<string[]>([]);
+
+	useEffect(() => {
+		taskApi
+			.listAvailableScripts()
+			.then(setAvailableScripts)
+			.catch(() => setAvailableScripts([]));
+	}, []);
 
 	const [state, dispatch] = useReducer(genericFormReducer<TaskFormInputs>, {
 		tag: "editing",
@@ -183,8 +191,8 @@ function TaskForm({
 						<div className="form-group">
 							<label>Type</label>
 							<select value={inputs.type} onChange={field("type")}>
-										<option value={TaskType.HTTP}>{TaskType.HTTP}</option>
-										<option value={TaskType.SCRIPT}>{TaskType.SCRIPT}</option>
+								<option value={TaskType.HTTP}>{TaskType.HTTP}</option>
+								<option value={TaskType.SCRIPT}>{TaskType.SCRIPT}</option>
 							</select>
 						</div>
 
@@ -223,12 +231,19 @@ function TaskForm({
 								</div>
 								<div className="form-group">
 									<label>File name</label>
-									<input
-										value={inputs.fileName}
-										onChange={field("fileName")}
-										placeholder="ex: 'index.js'"
-										required
-									/>
+									<select value={inputs.fileName} onChange={field("fileName")} required>
+										<option value="">— select a file —</option>
+										{[...new Set([inputs.fileName, ...availableScripts].filter(Boolean))].map(
+											(f) => (
+												<option key={f} value={f}>
+													{f}
+												</option>
+											),
+										)}
+									</select>
+									<span className="text-muted">
+										Files placed manually in the scripts folder by DEV/ADMIN.
+									</span>
 								</div>
 								<div className="form-group">
 									<label>

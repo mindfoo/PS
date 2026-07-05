@@ -8,7 +8,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
-import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.security.core.Authentication
@@ -20,20 +19,18 @@ import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
-import org.springframework.web.multipart.MultipartFile
-import org.workflow.dto.ScriptInfoResponse
 import org.workflow.dto.TaskCreateRequest
 import org.workflow.dto.TaskResponse
 import org.workflow.dto.TaskUpdateRequest
 import org.workflow.dto.ExecutionResponse
+import org.workflow.entity.ExecutionStatus
 import org.workflow.service.ExecutionService
-import org.workflow.service.utils.ExecutionError
-import org.workflow.service.utils.TaskError
 import org.workflow.service.TaskService
 import org.workflow.utils.Failure
 import org.workflow.utils.Problem
 import org.workflow.utils.Success
 import org.workflow.utils.Uris
+import org.workflow.utils.toResponse
 import java.util.UUID
 
 /** Exposes task CRUD endpoints scoped by workflow ownership and RBAC. */
@@ -170,77 +167,22 @@ class TaskController(
     ): ResponseEntity<Any> =
         when (val result = executionService.triggerManualTask(id, authentication.name)) {
             is Success -> ResponseEntity.status(HttpStatus.ACCEPTED)
-                .body(ExecutionResponse(executionId = result.value.toString(), status = "STARTED"))
-            is Failure -> when (result.value) {
-                ExecutionError.UserNotFound     -> Problem.response(404, Problem.userNotFound)
-                ExecutionError.TaskNotFound     -> Problem.response(404, Problem.taskNotFound)
-                ExecutionError.WorkflowNotFound -> Problem.response(404, Problem.workflowNotFound)
-                ExecutionError.NotCancelable    -> Problem.response(409, Problem.notCancelable)
-            }
-        }
-
-    @PostMapping(Uris.Tasks.SCRIPT, consumes = [MediaType.MULTIPART_FORM_DATA_VALUE])
-    @PreAuthorize("hasAuthority('task:upload')")
-    @Operation(
-        summary = "Upload script for a task",
-        description = "Uploads a script file (.py, .js, .ts, .sh, .bash) for a SCRIPT-type task. " +
-                "Restricted to ADMIN and DEV roles. Updates the task config so the executor picks up the file automatically."
-    )
-    @ApiResponses(
-        ApiResponse(responseCode = "201", description = "Script uploaded successfully",
-            content = [Content(schema = Schema(implementation = ScriptInfoResponse::class))]),
-        ApiResponse(responseCode = "400", description = "Unsupported file type",
-            content = [Content(mediaType = Problem.PROB_TYPE)]),
-        ApiResponse(responseCode = "403", description = "Insufficient permissions or private task",
-            content = [Content(mediaType = Problem.PROB_TYPE)]),
-        ApiResponse(responseCode = "404", description = "Task or user not found",
-            content = [Content(mediaType = Problem.PROB_TYPE)]),
-        ApiResponse(responseCode = "413", description = "File exceeds the maximum allowed size",
-            content = [Content(mediaType = Problem.PROB_TYPE)])
-    )
-    fun uploadScript(
-        @PathVariable id: UUID,
-        @RequestParam("file") file: MultipartFile,
-        authentication: Authentication
-    ): ResponseEntity<Any> =
-        when (val result = taskService.uploadScript(id, file, authentication.name)) {
-            is Success -> ResponseEntity.status(HttpStatus.CREATED).body(result.value)
+                .body(ExecutionResponse(executionId = result.value.toString(), status = ExecutionStatus.PENDING))
             is Failure -> result.value.toResponse()
         }
 
-    @GetMapping(Uris.Tasks.SCRIPT_INFO)
-    @PreAuthorize("hasAuthority('task:read')")
+    @GetMapping(Uris.Tasks.AVAILABLE_SCRIPTS)
+    @PreAuthorize("hasAuthority('task:write')")
     @Operation(
-        summary = "Get script metadata for a task",
-        description = "Returns the filename, size and upload timestamp for a task's uploaded script. " +
-                "Accessible to any authenticated user with task:read (all roles)."
+        summary = "List available script files",
+        description = "Filenames placed manually by DEV/ADMIN into the configured scripts directory " +
+                "(app.scripts.base-dir), offered as choices when configuring a SCRIPT task."
     )
     @ApiResponses(
-        ApiResponse(responseCode = "200", description = "Script metadata returned",
-            content = [Content(schema = Schema(implementation = ScriptInfoResponse::class))]),
-        ApiResponse(responseCode = "403", description = "Private task — access denied",
-            content = [Content(mediaType = Problem.PROB_TYPE)]),
-        ApiResponse(responseCode = "404", description = "Task or script not found",
+        ApiResponse(responseCode = "200", description = "Filenames returned"),
+        ApiResponse(responseCode = "403", description = "Insufficient permissions",
             content = [Content(mediaType = Problem.PROB_TYPE)])
     )
-    fun getScriptInfo(
-        @PathVariable id: UUID,
-        authentication: Authentication
-    ): ResponseEntity<Any> =
-        when (val result = taskService.getScriptInfo(id, authentication.name)) {
-            is Success -> ResponseEntity.ok(result.value)
-            is Failure -> result.value.toResponse()
-        }
-
-    private fun TaskError.toResponse(): ResponseEntity<Any> = when (this) {
-        TaskError.UserNotFound     -> Problem.response(404, Problem.userNotFound)
-        TaskError.WorkflowNotFound -> Problem.response(404, Problem.workflowNotFound)
-        TaskError.TaskNotFound     -> Problem.response(404, Problem.taskNotFound)
-        TaskError.AlreadyLinked    -> Problem.response(409, Problem.taskAlreadyLinked)
-        TaskError.NotLinked        -> Problem.response(404, Problem.taskNotLinked)
-        TaskError.AccessDenied     -> Problem.response(403, Problem.accessDenied)
-        TaskError.InvalidFileType  -> Problem.response(400, Problem.invalidFileType)
-        TaskError.FileTooLarge     -> Problem.response(413, Problem.fileTooLarge)
-        TaskError.ScriptNotFound   -> Problem.response(404, Problem.scriptNotFound)
-    }
+    fun listAvailableScripts(): ResponseEntity<Any> =
+        ResponseEntity.ok(taskService.listAvailableScripts())
 }

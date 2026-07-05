@@ -40,13 +40,6 @@ class GlobalExceptionHandler {
         return Problem.response(400, Problem.badRequest)
     }
 
-    /** 404 — resource not found, typically from service findById queries. */
-    @ExceptionHandler(NoSuchElementException::class)
-    fun handleNotFound(ex: NoSuchElementException): ResponseEntity<Any> {
-        log.debug("Not found: {}", ex.message)
-        return Problem.response(404, Problem.resourceNotFound)
-    }
-
     /** 403 — authenticated user lacks the required permission. */
     @ExceptionHandler(AccessDeniedException::class)
     fun handleForbidden(ex: AccessDeniedException): ResponseEntity<Any> {
