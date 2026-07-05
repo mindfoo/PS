@@ -3,6 +3,7 @@ package org.workflow.service
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Qualifier
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.http.HttpEntity
 import org.springframework.http.HttpHeaders
@@ -46,7 +47,8 @@ class ExecutionService(
     private val helpers: ServiceHelpers,
     @Qualifier("executionExecutor") private val executionExecutor: Executor,
     private val jdbcTemplate: JdbcTemplate,
-    private val objectMapper: ObjectMapper
+    private val objectMapper: ObjectMapper,
+    @Value("\${app.scripts.base-dir:./scripts}") private val scriptsBaseDir: String
 ) {
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -388,7 +390,9 @@ class ExecutionService(
         val command   = config["command"]  as? String
             ?: return mapOf("taskId" to task.id.toString(), "taskName" to task.name, "status" to ExecutionStatus.ERROR, "error" to "missing 'command' in config")
         val fileName  = config["fileName"] as? String ?: ""
-        val directory = config["directory"] as? String
+        // Scripts are picked from the shared scripts folder by default; "directory" only needs
+        // to be set to run somewhere else.
+        val directory = config["directory"] as? String ?: scriptsBaseDir
         val rawArgs   = config["args"]
 
         val allowedCommands = setOf("node", "python3", "bash", "sh", "python")
@@ -417,7 +421,7 @@ class ExecutionService(
         }
 
         val pb = ProcessBuilder(cmd)
-        if (directory != null) pb.directory(File(directory))
+        pb.directory(File(directory))
         pb.redirectErrorStream(true) // merge stderr into stdout so we capture error output too
 
         val process = pb.start()

@@ -252,7 +252,7 @@ function TaskForm({
 									<input
 										value={inputs.directory}
 										onChange={field("directory")}
-										placeholder="ex: /home/user/scripts"
+										placeholder="Defaults to the scripts folder — only set this to run elsewhere"
 									/>
 								</div>
 								<div className="form-group">

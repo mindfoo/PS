@@ -81,7 +81,8 @@ class ExecutionServiceTest {
             restTemplate, helpers,
             Executors.newVirtualThreadPerTaskExecutor(),
             jdbcTemplate,
-            ObjectMapper()
+            ObjectMapper(),
+            scriptsBaseDir = "./scripts"
         )
         TransactionSynchronizationManager.initSynchronization()
     }
