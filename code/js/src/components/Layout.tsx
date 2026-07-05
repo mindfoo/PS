@@ -17,7 +17,7 @@ function writeCollapsed(value: boolean): void {
 	try {
 		localStorage.setItem(STORAGE_KEY, String(value));
 	} catch {
-		// localStorage may be unavailable (private browsing, test environments); ignore.
+		console.error("Couldn't set localstorage")
 	}
 }
 
@@ -41,9 +41,7 @@ export function Layout({ children }: { children: ReactNode }) {
 		});
 	}
 
-	const sidebarClass = ["sidebar", menuOpen ? "sidebar--open" : "", collapsed ? "sidebar--collapsed" : ""]
-		.filter(Boolean)
-		.join(" ");
+	const sidebarClass = `sidebar${menuOpen ? " sidebar--open" : ""}${collapsed ? " sidebar--collapsed" : ""}`;
 
 	return (
 		<div className={`app-layout${collapsed ? " app-layout--sidebar-collapsed" : ""}`}>

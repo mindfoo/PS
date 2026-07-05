@@ -44,6 +44,9 @@ vi.mock("../../api/executions", () => ({
 		subscribeToExecution: (...args: unknown[]) => mockSubscribe(...args) as unknown,
 	},
 	isActiveExecutionStatus: (status: string) => status === "PENDING" || status === "RUNNING",
+	ExecutionStatus: { ERROR: "ERROR", SUCCESS: "SUCCESS", CANCELED: "CANCELED", RUNNING: "RUNNING", PENDING: "PENDING" },
+	ExecutionType: { WORKFLOW: "WORKFLOW", TASK: "TASK" },
+	ExecutionTriggerType: { MANUAL: "MANUAL", CRON: "CRON" },
 }));
 
 vi.mock("../../api/workflows", () => ({

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { usersApi, type RoleSummary, type UserResponse } from "../api/users";
 import { workflowApi, type WorkflowResponse } from "../api/workflows";
+import type { RoleType } from "../contexts/AuthContext";
 import { Layout } from "../components/Layout";
 import { PageHeader } from "../components/PageHeader";
 import { LoadingSpinner } from "../components/LoadingSpinner";
@@ -40,7 +41,7 @@ export function AdminPage() {
 		};
 	}, []);
 
-	async function handleRoleChange(userId: string, roleName: string) {
+	async function handleRoleChange(userId: string, roleName: RoleType) {
 		setError("");
 		setSavingUserId(userId);
 		try {
@@ -110,7 +111,7 @@ export function AdminPage() {
 															value={u.role}
 															disabled={savingUserId === u.id}
 															onChange={(e) =>
-																void handleRoleChange(u.id, e.target.value)
+																void handleRoleChange(u.id, e.target.value as RoleType)
 															}
 														>
 															{roles.map((r) => (

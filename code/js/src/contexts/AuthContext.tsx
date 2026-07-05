@@ -57,12 +57,6 @@ export function useAuth() {
 	return context;
 }
 
-/** Returns true if the current user has any role names. */
-export function useHasRole(...roles: string[]) {
-	const { user } = useAuth();
-	return user !== null && roles.includes(user.role);
-}
-
 /** Maps the current role to permissions. */
 export function usePermissions() {
 	const { user } = useAuth();

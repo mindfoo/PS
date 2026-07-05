@@ -1,13 +1,15 @@
-const STATUS_MAP: Record<string, { icon: string; cls: string }> = {
-	SUCCESS: { icon: "✅", cls: "badge-status-success" },
-	ERROR: { icon: "❌", cls: "badge-status-error" },
-	RUNNING: { icon: "⏳", cls: "badge-status-running" },
-	PENDING: { icon: "🕐", cls: "badge-status-pending" },
-	CANCELED: { icon: "—", cls: "badge-status-canceled" },
+import { ExecutionStatus } from "../api/executions";
+
+const STATUS_MAP: Record<ExecutionStatus, { icon: string; cls: string }> = {
+	[ExecutionStatus.SUCCESS]: { icon: "✅", cls: "badge-status-success" },
+	[ExecutionStatus.ERROR]: { icon: "❌", cls: "badge-status-error" },
+	[ExecutionStatus.RUNNING]: { icon: "⏳", cls: "badge-status-running" },
+	[ExecutionStatus.PENDING]: { icon: "🕐", cls: "badge-status-pending" },
+	[ExecutionStatus.CANCELED]: { icon: "—", cls: "badge-status-canceled" },
 };
 
 interface StatusBadgeProps {
-	status: string;
+	status: ExecutionStatus;
 	showIcon?: boolean;
 }
 

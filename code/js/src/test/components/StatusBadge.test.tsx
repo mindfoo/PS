@@ -1,9 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { StatusBadge } from "../../components/StatusBadge";
+import type { ExecutionStatus } from "../../api/executions";
 
 describe("StatusBadge", () => {
-	it.each([
+	it.each<[ExecutionStatus, string]>([
 		["SUCCESS", "badge-status-success"],
 		["ERROR", "badge-status-error"],
 		["RUNNING", "badge-status-running"],
@@ -17,7 +18,8 @@ describe("StatusBadge", () => {
 	});
 
 	it("renders unknown status with badge-muted class", () => {
-		render(<StatusBadge status="UNKNOWN" />);
+		// Simulates an unrecognized status value that could reach the UI from a future backend enum
+		render(<StatusBadge status={"UNKNOWN" as ExecutionStatus} />);
 		expect(screen.getByTitle("Status: UNKNOWN")).toHaveClass("badge-muted");
 	});
 

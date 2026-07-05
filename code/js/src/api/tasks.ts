@@ -1,9 +1,9 @@
 import { api } from "./client";
+import type { ExecutionStatus } from "./executions";
 
 export enum TaskType {
 	HTTP = "HTTP",
 	SCRIPT = "SCRIPT",
-	CUSTOM = "CUSTOM",
 }
 
 export interface TaskResponse {
@@ -15,7 +15,6 @@ export interface TaskResponse {
 	isPrivate: boolean;
 }
 
-/** Task entry enriched with workflow-scoped ordering metadata (stage, retry, dependencies). Returned by GET /tasks?workflowId=... */
 export interface WorkflowTaskEntry {
 	taskId: string;
 	name: string;
@@ -34,13 +33,13 @@ export const taskApi = {
 	getById: (id: string) => api.get<TaskResponse>(`/tasks/${id}`),
 	create: (body: {
 		name: string;
-		type: string;
+		type: TaskType;
 		workflowId?: string;
 		config?: Record<string, unknown>;
 		isPrivate?: boolean;
 	}) => api.post<TaskResponse>("/tasks", body),
-	update: (id: string, body: { name: string; type: string; config?: Record<string, unknown>; isPrivate?: boolean }) =>
+	update: (id: string, body: { name: string; type: TaskType; config?: Record<string, unknown>; isPrivate?: boolean }) =>
 		api.put<TaskResponse>(`/tasks/${id}`, body),
 	delete: (id: string) => api.delete<void>(`/tasks/${id}`),
-	run: (id: string) => api.post<{ executionId: string; status: string }>(`/tasks/${id}/run`, {}),
+	run: (id: string) => api.post<{ executionId: string; status: ExecutionStatus }>(`/tasks/${id}/run`, {}),
 };

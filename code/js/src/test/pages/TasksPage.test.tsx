@@ -33,6 +33,7 @@ vi.mock("../../api/tasks", () => ({
 		listAll: (...args: unknown[]) => mockListAll(...args) as unknown,
 		delete: (...args: unknown[]) => mockDelete(...args) as unknown,
 	},
+	TaskType: { HTTP: "HTTP", SCRIPT: "SCRIPT" },
 }));
 
 vi.mock("../../components/Layout", () => ({

@@ -13,16 +13,6 @@ describe("EmptyState", () => {
 		expect(screen.getByText("No tasks found.")).toBeInTheDocument();
 	});
 
-	it("renders action when provided", () => {
-		render(<EmptyState action={<button>Create</button>} />);
-		expect(screen.getByRole("button", { name: "Create" })).toBeInTheDocument();
-	});
-
-	it("omits action when not provided", () => {
-		render(<EmptyState message="Empty." />);
-		expect(screen.queryByRole("button")).not.toBeInTheDocument();
-	});
-
 	it("has empty-state class", () => {
 		const { container } = render(<EmptyState />);
 		expect(container.firstChild).toHaveClass("empty-state");

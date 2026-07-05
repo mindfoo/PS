@@ -1,9 +1,10 @@
 import { api } from "./client";
+import type { RoleType } from "../contexts/AuthContext.tsx";
 
 export interface UserAuth {
 	id: string;
 	username: string;
-	role: string;
+	role: RoleType;
 }
 
 export interface LoginRequest {
@@ -12,7 +13,7 @@ export interface LoginRequest {
 }
 
 export interface RegisterRequest extends LoginRequest {
-	roleName?: string;
+	roleName?: RoleType;
 }
 
 export const authApi = {

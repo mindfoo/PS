@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
+import { TaskType } from "../../api/tasks";
 
-const baseTask = { id: "t1", name: "Run script", type: "SCRIPT", config: {}, workflowId: null };
+const baseTask = { id: "t1", name: "Run script", type: TaskType.SCRIPT, config: {}, workflowId: null };
 
 function mockFetch(body: unknown, ok = true, status = 200) {
 	vi.stubGlobal(
@@ -27,8 +28,8 @@ describe("api/tasks", () => {
 	it("create returns created task", async () => {
 		mockFetch(baseTask, true, 201);
 		const { taskApi } = await import("../../api/tasks");
-		const result = await taskApi.create({ name: "Run script", type: "SCRIPT", config: {} });
-		expect(result.type).toBe("SCRIPT");
+		const result = await taskApi.create({ name: "Run script", type: TaskType.SCRIPT, config: {} });
+		expect(result.type).toBe(TaskType.SCRIPT);
 	});
 
 	it("deleteById sends DELETE", async () => {

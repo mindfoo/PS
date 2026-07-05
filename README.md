@@ -143,13 +143,6 @@ cd code/js
 npm test
 ```
 
-### End-to-end tests (Playwright — requires the app to be running)
-
-```bash
-cd code/js
-npm run test:e2e
-```
-
 ## API Overview
 
 Base URL: `http://localhost:8080/swagger-ui/index.html`

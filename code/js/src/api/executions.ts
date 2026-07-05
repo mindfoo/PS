@@ -1,15 +1,23 @@
 import { api } from "./client";
 
-type ExecutionType = "WORKFLOW" | "TASK";
-export type ExecutionStatus = keyof typeof ExecutionStatusEnum;
-export enum ExecutionStatusEnum {
-	ERROR = "ERROR",
-	SUCCESS = "SUCCESS",
-	CANCELED = "CANCELED",
-	RUNNING = "RUNNING",
-	PENDING = "PENDING"
+export const ExecutionStatus = {
+	ERROR: "ERROR",
+	SUCCESS: "SUCCESS",
+	CANCELED: "CANCELED",
+	RUNNING: "RUNNING",
+	PENDING: "PENDING",
+} as const;
+export type ExecutionStatus = (typeof ExecutionStatus)[keyof typeof ExecutionStatus];
+
+export enum ExecutionType {
+	WORKFLOW = "WORKFLOW",
+	TASK = "TASK",
 }
-type ExecutionTriggerType = "MANUAL" | "CRON";
+
+export enum ExecutionTriggerType {
+	MANUAL = "MANUAL",
+	CRON = "CRON",
+}
 
 export interface TaskExecutionSummary {
 	executionId: string;
@@ -37,12 +45,12 @@ export interface ExecutionSummaryResponse {
 export interface ExecutionEvent {
 	executionId: string;
 	status: ExecutionStatus;
-	taskStatuses: Record<string, string>;
+	taskStatuses: Record<string, ExecutionStatus>;
 	terminal: boolean;
 }
 
 export function isActiveExecutionStatus(status: ExecutionStatus): boolean {
-	return status === ExecutionStatusEnum.RUNNING.valueOf() || status === ExecutionStatusEnum.PENDING.valueOf();
+	return status === ExecutionStatus.RUNNING || status === ExecutionStatus.PENDING;
 }
 
 export const executionApi = {
