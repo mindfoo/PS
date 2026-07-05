@@ -6,6 +6,7 @@ import io.mockk.verify
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.workflow.dto.LoginRequest
 import org.workflow.dto.RegisterRequest
@@ -16,6 +17,7 @@ import org.workflow.repository.RoleRepository
 import org.workflow.repository.UserRepository
 import org.workflow.repository.UserTokenRepository
 import org.workflow.service.AuthService
+import org.workflow.service.ServiceHelpers
 import org.workflow.service.utils.AuthLoginError
 import org.workflow.service.utils.AuthRegisterError
 import org.workflow.utils.Failure
@@ -29,6 +31,7 @@ class AuthServiceTest {
     private lateinit var tokenRepository: UserTokenRepository
     private lateinit var passwordEncoder: PasswordEncoder
     private lateinit var service: AuthService
+    private lateinit var helpers: ServiceHelpers
 
     private fun readerRole() = Roles(id = UUID.randomUUID(), name = RoleType.READER)
     private fun user(role: Roles = readerRole()) = User(
@@ -42,7 +45,8 @@ class AuthServiceTest {
         roleRepository  = mockk()
         tokenRepository = mockk()
         passwordEncoder = mockk()
-        service = AuthService(userRepository, roleRepository, tokenRepository, passwordEncoder)
+        helpers = mockk()
+        service = AuthService(userRepository, roleRepository, tokenRepository, passwordEncoder, helpers)
     }
 
     // register
@@ -51,7 +55,7 @@ class AuthServiceTest {
     fun `register succeeds and returns ProfileResponse`() {
         val role = readerRole()
         val u    = user(role)
-        every { userRepository.findByUsername("alice") } returns null
+        every { helpers.findUser("alice") } returns null
         every { roleRepository.findByName(RoleType.READER) } returns role
         every { passwordEncoder.encode(any()) } returns "hashed"
         every { userRepository.save(any()) } returns u
@@ -64,7 +68,7 @@ class AuthServiceTest {
 
     @Test
     fun `register fails with UsernameAlreadyTaken when username exists`() {
-        every { userRepository.findByUsername("alice") } returns user()
+        every { helpers.findUser("alice") } returns user()
 
         val result = service.register(RegisterRequest("alice", "Secret1!Aa"))
 
@@ -74,7 +78,7 @@ class AuthServiceTest {
 
     @Test
     fun `register fails with RoleNotFound when role does not exist`() {
-        every { userRepository.findByUsername("new") } returns null
+        every { helpers.findUser("new") } returns null
 
         val result = service.register(RegisterRequest("new", "Secret1!Aa", roleName = "GHOST"))
 
@@ -95,7 +99,7 @@ class AuthServiceTest {
     @Test
     fun `login succeeds and returns token`() {
         val u = user()
-        every { userRepository.findByUsername("alice") } returns u
+        every { helpers.findUser("alice") } returns u
         every { passwordEncoder.matches("Secret1!Aa", "hashed") } returns true
         every { tokenRepository.save(any()) } returnsArgument 0
 
@@ -107,7 +111,7 @@ class AuthServiceTest {
 
     @Test
     fun `login fails with InvalidCredentials when user not found`() {
-        every { userRepository.findByUsername("ghost") } returns null
+        every { helpers.findUser("ghost") } returns null
 
         val result = service.login(LoginRequest("ghost", "anything"))
 
@@ -118,7 +122,7 @@ class AuthServiceTest {
     @Test
     fun `login fails with InvalidCredentials when password is wrong`() {
         val u = user()
-        every { userRepository.findByUsername("alice") } returns u
+        every { helpers.findUser("alice") } returns u
         every { passwordEncoder.matches("wrong", "hashed") } returns false
 
         val result = service.login(LoginRequest("alice", "wrong"))
@@ -150,7 +154,7 @@ class AuthServiceTest {
 
     @Test
     fun `me returns ProfileResponse for existing user`() {
-        every { userRepository.findByUsername("alice") } returns user()
+        every { helpers.findUser("alice") } returns user()
 
         val result = service.profile("alice")
 
@@ -160,7 +164,7 @@ class AuthServiceTest {
 
     @Test
     fun `me returns UserNotFound when user does not exist`() {
-        every { userRepository.findByUsername("ghost") } returns null
+        every { helpers.findUser("ghost") } returns null
 
         val result = service.profile("ghost")
 
