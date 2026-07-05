@@ -15,6 +15,7 @@ import org.workflow.entity.enums.RoleType
 import org.workflow.repository.PermissionRepository
 import org.workflow.repository.RoleRepository
 import org.workflow.repository.UserRepository
+import org.workflow.service.ServiceHelpers
 
 /**
  * Seeds the database with default roles, permissions and a default admin account on first startup.
@@ -24,7 +25,8 @@ class DataInitializer(
     private val roleRepository: RoleRepository,
     private val permissionRepository: PermissionRepository,
     private val userRepository: UserRepository,
-    private val passwordEncoder: PasswordEncoder
+    private val passwordEncoder: PasswordEncoder,
+    private val helpers: ServiceHelpers
 ) : ApplicationRunner {
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -82,7 +84,7 @@ class DataInitializer(
         roleRepository.saveAll(listOf(reader, writer, dev, admin))
 
         // Default admin account as first user
-        if (userRepository.findByUsername("admin") == null) {
+        if (helpers.findUser("admin") == null) {
             userRepository.save(
                 User(
                     username = "admin",

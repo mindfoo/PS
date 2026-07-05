@@ -13,11 +13,6 @@ class ServiceHelpers(private val userRepository: UserRepository) {
     fun findUser(username: String): User? =
         userRepository.findByUsername(username)
 
-    /** Returns the user with the given username, throwing if not found. */
-    fun requireUser(username: String): User =
-        userRepository.findByUsername(username)
-            ?: throw NoSuchElementException("User '$username' not found")
-
     /** Returns true if the user has the ADMIN role. */
     fun isAdmin(user: User): Boolean =
         user.role.name == RoleType.ADMIN

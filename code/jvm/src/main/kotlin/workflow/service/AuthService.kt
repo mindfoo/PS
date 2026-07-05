@@ -27,7 +27,8 @@ class AuthService(
     private val userRepository: UserRepository,
     private val roleRepository: RoleRepository,
     private val userTokenRepository: UserTokenRepository,
-    private val passwordEncoder: PasswordEncoder
+    private val passwordEncoder: PasswordEncoder,
+    private val helpers: ServiceHelpers
 ) {
 
     companion object {
@@ -41,7 +42,7 @@ class AuthService(
             return failure(AuthRegisterError.InsecurePassword)
         }
 
-        if (userRepository.findByUsername(request.username) != null) {
+        if (helpers.findUser(request.username) != null) {
             return failure(AuthRegisterError.UsernameAlreadyTaken)
         }
 
@@ -70,7 +71,7 @@ class AuthService(
             return failure(AuthLoginError.InvalidCredentials)
         }
 
-        val user = userRepository.findByUsername(request.username)
+        val user = helpers.findUser(request.username)
             ?: return failure(AuthLoginError.InvalidCredentials)
 
         if (!passwordEncoder.matches(request.password, user.passwordValidation)) {
@@ -99,7 +100,7 @@ class AuthService(
 
     @Transactional(readOnly = true)
     fun profile(username: String): Either<AuthLoginError, ProfileResponse> {
-        val user = userRepository.findByUsername(username)
+        val user = helpers.findUser(username)
             ?: return failure(AuthLoginError.UserNotFound)
 
         return success(ProfileResponse(id = user.id, username = user.username, role = user.role.name))

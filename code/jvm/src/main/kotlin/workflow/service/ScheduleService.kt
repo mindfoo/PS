@@ -1,5 +1,6 @@
 package org.workflow.service
 
+import org.springframework.data.repository.findByIdOrNull
 import org.springframework.scheduling.support.CronExpression
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -64,7 +65,7 @@ class ScheduleService(
 
         val userId = user.id ?: return failure(ScheduleError.UserNotFound)
         val workflow = if (isAdmin(user)) {
-            workflowRepository.findById(request.workflowId).orElse(null)
+            workflowRepository.findByIdOrNull(request.workflowId)
         } else {
             workflowRepository.findByIdAndOwnerId(request.workflowId, userId)
         } ?: return failure(ScheduleError.WorkflowNotFound)
@@ -161,7 +162,7 @@ class ScheduleService(
 
     /** Admins can access any schedule by ID; other users only their own. */
     private fun findOwnedSchedule(scheduleId: UUID, user: User): Schedule? {
-        if (isAdmin(user)) return scheduleRepository.findById(scheduleId).orElse(null)
+        if (isAdmin(user)) return scheduleRepository.findByIdOrNull(scheduleId);
         val userId = user.id ?: return null
         return scheduleRepository.findByIdAndOwnerId(scheduleId, userId)
     }

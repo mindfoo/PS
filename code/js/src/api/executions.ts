@@ -1,7 +1,14 @@
 import { api } from "./client";
 
 type ExecutionType = "WORKFLOW" | "TASK";
-export type ExecutionStatus = "ERROR" | "SUCCESS" | "CANCELED" | "RUNNING" | "PENDING";
+export type ExecutionStatus = keyof typeof ExecutionStatusEnum;
+export enum ExecutionStatusEnum {
+	ERROR = "ERROR",
+	SUCCESS = "SUCCESS",
+	CANCELED = "CANCELED",
+	RUNNING = "RUNNING",
+	PENDING = "PENDING"
+}
 type ExecutionTriggerType = "MANUAL" | "CRON";
 
 export interface TaskExecutionSummary {
@@ -34,9 +41,8 @@ export interface ExecutionEvent {
 	terminal: boolean;
 }
 
-/** An execution still in flight is one the SSE stream can still update. */
 export function isActiveExecutionStatus(status: ExecutionStatus): boolean {
-	return status === "PENDING" || status === "RUNNING";
+	return status === ExecutionStatusEnum.RUNNING.valueOf() || status === ExecutionStatusEnum.PENDING.valueOf();
 }
 
 export const executionApi = {

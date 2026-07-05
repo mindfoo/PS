@@ -1,6 +1,7 @@
 package org.workflow.service
 
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.multipart.MultipartFile
@@ -65,7 +66,7 @@ class TaskService(
         val currentUser = findCurrentUser(authenticationName)
             ?: return failure(TaskError.UserNotFound)
 
-        val workflow = workflowRepository.findById(workflowId).orElse(null)
+        val workflow = workflowRepository.findByIdOrNull(workflowId)
             ?: return failure(TaskError.WorkflowNotFound)
 
         val wfId = workflow.id ?: return failure(TaskError.WorkflowNotFound)
@@ -114,7 +115,7 @@ class TaskService(
         val currentUser = findCurrentUser(authenticationName)
             ?: return failure(TaskError.UserNotFound)
 
-        val task = taskRepository.findById(taskId).orElse(null)
+        val task = taskRepository.findByIdOrNull(taskId)
             ?: return failure(TaskError.TaskNotFound)
         if (!isAdmin(currentUser) && task.isPrivate && task.createdBy?.id != currentUser.id) {
             return failure(TaskError.AccessDenied)
@@ -259,7 +260,7 @@ class TaskService(
         authenticationName: String
     ): Either<TaskError, ScriptInfoResponse> {
         val currentUser = findCurrentUser(authenticationName) ?: return failure(TaskError.UserNotFound)
-        val task = taskRepository.findById(taskId).orElse(null) ?: return failure(TaskError.TaskNotFound)
+        val task = taskRepository.findByIdOrNull(taskId) ?: return failure(TaskError.TaskNotFound)
 
         if (task.isPrivate && !isAdmin(currentUser) && task.createdBy?.id != currentUser.id) {
             return failure(TaskError.AccessDenied)
@@ -302,7 +303,7 @@ class TaskService(
     @Transactional(readOnly = true)
     fun getScriptInfo(taskId: UUID, authenticationName: String): Either<TaskError, ScriptInfoResponse> {
         val currentUser = findCurrentUser(authenticationName) ?: return failure(TaskError.UserNotFound)
-        val task = taskRepository.findById(taskId).orElse(null) ?: return failure(TaskError.TaskNotFound)
+        val task = taskRepository.findByIdOrNull(taskId) ?: return failure(TaskError.TaskNotFound)
 
         if (task.isPrivate && !isAdmin(currentUser) && task.createdBy?.id != currentUser.id) {
             return failure(TaskError.AccessDenied)
@@ -321,14 +322,14 @@ class TaskService(
     // Helpers
 
     private fun findAccessibleWorkflow(workflowId: UUID, user: User): org.workflow.entity.Workflow? {
-        if (isAdmin(user)) return workflowRepository.findById(workflowId).orElse(null)
+        if (isAdmin(user)) return workflowRepository.findByIdOrNull(workflowId)
         val userId = user.id ?: return null
         return workflowRepository.findByIdAndOwnerId(workflowId, userId)
     }
 
     /** Admins can access any task by ID; other users only their own. */
     private fun findOwnedTask(taskId: UUID, user: User): Task? {
-        if (isAdmin(user)) return taskRepository.findById(taskId).orElse(null)
+        if (isAdmin(user)) return taskRepository.findByIdOrNull(taskId)
         val userId = user.id ?: return null
         return taskRepository.findByIdAndOwnerId(taskId, userId)
     }

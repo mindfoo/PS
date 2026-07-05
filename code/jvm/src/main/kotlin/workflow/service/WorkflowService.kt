@@ -1,5 +1,6 @@
 package org.workflow.service
 
+import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.workflow.dto.ExecutionSummaryResponse
@@ -48,7 +49,7 @@ class WorkflowService(
         val currentUser = findCurrentUser(authenticationName)
             ?: return failure(WorkflowError.UserNotFound)
 
-        val workflow = workflowRepository.findById(workflowId).orElse(null)
+        val workflow = workflowRepository.findByIdOrNull(workflowId)
             ?: return failure(WorkflowError.WorkflowNotFound)
         if (!isAdmin(currentUser) && workflow.isPrivate && workflow.createdBy.id != currentUser.id) {
             return failure(WorkflowError.AccessDenied)
@@ -165,7 +166,7 @@ class WorkflowService(
         // Any authenticated user who can read workflows can poll execution status
         findCurrentUser(authenticationName) ?: return failure(WorkflowError.UserNotFound)
 
-        val ex = executionLogRepository.findById(executionId).orElse(null)
+        val ex = executionLogRepository.findByIdOrNull(executionId)
             ?: return failure(WorkflowError.ExecutionNotFound)
 
         val exId = ex.id ?: return failure(WorkflowError.ExecutionNotFound)
@@ -204,7 +205,7 @@ class WorkflowService(
         val currentUser = findCurrentUser(authenticationName)
             ?: return failure(WorkflowError.UserNotFound)
 
-        val workflow = workflowRepository.findById(workflowId).orElse(null)
+        val workflow = workflowRepository.findByIdOrNull(workflowId)
             ?: return failure(WorkflowError.WorkflowNotFound)
 
         val wid = workflow.id ?: return failure(WorkflowError.WorkflowNotFound)
@@ -246,7 +247,7 @@ class WorkflowService(
 
     /** Admins can access any workflow by ID; other users only their own. */
     private fun findOwnedWorkflow(workflowId: UUID, currentUser: org.workflow.entity.User, userId: UUID): Workflow? =
-        if (isAdmin(currentUser)) workflowRepository.findById(workflowId).orElse(null)
+        if (isAdmin(currentUser)) workflowRepository.findByIdOrNull(workflowId)
         else workflowRepository.findByIdAndOwnerId(workflowId, userId)
 
     private fun Workflow.toResponse(): WorkflowResponse {
