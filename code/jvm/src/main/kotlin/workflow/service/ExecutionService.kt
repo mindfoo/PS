@@ -48,14 +48,14 @@ class ExecutionService(
     @Qualifier("executionExecutor") private val executionExecutor: Executor,
     private val jdbcTemplate: JdbcTemplate,
     private val objectMapper: ObjectMapper,
-    @Value("\${app.scripts.base-dir:./scripts}") private val scriptsBaseDir: String
+    @Value("\${app.scripts.base-dir:./scripts}") private val scriptsBaseDir: String,
+    /** Very fast task runs so the UI visibly shows the RUNNING state. */
+    @Value("\${app.execution.min-task-running-ms:2000}") private val minTaskRunningMs: Long
 ) {
 
     private val log = LoggerFactory.getLogger(javaClass)
 
     companion object {
-        private const val MIN_TASK_RUNNING_MS = 2_000L
-
         /** Splits a raw, space-separated argument string (e.g. "--flag value") into a list. */
         private val WHITESPACE = Regex("\\s+")
     }
@@ -102,14 +102,7 @@ class ExecutionService(
         )
 
         val executionId = checkNotNull(execution.id) { "Something went wrong saving the execution" }
-
-        // Dispatch AFTER this transaction commits: runExecution reads the execution back by id,
-        // and would find nothing if it ran before the save above is visible to other connections.
-        TransactionSynchronizationManager.registerSynchronization(object : TransactionSynchronization {
-            override fun afterCommit() {
-                CompletableFuture.runAsync({ runExecution(executionId) }, executionExecutor)
-            }
-        })
+        dispatchAfterCommit { runExecution(executionId) }
         return success(executionId)
     }
 
@@ -127,6 +120,21 @@ class ExecutionService(
             )
         )
         return checkNotNull(execution.id) { "Something went wrong saving the execution" }
+    }
+
+    /** Starts an execution once the previous transaction commits. */
+    fun runExecutionAfterCommit(executionId: UUID) =
+        dispatchAfterCommit { runExecution(executionId) }
+
+    /**
+     * Runs action on the execution executor AFTER the current transaction commits.
+     */
+    private fun dispatchAfterCommit(action: () -> Unit) {
+        TransactionSynchronizationManager.registerSynchronization(object : TransactionSynchronization {
+            override fun afterCommit() {
+                CompletableFuture.runAsync(action, executionExecutor)
+            }
+        })
     }
 
     /** Runs a workflow's stages in order; tasks in the same stage run in parallel. Called on a virtual thread. */
@@ -155,15 +163,15 @@ class ExecutionService(
             val wfId = workflow.id
                 ?: throw IllegalStateException("Workflow id is null for execution $executionId — data integrity violation")
 
-            val orderRows = workflowTaskOrderRepository.findAllByWorkflowIdOrderByTaskOrderAsc(wfId).ifEmpty { null }
+            // Every workflow-linked task has a WorkflowTaskOrder row (created on task creation/link),
+            // so the order rows are the single source of stages.
+            val orderRows = workflowTaskOrderRepository.findAllByWorkflowIdOrderByTaskOrderAsc(wfId)
 
-            val stages: Map<Int, List<Task>> = orderRows
-                ?.groupBy({ it.taskOrder }, { it.task })
-                ?: taskRepository.findAllByWorkflowId(wfId).mapIndexed { idx, task -> idx to listOf(task) }.toMap()
+            val stages: Map<Int, List<Task>> = orderRows.groupBy({ it.taskOrder }, { it.task })
 
             val retryPolicies: Map<UUID, Int> = orderRows
-                ?.mapNotNull { row -> row.task.id?.let { id -> id to row.retryPolicy } }
-                ?.toMap() ?: emptyMap()
+                .mapNotNull { row -> row.task.id?.let { id -> id to row.retryPolicy } }
+                .toMap()
 
             // One PENDING child execution per task, created up front so the UI can show them immediately.
             val taskExecIds: Map<UUID, UUID> = stages.values.flatten()
@@ -198,11 +206,6 @@ class ExecutionService(
                 }
                 totalExecuted += results.size
                 notifyStatusChange(executionId, ExecutionStatus.RUNNING, taskStatusMap)
-
-                if (executionLogRepository.isCancelRequested(executionId)) {
-                    wasCanceled = true
-                    break
-                }
             }
 
             if (wasCanceled) cancelPendingChildren(executionId)
@@ -261,17 +264,13 @@ class ExecutionService(
         )
 
         val executionId = checkNotNull(execution.id) { "Execution id null after save — data integrity violation" }
-
-        // Dispatch AFTER this transaction commits — see triggerManualWorkflow for why.
-        TransactionSynchronizationManager.registerSynchronization(object : TransactionSynchronization {
-            override fun afterCommit() {
-                CompletableFuture.runAsync({ runManualTask(executionId, task) }, executionExecutor)
-            }
-        })
+        dispatchAfterCommit { runManualTask(executionId, task) }
         return success(executionId)
     }
 
-    /** Runs a single manually-triggered task and records its outcome. Runs on a virtual thread. */
+    /**
+     * Runs a single manually-triggered task and records its outcome. Runs on a virtual thread.
+     */
     private fun runManualTask(executionId: UUID, task: Task) {
         val execRecord = executionLogRepository.findByIdOrNull(executionId) ?: return
 
@@ -284,17 +283,9 @@ class ExecutionService(
             return
         }
 
-        execRecord.status = ExecutionStatus.RUNNING
-        execRecord.startedAt = LocalDateTime.now()
-        executionLogRepository.save(execRecord)
         notifyStatusChange(executionId, ExecutionStatus.RUNNING)
-
-        val output = runTaskSafely(task)
-        execRecord.status = if (output["status"] == ExecutionStatus.SUCCESS) ExecutionStatus.SUCCESS else ExecutionStatus.ERROR
-        execRecord.finishedAt = LocalDateTime.now()
-        execRecord.output = output
-        executionLogRepository.save(execRecord)
-        notifyStatusChange(executionId, execRecord.status, terminal = true)
+        val output = runTaskWithTracking(task, executionId)
+        notifyStatusChange(executionId, (output["status"] as? String) ?: ExecutionStatus.ERROR, terminal = true)
     }
 
     private fun createPendingTaskExecution(parent: Execution, task: Task): UUID {
@@ -346,7 +337,7 @@ class ExecutionService(
                 executionLogRepository.save(child)
                 Thread.sleep(2_000L)
             }
-            output = runTaskSafely(task)
+            output = runTaskWithTime(task)
             attempt++
         } while (output["status"] != ExecutionStatus.SUCCESS && attempt <= retryPolicy)
 
@@ -358,8 +349,7 @@ class ExecutionService(
         return output
     }
 
-    /** Runs [task], turning any exception into an ERROR result; pads short runs to a minimum visible duration. */
-    private fun runTaskSafely(task: Task): Map<String, Any> {
+    private fun runTaskWithTime(task: Task): Map<String, Any> {
         val startedMs = System.currentTimeMillis()
         val output = try {
             runTask(task)
@@ -372,7 +362,7 @@ class ExecutionService(
             )
         }
         val elapsed = System.currentTimeMillis() - startedMs
-        if (elapsed < MIN_TASK_RUNNING_MS) Thread.sleep(MIN_TASK_RUNNING_MS - elapsed)
+        if (elapsed < minTaskRunningMs) Thread.sleep(minTaskRunningMs - elapsed)
         return output
     }
 
@@ -390,9 +380,6 @@ class ExecutionService(
         val command   = config["command"]  as? String
             ?: return mapOf("taskId" to task.id.toString(), "taskName" to task.name, "status" to ExecutionStatus.ERROR, "error" to "missing 'command' in config")
         val fileName  = config["fileName"] as? String ?: ""
-        // Scripts are picked from the shared scripts folder by default; "directory" only needs
-        // to be set to run somewhere else.
-        val directory = config["directory"] as? String ?: scriptsBaseDir
         val rawArgs   = config["args"]
 
         val allowedCommands = setOf("node", "python3", "bash", "sh", "python")
@@ -421,7 +408,8 @@ class ExecutionService(
         }
 
         val pb = ProcessBuilder(cmd)
-        pb.directory(File(directory))
+
+        pb.directory(File(scriptsBaseDir))
         pb.redirectErrorStream(true) // merge stderr into stdout so we capture error output too
 
         val process = pb.start()
@@ -445,7 +433,7 @@ class ExecutionService(
         )
     }
 
-    /** Runs an HTTP task via [RestTemplate]. */
+    /* Runs an HTTP task via [RestTemplate]. */
     private fun runHttpTask(task: Task): Map<String, Any> {
         val config = task.config
         val rawUrl = config["url"] as? String
@@ -476,7 +464,7 @@ class ExecutionService(
         )
     }
 
-    // ---------- Helpers ----------
+    /* ---------- Helpers ---------- */
 
     private fun isAdmin(user: User) = helpers.isAdmin(user)
 

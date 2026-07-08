@@ -13,9 +13,10 @@ export interface TaskFormInputs {
 	type: TaskType;
 	url: string;
 	method: string;
+	headers: string;
+	body: string;
 	command: string;
 	fileName: string;
-	directory: string;
 	args: string;
 }
 
@@ -24,11 +25,31 @@ const DEFAULT_INPUTS: TaskFormInputs = {
 	type: TaskType.HTTP,
 	url: "",
 	method: Method.GET,
+	headers: "",
+	body: "",
 	command: "",
 	fileName: "",
-	directory: "",
 	args: "",
 };
+
+// Mirrors the backend allowlist in ExecutionService.runScriptTask.
+const ALLOWED_COMMANDS = ["node", "python3", "python", "bash", "sh"];
+
+function parseHeaders(text: string): Record<string, string> {
+	const headers: Record<string, string> = {};
+	for (const line of text.split("\n")) {
+		const idx = line.indexOf(":");
+		if (idx > 0) headers[line.slice(0, idx).trim()] = line.slice(idx + 1).trim();
+	}
+	return headers;
+}
+
+function headersToText(headers: unknown): string {
+	if (!headers || typeof headers !== "object") return "";
+	return Object.entries(headers as Record<string, string>)
+		.map(([name, value]) => `${name}: ${value}`)
+		.join("\n");
+}
 
 function fromTask(t: { name: string; type: TaskType; config: Record<string, unknown> }): TaskFormInputs {
 	const configuration = t.config as Record<string, string>;
@@ -38,9 +59,10 @@ function fromTask(t: { name: string; type: TaskType; config: Record<string, unkn
 		type: t.type,
 		url: configuration.url ?? "",
 		method: configuration.method ?? Method.GET,
+		headers: headersToText(configuration.headers),
+		body: configuration.body ?? "",
 		command: configuration.command ?? "",
 		fileName: configuration.fileName ?? "",
-		directory: configuration.directory ?? "",
 		args: Array.isArray(configuration.args)
 			? (configuration.args as unknown as string[]).join(" ")
 			: (configuration.args ?? ""),
@@ -49,11 +71,15 @@ function fromTask(t: { name: string; type: TaskType; config: Record<string, unkn
 
 function buildConfig(inputs: TaskFormInputs): Record<string, unknown> {
 	switch (inputs.type) {
-		case TaskType.HTTP:
-			return { url: inputs.url, method: inputs.method };
+		case TaskType.HTTP: {
+			const cfg: Record<string, unknown> = { url: inputs.url, method: inputs.method };
+			const headers = parseHeaders(inputs.headers);
+			if (Object.keys(headers).length > 0) cfg.headers = headers;
+			if (inputs.body.trim()) cfg.body = inputs.body;
+			return cfg;
+		}
 		case TaskType.SCRIPT: {
 			const cfg: Record<string, unknown> = { command: inputs.command, fileName: inputs.fileName };
-			if (inputs.directory) cfg.directory = inputs.directory;
 			if (inputs.args) cfg.args = inputs.args.trim().split(/\s+/);
 			return cfg;
 		}
@@ -201,6 +227,7 @@ function TaskForm({
 								<div className="form-group">
 									<label>URL</label>
 									<input
+										type="url"
 										value={inputs.url}
 										onChange={field("url")}
 										placeholder="https://example.com/api"
@@ -215,6 +242,29 @@ function TaskForm({
 										))}
 									</select>
 								</div>
+								<div className="form-group">
+									<label>
+										Headers
+										<span className="text-muted">(optional)</span>
+									</label>
+									<textarea
+										value={inputs.headers}
+										onChange={field("headers")}
+										placeholder={"Content-Type: application/json\netc: etc"}
+										rows={3}
+									/>
+								</div>
+								<div className="form-group">
+									<label>
+										Body <span className="text-muted">(optional)</span>
+									</label>
+									<textarea
+										value={inputs.body}
+										onChange={field("body")}
+										placeholder='{"key": "value"}'
+										rows={4}
+									/>
+								</div>
 							</>
 						)}
 
@@ -222,12 +272,16 @@ function TaskForm({
 							<>
 								<div className="form-group">
 									<label>Command</label>
-									<input
-										value={inputs.command}
-										onChange={field("command")}
-										placeholder="ex: 'node'"
-										required
-									/>
+									<select value={inputs.command} onChange={field("command")} required>
+										<option value="">— select a command —</option>
+										{[...new Set([inputs.command, ...ALLOWED_COMMANDS].filter(Boolean))].map(
+											(comm) => (
+												<option key={comm} value={comm}>
+													{comm}
+												</option>
+											),
+										)}
+									</select>
 								</div>
 								<div className="form-group">
 									<label>File name</label>
@@ -244,16 +298,6 @@ function TaskForm({
 									<span className="text-muted">
 										Files placed manually in the scripts folder by DEV/ADMIN.
 									</span>
-								</div>
-								<div className="form-group">
-									<label>
-										Directory <span className="text-muted">(optional)</span>
-									</label>
-									<input
-										value={inputs.directory}
-										onChange={field("directory")}
-										placeholder="Defaults to the scripts folder — only set this to run elsewhere"
-									/>
 								</div>
 								<div className="form-group">
 									<label>

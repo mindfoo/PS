@@ -116,6 +116,8 @@ export function WorkflowDetailPage() {
 		unsubscribeRef.current = null;
 	}, []);
 
+	// The backend sends a catch-up event with the current status as soon as the SSE
+	// connection opens, so subscribing is enough even if the execution already finished.
 	const monitorExecution = useCallback(
 		(execId: string) => {
 			stopMonitoring();
@@ -129,20 +131,12 @@ export function WorkflowDetailPage() {
 					void loadExecutions();
 				}
 			});
-
-			void executionApi.getById(execId).then((ex) => {
-				if (!isActiveExecutionStatus(ex.status)) {
-					stopMonitoring();
-					setExecutions((prev) => prev.map((e) => (e.id === execId ? ex : e)));
-				}
-			});
 		},
 		[stopMonitoring, loadExecutions],
 	);
 
 	useEffect(() => stopMonitoring, [stopMonitoring]);
 
-	// --- Task & Order Persisters ---
 	async function persistOrder(updated: WorkflowTaskEntry[]) {
 		if (!id) return;
 		const items: TaskOrderItem[] = updated

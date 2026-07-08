@@ -82,7 +82,8 @@ class ExecutionServiceTest {
             Executors.newVirtualThreadPerTaskExecutor(),
             jdbcTemplate,
             ObjectMapper(),
-            scriptsBaseDir = "./scripts"
+            scriptsBaseDir = "./scripts",
+            minTaskRunningMs = 0L
         )
         TransactionSynchronizationManager.initSynchronization()
     }

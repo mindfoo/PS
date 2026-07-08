@@ -4,9 +4,6 @@ import org.springframework.data.repository.findByIdOrNull
 import org.springframework.scheduling.support.CronExpression
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import org.springframework.transaction.support.TransactionSynchronization
-import org.springframework.transaction.support.TransactionSynchronizationManager
-import java.util.concurrent.CompletableFuture
 import org.workflow.dto.ScheduleCreateRequest
 import org.workflow.dto.ScheduleResponse
 import org.workflow.dto.ScheduleUpdateRequest
@@ -131,13 +128,7 @@ class ScheduleService(
             if (!schedule.enabled) return@forEach
 
             val executionId = executionService.createCronExecution(schedule.workflow, schedule.createdBy)
-
-            // Dispatch AFTER this transaction commits: createCronExecution saves the execution
-            TransactionSynchronizationManager.registerSynchronization(object : TransactionSynchronization {
-                override fun afterCommit() {
-                    CompletableFuture.runAsync { executionService.runExecution(executionId) }
-                }
-            })
+            executionService.runExecutionAfterCommit(executionId)
 
             schedule.lastRunAt = now
             schedule.nextRunAt = computeNextRun(schedule.cronExpression, schedule.timezone)

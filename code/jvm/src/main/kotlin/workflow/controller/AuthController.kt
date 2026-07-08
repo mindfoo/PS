@@ -27,7 +27,6 @@ import org.workflow.utils.Problem
 import org.workflow.utils.Success
 import org.workflow.utils.Uris
 import org.workflow.security.CookieAuthenticationFilter.Companion.COOKIE_NAME
-import org.workflow.security.CookieAuthenticationFilter.Companion.USERNAME_COOKIE_NAME
 import org.workflow.service.utils.AuthLoginError
 import org.workflow.service.utils.AuthRegisterError
 
@@ -78,17 +77,8 @@ class AuthController(
                     .path("/")
                     .build()
 
-                val usernameCookie = ResponseCookie.from(USERNAME_COOKIE_NAME, request.username)
-                    .httpOnly(false)
-                    .secure(true)
-                    .sameSite("Strict")
-                    .maxAge(AuthService.TOKEN_TTL_HOURS * 3600)
-                    .path("/")
-                    .build()
-
                 ResponseEntity.ok()
                     .header(HttpHeaders.SET_COOKIE, tokenCookie.toString())
-                    .header(HttpHeaders.SET_COOKIE, usernameCookie.toString())
                     .body(mapOf("message" to "Logged in successfully"))
             }
             is Failure -> when (result.value) {
@@ -119,17 +109,8 @@ class AuthController(
             .path("/")
             .build()
 
-        val expiredUsername = ResponseCookie.from(USERNAME_COOKIE_NAME, "")
-            .httpOnly(false)
-            .secure(true)
-            .sameSite("Strict")
-            .maxAge(0)
-            .path("/")
-            .build()
-
         return ResponseEntity.noContent()
             .header(HttpHeaders.SET_COOKIE, expiredToken.toString())
-            .header(HttpHeaders.SET_COOKIE, expiredUsername.toString())
             .build<Any>()
     }
 

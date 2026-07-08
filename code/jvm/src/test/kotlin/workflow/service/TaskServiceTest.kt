@@ -31,7 +31,7 @@ import java.util.UUID
 class TaskServiceTest {
 
     /* JUnit 5 injects a fresh temp directory before each test — used as scriptsBaseDir
-       so upload tests can create/read real files without polluting the project tree. */
+       so listAvailableScripts tests can create real files without polluting the project tree. */
     @TempDir
     lateinit var tempDir: Path
 
