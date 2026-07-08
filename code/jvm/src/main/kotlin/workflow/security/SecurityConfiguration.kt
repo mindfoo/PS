@@ -26,6 +26,8 @@ class SecurityConfiguration(
     @Value("\${app.cors.allowed-origins:http://localhost:5173}") private val allowedOrigins: String
 ) : WebMvcConfigurer {
 
+    private val allowedOriginsList: Array<String> = allowedOrigins.split(",").map { it.trim() }.toTypedArray()
+
     /** BCrypt password encoder — injected into AuthService for hashing and verification. */
     @Bean
     fun passwordEncoder(): PasswordEncoder = BCryptPasswordEncoder()
@@ -70,7 +72,7 @@ class SecurityConfiguration(
     /** Allow the frontend Vite dev server (or the configured origin) to call the API. */
     override fun addCorsMappings(registry: CorsRegistry) {
         registry.addMapping("/api/**")
-            .allowedOrigins(allowedOrigins)
+            .allowedOrigins(*allowedOriginsList)
             .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD")
             .allowedHeaders("*")
             .allowCredentials(true)
