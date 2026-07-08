@@ -12,6 +12,11 @@ RUN ./gradlew bootJar --no-daemon -x test
 FROM eclipse-temurin:25-jre AS runtime
 WORKDIR /app
 
+# Installations needed for script tasks to be able to run on the container
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends nodejs python3 python-is-python3 && \
+    rm -rf /var/lib/apt/lists/*
+
 COPY --from=builder /app/build/libs/*.jar app.jar
 
 EXPOSE 8080

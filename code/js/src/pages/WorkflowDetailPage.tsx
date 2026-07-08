@@ -214,18 +214,6 @@ export function WorkflowDetailPage() {
 		}
 	}
 
-	// --- Execution Triggers ---
-	async function handleRunTask(taskId: string) {
-		try {
-			const res = await taskApi.run(taskId);
-			setTaskStatuses((prev) => ({ ...prev, [taskId]: ExecutionStatus.RUNNING }));
-			monitorExecution(res.executionId);
-			void loadExecutions();
-		} catch (err) {
-			setError(err instanceof Error ? err.message : "Run failed");
-		}
-	}
-
 	async function handleRunWorkflow() {
 		if (!id) return;
 		setRunning(true);
@@ -554,15 +542,6 @@ export function WorkflowDetailPage() {
 															</td>
 															{!perms.isReader && (
 																<td className="actions-cell">
-																	{perms.canExecuteWorkflows && (
-																		<button
-																			className="btn btn-sm btn-success"
-																			onClick={() => handleRunTask(t.taskId)}
-																			title="Run this task now"
-																		>
-																			▶
-																		</button>
-																	)}
 																	{perms.canWriteTasks && (
 																		<Link
 																			to={`/tasks/${t.taskId}/edit?workflowId=${id}`}
