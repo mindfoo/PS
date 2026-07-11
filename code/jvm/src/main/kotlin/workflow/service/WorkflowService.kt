@@ -11,7 +11,7 @@ import org.workflow.dto.WorkflowCreateRequest
 import org.workflow.dto.WorkflowResponse
 import org.workflow.dto.WorkflowUpdateRequest
 import org.workflow.entity.Workflow
-import org.workflow.repository.ExecutionLogRepository
+import org.workflow.repository.ExecutionRepository
 import org.workflow.repository.ScheduleRepository
 import org.workflow.repository.TaskRepository
 import org.workflow.repository.WorkflowRepository
@@ -27,7 +27,7 @@ import java.util.UUID
 class WorkflowService(
     private val workflowRepository: WorkflowRepository,
     private val workflowTaskOrderRepository: WorkflowTaskOrderRepository,
-    private val executionLogRepository: ExecutionLogRepository,
+    private val executionRepository: ExecutionRepository,
     private val scheduleRepository: ScheduleRepository,
     private val taskRepository: TaskRepository,
     private val helpers: ServiceHelpers
@@ -100,7 +100,7 @@ class WorkflowService(
 
         val wid = workflow.id ?: return failure(WorkflowError.WorkflowNotFound)
         /* Cascade-delete in FK dependency order: executions → schedules → workflow_tasks_order → tasks → workflow */
-        executionLogRepository.deleteAllByWorkflowId(wid)
+        executionRepository.deleteAllByWorkflowId(wid)
         scheduleRepository.deleteAllByWorkflowId(wid)
         workflowTaskOrderRepository.deleteAllByWorkflowId(wid)
         taskRepository.deleteAllByWorkflowId(wid)
@@ -162,11 +162,11 @@ class WorkflowService(
         // Any authenticated user who can read workflows can poll execution status
         findCurrentUser(authenticationName) ?: return failure(WorkflowError.UserNotFound)
 
-        val ex = executionLogRepository.findByIdOrNull(executionId)
+        val ex = executionRepository.findByIdOrNull(executionId)
             ?: return failure(WorkflowError.ExecutionNotFound)
 
         val exId = ex.id ?: return failure(WorkflowError.ExecutionNotFound)
-        val taskExecs = executionLogRepository
+        val taskExecs = executionRepository
             .findAllByParentExecutionIdOrderByStartedAtAsc(exId)
             .map { child ->
                 TaskExecutionSummary(
@@ -205,10 +205,10 @@ class WorkflowService(
             ?: return failure(WorkflowError.WorkflowNotFound)
 
         val wid = workflow.id ?: return failure(WorkflowError.WorkflowNotFound)
-        val executions = executionLogRepository.findTopLevelByWorkflowIdOrderByStartedAtDesc(wid)
+        val executions = executionRepository.findTopLevelByWorkflowIdOrderByStartedAtDesc(wid)
             .map { ex ->
                 val exId = ex.id ?: return failure(WorkflowError.WorkflowNotFound)
-                val taskExecs = executionLogRepository
+                val taskExecs = executionRepository
                     .findAllByParentExecutionIdOrderByStartedAtAsc(exId)
                     .map { child ->
                         TaskExecutionSummary(
@@ -249,7 +249,7 @@ class WorkflowService(
         )
 
     private fun Workflow.toResponse(): WorkflowResponse {
-        val lastStatus = id?.let { executionLogRepository.findLatestByWorkflowId(it)?.status }
+        val lastStatus = id?.let { executionRepository.findLatestByWorkflowId(it)?.status }
         return WorkflowResponse(
             id = id,
             name = name,

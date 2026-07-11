@@ -9,7 +9,7 @@ import java.time.LocalDateTime
 
 /**
  * Validates the raw token value read from the cookie against the hashed entry in the database.
- * Returns the authenticated [User] or null if the token is absent, unknown, or expired.
+ * Returns the user or null if the token is absent, unknown, or expired.
  */
 @Component
 class RequestTokenProcessor(

@@ -28,7 +28,7 @@ class CustomUserDetailsService(
         val role = user.role
         val roleName = role.name
 
-        // authority: ROLE_ADMIN, ROLE_WRITER, ROLE_READER, ROLE_DEV
+        // ROLE_ADMIN, ROLE_WRITER, ROLE_READER, ROLE_DEV
         val roleAuthority = SimpleGrantedAuthority("ROLE_$roleName")
 
         // authorities from the permission catalogue: workflow:read, task:write, etc.

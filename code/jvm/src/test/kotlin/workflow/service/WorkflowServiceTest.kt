@@ -19,7 +19,7 @@ import org.workflow.entity.WorkflowTaskOrder
 import java.time.LocalDateTime
 import org.workflow.entity.User
 import org.workflow.entity.Workflow
-import org.workflow.repository.ExecutionLogRepository
+import org.workflow.repository.ExecutionRepository
 import org.workflow.repository.ScheduleRepository
 import org.workflow.repository.TaskRepository
 import org.workflow.repository.WorkflowRepository
@@ -36,7 +36,7 @@ class WorkflowServiceTest {
 
     private lateinit var workflowRepository: WorkflowRepository
     private lateinit var wtoRepository: WorkflowTaskOrderRepository
-    private lateinit var executionLogRepository: ExecutionLogRepository
+    private lateinit var executionRepository: ExecutionRepository
     private lateinit var scheduleRepository: ScheduleRepository
     private lateinit var taskRepository: TaskRepository
     private lateinit var helpers: ServiceHelpers
@@ -53,14 +53,14 @@ class WorkflowServiceTest {
     fun setup() {
         workflowRepository    = mockk()
         wtoRepository         = mockk()
-        executionLogRepository = mockk()
+        executionRepository = mockk()
         scheduleRepository    = mockk()
         taskRepository        = mockk()
         helpers              = mockk()
         every { helpers.isAdmin(any()) } answers { firstArg<User>().role.name == RoleType.ADMIN }
         service = WorkflowService(
             workflowRepository, wtoRepository,
-            executionLogRepository, scheduleRepository, taskRepository, helpers
+            executionRepository, scheduleRepository, taskRepository, helpers
         )
     }
 
@@ -72,7 +72,7 @@ class WorkflowServiceTest {
         val wf    = workflow(admin)
         every { helpers.findUser("admin") } returns admin
         every { workflowRepository.findAll() } returns listOf(wf)
-        every { executionLogRepository.findLatestByWorkflowId(any()) } returns null
+        every { executionRepository.findLatestByWorkflowId(any()) } returns null
 
         val result = service.list("admin")
 
@@ -86,7 +86,7 @@ class WorkflowServiceTest {
         val wf    = workflow(alice)
         every { helpers.findUser("alice") } returns alice
         every { workflowRepository.findAllVisible(alice.id!!) } returns listOf(wf)
-        every { executionLogRepository.findLatestByWorkflowId(any()) } returns null
+        every { executionRepository.findLatestByWorkflowId(any()) } returns null
 
         val result = service.list("alice")
 
@@ -112,7 +112,7 @@ class WorkflowServiceTest {
         val wf    = workflow(alice)
         every { helpers.findUser("alice") } returns alice
         every { workflowRepository.findById(wf.id!!) } returns Optional.of(wf)
-        every { executionLogRepository.findLatestByWorkflowId(wf.id!!) } returns null
+        every { executionRepository.findLatestByWorkflowId(wf.id!!) } returns null
 
         val result = service.getById(wf.id!!, "alice")
 
@@ -141,7 +141,7 @@ class WorkflowServiceTest {
         val wf    = workflow(alice)
         every { helpers.findUser("alice") } returns alice
         every { workflowRepository.save(any()) } returns wf
-        every { executionLogRepository.findLatestByWorkflowId(any()) } returns null
+        every { executionRepository.findLatestByWorkflowId(any()) } returns null
 
         val result = service.create(WorkflowCreateRequest("My WF"), "alice")
 
@@ -158,7 +158,7 @@ class WorkflowServiceTest {
         every { helpers.findUser("alice") } returns alice
         every { workflowRepository.findByIdAndOwnerId(wf.id!!, alice.id!!) } returns wf
         every { workflowRepository.save(wf) } returns wf.apply { name = "New Name" }
-        every { executionLogRepository.findLatestByWorkflowId(any()) } returns null
+        every { executionRepository.findLatestByWorkflowId(any()) } returns null
 
         val result = service.update(wf.id!!, WorkflowUpdateRequest("New Name"), "alice")
 
@@ -173,7 +173,7 @@ class WorkflowServiceTest {
         val wf    = workflow(alice)
         every { helpers.findUser("alice") } returns alice
         every { workflowRepository.findByIdAndOwnerId(wf.id!!, alice.id!!) } returns wf
-        every { executionLogRepository.deleteAllByWorkflowId(wf.id!!) } returns Unit
+        every { executionRepository.deleteAllByWorkflowId(wf.id!!) } returns Unit
         every { scheduleRepository.deleteAllByWorkflowId(wf.id!!) } returns Unit
         every { wtoRepository.deleteAllByWorkflowId(wf.id!!) } returns Unit
         every { taskRepository.deleteAllByWorkflowId(wf.id!!) } returns Unit
@@ -206,7 +206,7 @@ class WorkflowServiceTest {
         val wf    = workflow(admin)
         every { helpers.findUser("admin") } returns admin
         every { workflowRepository.findById(wf.id!!) } returns Optional.of(wf)
-        every { executionLogRepository.findLatestByWorkflowId(wf.id!!) } returns null
+        every { executionRepository.findLatestByWorkflowId(wf.id!!) } returns null
 
         val result = service.getById(wf.id!!, "admin")
 
@@ -275,8 +275,8 @@ class WorkflowServiceTest {
         )
         every { helpers.findUser("alice") } returns alice
         every { workflowRepository.findById(wf.id!!) } returns Optional.of(wf)
-        every { executionLogRepository.findTopLevelByWorkflowIdOrderByStartedAtDesc(wf.id!!) } returns listOf(exec)
-        every { executionLogRepository.findAllByParentExecutionIdOrderByStartedAtAsc(exec.id!!) } returns emptyList()
+        every { executionRepository.findTopLevelByWorkflowIdOrderByStartedAtDesc(wf.id!!) } returns listOf(exec)
+        every { executionRepository.findAllByParentExecutionIdOrderByStartedAtAsc(exec.id!!) } returns emptyList()
 
         val result = service.listExecutions(wf.id!!, "alice")
 
@@ -320,8 +320,8 @@ class WorkflowServiceTest {
             startedAt = LocalDateTime.now()
         )
         every { helpers.findUser("alice") } returns alice
-        every { executionLogRepository.findById(execId) } returns Optional.of(exec)
-        every { executionLogRepository.findAllByParentExecutionIdOrderByStartedAtAsc(execId) } returns emptyList()
+        every { executionRepository.findById(execId) } returns Optional.of(exec)
+        every { executionRepository.findAllByParentExecutionIdOrderByStartedAtAsc(execId) } returns emptyList()
 
         val result = service.getExecution(execId, "alice")
 
@@ -344,7 +344,7 @@ class WorkflowServiceTest {
         val alice  = user()
         val execId = UUID.randomUUID()
         every { helpers.findUser("alice") } returns alice
-        every { executionLogRepository.findById(execId) } returns Optional.empty()
+        every { executionRepository.findById(execId) } returns Optional.empty()
 
         val result = service.getExecution(execId, "alice")
 

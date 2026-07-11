@@ -19,7 +19,7 @@ import org.workflow.entity.enums.RoleType
 import org.workflow.entity.Roles
 import org.workflow.entity.Task
 import org.workflow.entity.User
-import org.workflow.repository.ExecutionLogRepository
+import org.workflow.repository.ExecutionRepository
 import org.workflow.repository.TaskRepository
 import org.workflow.repository.WorkflowRepository
 import org.workflow.repository.WorkflowTaskOrderRepository
@@ -35,7 +35,7 @@ import java.util.concurrent.Executors
 
 class ExecutionServiceTest {
 
-    private lateinit var executionLogRepository: ExecutionLogRepository
+    private lateinit var executionRepository: ExecutionRepository
     private lateinit var taskRepository: TaskRepository
     private lateinit var workflowRepository: WorkflowRepository
     private lateinit var wtoRepository: WorkflowTaskOrderRepository
@@ -68,7 +68,7 @@ class ExecutionServiceTest {
 
     @BeforeEach
     fun setup() {
-        executionLogRepository = mockk()
+        executionRepository = mockk()
         taskRepository         = mockk()
         workflowRepository     = mockk()
         wtoRepository          = mockk()
@@ -77,7 +77,7 @@ class ExecutionServiceTest {
         jdbcTemplate           = mockk(relaxed = true)
         every { helpers.isAdmin(any()) } answers { firstArg<User>().role.name == RoleType.ADMIN }
         service = ExecutionService(
-            executionLogRepository, workflowRepository, wtoRepository, taskRepository,
+            executionRepository, workflowRepository, wtoRepository, taskRepository,
             restTemplate, helpers,
             Executors.newVirtualThreadPerTaskExecutor(),
             jdbcTemplate,
@@ -100,14 +100,14 @@ class ExecutionServiceTest {
         val alice = user()
         val exec  = execution(alice, ExecutionStatus.RUNNING)
         every { helpers.findUser("alice") } returns alice
-        every { executionLogRepository.findById(execId) } returns Optional.of(exec)
-        every { executionLogRepository.requestCancellation(execId) } returns 1
-        every { executionLogRepository.findAllByParentExecutionIdOrderByStartedAtAsc(execId) } returns emptyList()
+        every { executionRepository.findById(execId) } returns Optional.of(exec)
+        every { executionRepository.requestCancellation(execId) } returns 1
+        every { executionRepository.findAllByParentExecutionIdOrderByStartedAtAsc(execId) } returns emptyList()
 
         val result = service.cancelExecution(execId, "alice")
 
         assertInstanceOf(Success::class.java, result)
-        verify(exactly = 1) { executionLogRepository.requestCancellation(execId) }
+        verify(exactly = 1) { executionRepository.requestCancellation(execId) }
     }
 
     @Test
@@ -116,9 +116,9 @@ class ExecutionServiceTest {
         val admin = adminUser()
         val exec  = execution(alice, ExecutionStatus.RUNNING)
         every { helpers.findUser("admin") } returns admin
-        every { executionLogRepository.findById(execId) } returns Optional.of(exec)
-        every { executionLogRepository.requestCancellation(execId) } returns 1
-        every { executionLogRepository.findAllByParentExecutionIdOrderByStartedAtAsc(execId) } returns emptyList()
+        every { executionRepository.findById(execId) } returns Optional.of(exec)
+        every { executionRepository.requestCancellation(execId) } returns 1
+        every { executionRepository.findAllByParentExecutionIdOrderByStartedAtAsc(execId) } returns emptyList()
 
         assertInstanceOf(Success::class.java, service.cancelExecution(execId, "admin"))
     }
@@ -128,8 +128,8 @@ class ExecutionServiceTest {
         val alice = user()
         val exec  = execution(alice, ExecutionStatus.SUCCESS)
         every { helpers.findUser("alice") } returns alice
-        every { executionLogRepository.findById(execId) } returns Optional.of(exec)
-        every { executionLogRepository.requestCancellation(execId) } returns 0
+        every { executionRepository.findById(execId) } returns Optional.of(exec)
+        every { executionRepository.requestCancellation(execId) } returns 0
 
         val result = service.cancelExecution(execId, "alice")
         assertEquals(ExecutionError.NotCancelable, (result as Failure).value)
@@ -147,7 +147,7 @@ class ExecutionServiceTest {
     fun `cancelExecution returns NotCancelable when execution not found`() {
         val alice = user()
         every { helpers.findUser("alice") } returns alice
-        every { executionLogRepository.findById(execId) } returns Optional.empty()
+        every { executionRepository.findById(execId) } returns Optional.empty()
 
         val result = service.cancelExecution(execId, "alice")
         assertEquals(ExecutionError.NotCancelable, (result as Failure).value)
@@ -159,7 +159,7 @@ class ExecutionServiceTest {
         val bob   = bob()
         val exec  = execution(alice, ExecutionStatus.RUNNING)
         every { helpers.findUser("bob") } returns bob
-        every { executionLogRepository.findById(execId) } returns Optional.of(exec)
+        every { executionRepository.findById(execId) } returns Optional.of(exec)
 
         val result = service.cancelExecution(execId, "bob")
         assertEquals(ExecutionError.NotCancelable, (result as Failure).value)
@@ -174,7 +174,7 @@ class ExecutionServiceTest {
         val saved = execution(alice, ExecutionStatus.PENDING).also { it.id = execId }
         every { helpers.findUser("alice") } returns alice
         every { taskRepository.findByIdAndOwnerId(taskId, userId) } returns t
-        every { executionLogRepository.save(any()) } returns saved
+        every { executionRepository.save(any()) } returns saved
 
         val result = service.triggerManualTask(taskId, "alice")
 

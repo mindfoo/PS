@@ -11,7 +11,7 @@ import java.util.UUID
 
 /** Data access operations for workflow execution logs. */
 @Repository
-interface ExecutionLogRepository : JpaRepository<Execution, UUID> {
+interface ExecutionRepository : JpaRepository<Execution, UUID> {
 
     /** Top-level workflow executions (not child task records), most recent first. */
     @Query("select e from Execution e where e.workflow.id = :workflowId and e.parentExecutionId is null order by e.startedAt desc")

@@ -6,7 +6,7 @@ import jakarta.annotation.PreDestroy
 import org.postgresql.PGConnection
 import org.postgresql.PGNotification
 import org.workflow.entity.ExecutionStatus
-import org.workflow.repository.ExecutionLogRepository
+import org.workflow.repository.ExecutionRepository
 import org.slf4j.LoggerFactory
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
@@ -29,14 +29,14 @@ data class ExecutionEvent(
 class ExecutionEventService(
     private val dataSource: DataSource,
     private val objectMapper: ObjectMapper,
-    private val executionLogRepository: ExecutionLogRepository
+    private val executionRepository: ExecutionRepository
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
-    /** executionId -> subscribed browser clients for that execution. In-memory only. */
+    /** executionId -> subscribed browser clients for that execution. */
     private val emitters = ConcurrentHashMap<UUID, CopyOnWriteArrayList<SseEmitter>>()
 
-    /** Statuses that mean "still in progress" — anything else is a final outcome. */
+    /** Statuses that trigger notification */
     private val activeStatuses = setOf(ExecutionStatus.PENDING, ExecutionStatus.RUNNING)
 
     @Volatile private var running = true
@@ -48,7 +48,7 @@ class ExecutionEventService(
         private const val RECONNECT_DELAY_MS = 5_000L              // wait time before retrying a dropped DB connection
     }
 
-    // ---------- Listener (Postgres -> this instance) ----------
+    /* ---------- Postgres --------*/
 
     @PostConstruct
     fun startListening() {
@@ -61,7 +61,6 @@ class ExecutionEventService(
         listenerThread.interrupt()
     }
 
-    /** Keeps trying to listen forever, reconnecting after a delay whenever the connection drops. */
     private fun listenWithReconnect() {
         while (running) {
             try {
@@ -84,7 +83,7 @@ class ExecutionEventService(
 
             while (running) {
                 val notifications = pgConnection.getNotifications(POLL_TIMEOUT_MS) ?: continue
-                notifications.forEach(::handleNotification)
+                notifications.forEach { n -> handleNotification(n) }
             }
         }
     }
@@ -98,11 +97,13 @@ class ExecutionEventService(
         }
     }
 
-    // ---------- Subscriptions (this instance -> browser) ----------
+    /* ---------- Browser ----------*/
 
-    /** Registers a new SSE subscription for [executionId] and immediately sends its current status. */
+    /** Registers a new SSE subscription */
     fun subscribe(executionId: UUID): SseEmitter {
         val emitter = SseEmitter(SUBSCRIPTION_TIMEOUT_MS)
+
+        // computeIfAbsent is a special method for concurrent writes on a shared hashmap
         emitters.computeIfAbsent(executionId) { CopyOnWriteArrayList() }.add(emitter)
 
         val cleanup = Runnable { removeEmitter(executionId, emitter) }
@@ -115,10 +116,12 @@ class ExecutionEventService(
     }
 
     private fun sendCatchUpEvent(executionId: UUID, emitter: SseEmitter, cleanup: Runnable) {
-        val execution = executionLogRepository.findByIdOrNull(executionId) ?: return
+        val execution = executionRepository.findByIdOrNull(executionId) ?: return
         val isTerminal = execution.status !in activeStatuses
-        val taskStatuses = executionLogRepository.findTaskStatusesByParentId(executionId)
-            .associate { row -> row[0].toString() to row[1].toString() }
+        val taskStatuses = executionRepository.findTaskStatusesByParentId(executionId)
+            .map { row -> row[0].toString() to row[1].toString() }
+            .toMap()
+
         val event = ExecutionEvent(executionId.toString(), execution.status, taskStatuses, isTerminal)
 
         try {

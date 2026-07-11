@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionSynchronization
 import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.web.client.RestTemplate
+import org.springframework.web.client.exchange
 import org.workflow.entity.Execution
 import org.workflow.entity.ExecutionStatus
 import org.workflow.entity.ExecutionTriggerType
@@ -22,7 +23,7 @@ import org.workflow.entity.TaskType
 import org.workflow.entity.Task
 import org.workflow.entity.User
 import org.workflow.entity.Workflow
-import org.workflow.repository.ExecutionLogRepository
+import org.workflow.repository.ExecutionRepository
 import org.workflow.repository.TaskRepository
 import org.workflow.repository.WorkflowRepository
 import org.workflow.repository.WorkflowTaskOrderRepository
@@ -39,7 +40,7 @@ import java.util.concurrent.Executor
 /** Creates and runs workflow/task executions, including manual and cron-triggered flows. */
 @Service
 class ExecutionService(
-    private val executionLogRepository: ExecutionLogRepository,
+    private val executionRepository: ExecutionRepository,
     private val workflowRepository: WorkflowRepository,
     private val workflowTaskOrderRepository: WorkflowTaskOrderRepository,
     private val taskRepository: TaskRepository,
@@ -66,20 +67,20 @@ class ExecutionService(
         val user = helpers.findUser(authenticationName)
             ?: return failure(ExecutionError.UserNotFound)
 
-        val execution = executionLogRepository.findByIdOrNull(executionId)
+        val execution = executionRepository.findByIdOrNull(executionId)
             ?: return failure(ExecutionError.NotCancelable)
 
         if (!isAdmin(user) && execution.triggeredBy.id != user.id)
             return failure(ExecutionError.NotCancelable)
 
-        val updated = executionLogRepository.requestCancellation(executionId)
+        val updated = executionRepository.requestCancellation(executionId)
         if (updated == 0) return failure(ExecutionError.NotCancelable)
 
         cancelPendingChildren(executionId)
         return success(Unit)
     }
 
-    /** Creates a PENDING workflow execution and runs it asynchronously; returns its id right away. */
+    /** Creates a PENDING workflow execution  */
     @Transactional
     fun triggerManualWorkflow(workflowId: UUID, authenticationName: String): Either<ExecutionError, UUID> {
         val user = helpers.findUser(authenticationName)
@@ -90,7 +91,7 @@ class ExecutionService(
             byOwner = { workflowRepository.findByIdAndOwnerId(workflowId, it) }
         ) ?: return failure(ExecutionError.WorkflowNotFound)
 
-        val execution = executionLogRepository.save(
+        val execution = executionRepository.save(
             Execution(
                 triggeredType = ExecutionTriggerType.MANUAL,
                 type = ExecutionType.WORKFLOW,
@@ -109,7 +110,7 @@ class ExecutionService(
     /** Creates a PENDING workflow execution for a scheduled (CRON) run. */
     @Transactional
     fun createCronExecution(workflow: Workflow, triggeredBy: User): UUID {
-        val execution = executionLogRepository.save(
+        val execution = executionRepository.save(
             Execution(
                 triggeredType = ExecutionTriggerType.CRON,
                 type = ExecutionType.WORKFLOW,
@@ -139,7 +140,7 @@ class ExecutionService(
 
     /** Runs a workflow's stages in order; tasks in the same stage run in parallel. Called on a virtual thread. */
     fun runExecution(executionId: UUID) {
-        val execution = executionLogRepository.findByIdOrNull(executionId) ?: run {
+        val execution = executionRepository.findByIdOrNull(executionId) ?: run {
             log.error("Execution '{}' not found — cannot run", executionId)
             return
         }
@@ -148,13 +149,13 @@ class ExecutionService(
             execution.status = ExecutionStatus.ERROR
             execution.finishedAt = LocalDateTime.now()
             execution.output = mapOf("error" to "Missing workflow for execution")
-            executionLogRepository.save(execution)
+            executionRepository.save(execution)
             return
         }
 
         execution.status = ExecutionStatus.RUNNING
         execution.startedAt = LocalDateTime.now()
-        executionLogRepository.save(execution)
+        executionRepository.save(execution)
         notifyStatusChange(executionId, ExecutionStatus.RUNNING)
 
         var wasCanceled = false
@@ -173,7 +174,6 @@ class ExecutionService(
                 .mapNotNull { row -> row.task.id?.let { id -> id to row.retryPolicy } }
                 .toMap()
 
-            // One PENDING child execution per task, created up front so the UI can show them immediately.
             val taskExecIds: Map<UUID, UUID> = stages.values.flatten()
                 .mapNotNull { task -> task.id?.let { id -> id to createPendingTaskExecution(execution, task) } }
                 .toMap()
@@ -186,7 +186,7 @@ class ExecutionService(
             val taskOutputs = mutableListOf<Map<String, Any>>()
 
             for ((stage, tasksInStage) in stages.entries.sortedBy { it.key }) {
-                if (executionLogRepository.isCancelRequested(executionId)) {
+                if (executionRepository.isCancelRequested(executionId)) {
                     wasCanceled = true
                     break
                 }
@@ -234,7 +234,7 @@ class ExecutionService(
             log.error("Execution {} failed: {}", executionId, ex.message, ex)
         }
 
-        executionLogRepository.save(execution)
+        executionRepository.save(execution)
         log.info("Execution {} finished — status: {}", executionId, execution.status)
         notifyStatusChange(executionId, execution.status, emptyMap(), terminal = true)
     }
@@ -250,7 +250,7 @@ class ExecutionService(
             byOwner = { taskRepository.findByIdAndOwnerId(taskId, it) }
         ) ?: return failure(ExecutionError.TaskNotFound)
 
-        val execution = executionLogRepository.save(
+        val execution = executionRepository.save(
             Execution(
                 triggeredType = ExecutionTriggerType.MANUAL,
                 type = ExecutionType.TASK,
@@ -272,13 +272,13 @@ class ExecutionService(
      * Runs a single manually-triggered task and records its outcome. Runs on a virtual thread.
      */
     private fun runManualTask(executionId: UUID, task: Task) {
-        val execRecord = executionLogRepository.findByIdOrNull(executionId) ?: return
+        val execRecord = executionRepository.findByIdOrNull(executionId) ?: return
 
         if (execRecord.cancelRequested) {
             execRecord.status = ExecutionStatus.CANCELED
             execRecord.finishedAt = LocalDateTime.now()
             execRecord.output = mapOf("info" to "Canceled by user")
-            executionLogRepository.save(execRecord)
+            executionRepository.save(execRecord)
             notifyStatusChange(executionId, ExecutionStatus.CANCELED, terminal = true)
             return
         }
@@ -289,7 +289,7 @@ class ExecutionService(
     }
 
     private fun createPendingTaskExecution(parent: Execution, task: Task): UUID {
-        val child = executionLogRepository.save(
+        val child = executionRepository.save(
             Execution(
                 triggeredType = parent.triggeredType,
                 type = ExecutionType.TASK,
@@ -305,20 +305,20 @@ class ExecutionService(
         return checkNotNull(child.id) { "Child execution id null after save — data integrity violation" }
     }
 
-    /** Marks every still-PENDING child of [executionId] as CANCELED — running children are left alone. */
+    /** Marks every still-PENDING child as CANCELED  */
     private fun cancelPendingChildren(executionId: UUID) {
-        executionLogRepository.findAllByParentExecutionIdOrderByStartedAtAsc(executionId)
+        executionRepository.findAllByParentExecutionIdOrderByStartedAtAsc(executionId)
             .filter { it.status == ExecutionStatus.PENDING }
             .forEach { child ->
                 child.status = ExecutionStatus.CANCELED
                 child.finishedAt = LocalDateTime.now()
-                executionLogRepository.save(child)
+                executionRepository.save(child)
             }
     }
 
-    /** Runs [task] against its child execution record, retrying up to [retryPolicy] times on failure. */
+    /** Runs task */
     private fun runTaskWithTracking(task: Task, childExecutionId: UUID, retryPolicy: Int = 0): Map<String, Any> {
-        val child = executionLogRepository.findByIdOrNull(childExecutionId)
+        val child = executionRepository.findByIdOrNull(childExecutionId)
             ?: return mapOf(
                 "taskId"   to task.id.toString(),
                 "taskName" to task.name,
@@ -327,14 +327,14 @@ class ExecutionService(
             )
         child.status = ExecutionStatus.RUNNING
         child.startedAt = LocalDateTime.now()
-        executionLogRepository.save(child)
+        executionRepository.save(child)
 
         var attempt = 0
         var output: Map<String, Any>
         do {
             if (attempt > 0) {
                 child.retryCount = attempt
-                executionLogRepository.save(child)
+                executionRepository.save(child)
                 Thread.sleep(2_000L)
             }
             output = runTaskWithTime(task)
@@ -345,14 +345,14 @@ class ExecutionService(
         child.retryCount = attempt - 1
         child.finishedAt = LocalDateTime.now()
         child.output = output
-        executionLogRepository.save(child)
+        executionRepository.save(child)
         return output
     }
 
     private fun runTaskWithTime(task: Task): Map<String, Any> {
         val startedMs = System.currentTimeMillis()
         val output = try {
-            runTask(task)
+            runTypeTask(task)
         } catch (ex: Exception) {
             mapOf(
                 "taskId"   to task.id.toString(),
@@ -366,7 +366,7 @@ class ExecutionService(
         return output
     }
 
-    private fun runTask(task: Task): Map<String, Any> {
+    private fun runTypeTask(task: Task): Map<String, Any> {
         return when (task.type.uppercase()) {
             TaskType.SCRIPT -> runScriptTask(task)
             TaskType.HTTP   -> runHttpTask(task)
@@ -415,9 +415,9 @@ class ExecutionService(
         val process = pb.start()
         val (stdout, exitCode) = try {
             val output = process.inputStream.bufferedReader().use { it.readText() }
-            output to process.waitFor()
+            output to process.waitFor() // this is a blocking method
         } finally {
-            if (process.isAlive) process.destroyForcibly() // don't leak the OS process if we get interrupted
+            if (process.isAlive) process.destroyForcibly()
         }
 
         log.info("Task '{}' script '{}' exited {} — output: {}", task.id, cmd.joinToString(" "), exitCode, stdout.take(200))
@@ -433,7 +433,7 @@ class ExecutionService(
         )
     }
 
-    /* Runs an HTTP task via [RestTemplate]. */
+    /* Runs an HTTP task */
     private fun runHttpTask(task: Task): Map<String, Any> {
         val config = task.config
         val rawUrl = config["url"] as? String
@@ -441,14 +441,13 @@ class ExecutionService(
         val method = (config["method"] as? String ?: "GET").uppercase()
 
         val headers = HttpHeaders()
-        @Suppress("UNCHECKED_CAST")
         val headersMap = config["headers"] as? Map<String, String> ?: emptyMap()
         headersMap.forEach { (k, v) -> headers.set(k, v) }
 
         val body = config["body"] as? String
         val entity = HttpEntity(body, headers)
 
-        val response = restTemplate.exchange(rawUrl, HttpMethod.valueOf(method), entity, String::class.java)
+        val response = restTemplate.exchange<String>(rawUrl, HttpMethod.valueOf(method), entity)
 
         log.info("Task '{}' HTTP {} {} — status {}", task.id, method, rawUrl, response.statusCode.value())
 
@@ -468,7 +467,7 @@ class ExecutionService(
 
     private fun isAdmin(user: User) = helpers.isAdmin(user)
 
-    /** Publishes a pg_notify so [ExecutionEventService] can push the update to subscribed SSE clients. */
+    /** Publishes a pg_notify so ExecutionEventService can push the update to subscribed SSE clients. */
     private fun notifyStatusChange(
         executionId: UUID,
         status: String,
