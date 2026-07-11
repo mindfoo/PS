@@ -42,7 +42,7 @@ export default function App() {
 					<Route
 						path="/tasks/new"
 						element={
-							<ProtectedRoute roles={[RoleType.ADMIN, RoleType.WRITER]}>
+							<ProtectedRoute roles={[RoleType.ADMIN, RoleType.WRITER, RoleType.DEV]}>
 								<TaskFormPage />
 							</ProtectedRoute>
 						}
@@ -50,7 +50,7 @@ export default function App() {
 					<Route
 						path="/tasks/:id/edit"
 						element={
-							<ProtectedRoute roles={[RoleType.ADMIN, RoleType.WRITER]}>
+							<ProtectedRoute roles={[RoleType.ADMIN, RoleType.WRITER, RoleType.DEV]}>
 								<TaskFormPage />
 							</ProtectedRoute>
 						}
@@ -58,7 +58,7 @@ export default function App() {
 					<Route
 						path="/workflows/new"
 						element={
-							<ProtectedRoute roles={[RoleType.ADMIN, RoleType.WRITER]}>
+							<ProtectedRoute roles={[RoleType.ADMIN, RoleType.WRITER, RoleType.DEV]}>
 								<WorkflowFormPage />
 							</ProtectedRoute>
 						}
@@ -74,7 +74,7 @@ export default function App() {
 					<Route
 						path="/workflows/:id/edit"
 						element={
-							<ProtectedRoute roles={[RoleType.ADMIN, RoleType.WRITER]}>
+							<ProtectedRoute roles={[RoleType.ADMIN, RoleType.WRITER, RoleType.DEV]}>
 								<WorkflowFormPage />
 							</ProtectedRoute>
 						}
@@ -90,7 +90,7 @@ export default function App() {
 					<Route
 						path="/workflows/:workflowId/tasks/new"
 						element={
-							<ProtectedRoute roles={[RoleType.ADMIN, RoleType.WRITER]}>
+							<ProtectedRoute roles={[RoleType.ADMIN, RoleType.WRITER, RoleType.DEV]}>
 								<TaskFormPage />
 							</ProtectedRoute>
 						}
