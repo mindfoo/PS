@@ -13,8 +13,7 @@ data class ScheduleCreateRequest(
     val cronExpression: String,
     @field:NotBlank
     val timezone: String = "UTC",
-    val enabled: Boolean = true,
-    val description: String? = null
+    val enabled: Boolean = true
 )
 
 /** Payload to change cron settings for an existing schedule. */
@@ -23,8 +22,7 @@ data class ScheduleUpdateRequest(
     val cronExpression: String,
     @field:NotBlank
     val timezone: String,
-    val enabled: Boolean,
-    val description: String? = null
+    val enabled: Boolean
 )
 
 /** Schedule details exposed by the API. */
@@ -36,8 +34,7 @@ data class ScheduleResponse(
     val timezone: String,
     val enabled: Boolean,
     val nextRunAt: LocalDateTime,
-    val lastRunAt: LocalDateTime?,
-    val description: String? = null
+    val lastRunAt: LocalDateTime?
 )
 
 /** Response returned after a manual workflow trigger. */

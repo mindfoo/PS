@@ -40,7 +40,8 @@ class WorkflowService(
 
         val userId = currentUser.id ?: return failure(WorkflowError.UserNotFound)
         val workflows = if (isAdmin(currentUser)) workflowRepository.findAll()
-                         else workflowRepository.findAllVisible(userId)
+                         else workflowRepository.findAllPublic(userId)
+
         return success(workflows.map { it.toResponse() })
     }
 
@@ -82,7 +83,7 @@ class WorkflowService(
         val currentUser = findCurrentUser(authenticationName)
             ?: return failure(WorkflowError.UserNotFound)
 
-        val workflow = findOwnedWorkflow(workflowId, currentUser)
+        val workflow = findPublicWorkflow(workflowId, currentUser)
             ?: return failure(WorkflowError.WorkflowNotFound)
 
         workflow.name = request.name
@@ -95,7 +96,7 @@ class WorkflowService(
         val currentUser = findCurrentUser(authenticationName)
             ?: return failure(WorkflowError.UserNotFound)
 
-        val workflow = findOwnedWorkflow(workflowId, currentUser)
+        val workflow = findPublicWorkflow(workflowId, currentUser)
             ?: return failure(WorkflowError.WorkflowNotFound)
 
         val wid = workflow.id ?: return failure(WorkflowError.WorkflowNotFound)
@@ -118,7 +119,7 @@ class WorkflowService(
         val currentUser = findCurrentUser(authenticationName)
             ?: return failure(WorkflowError.UserNotFound)
 
-        val workflow = findOwnedWorkflow(workflowId, currentUser)
+        val workflow = findPublicWorkflow(workflowId, currentUser)
             ?: return failure(WorkflowError.WorkflowNotFound)
 
         val wid = workflow.id ?: return failure(WorkflowError.WorkflowNotFound)
@@ -145,7 +146,7 @@ class WorkflowService(
         val currentUser = findCurrentUser(authenticationName)
             ?: return failure(WorkflowError.UserNotFound)
 
-        val workflow = findOwnedWorkflow(workflowId, currentUser)
+        val workflow = findPublicWorkflow(workflowId, currentUser)
             ?: return failure(WorkflowError.WorkflowNotFound)
 
         val wid = workflow.id ?: return failure(WorkflowError.WorkflowNotFound)
@@ -159,11 +160,13 @@ class WorkflowService(
 
     @Transactional(readOnly = true)
     fun getExecution(executionId: UUID, authenticationName: String): Either<WorkflowError, ExecutionSummaryResponse> {
-        // Any authenticated user who can read workflows can poll execution status
-        findCurrentUser(authenticationName) ?: return failure(WorkflowError.UserNotFound)
+        val currentUser = findCurrentUser(authenticationName)
+            ?: return failure(WorkflowError.UserNotFound)
 
         val ex = executionRepository.findByIdOrNull(executionId)
             ?: return failure(WorkflowError.ExecutionNotFound)
+
+        if (!canViewExecution(ex, currentUser)) return failure(WorkflowError.AccessDenied)
 
         val exId = ex.id ?: return failure(WorkflowError.ExecutionNotFound)
         val taskExecs = executionRepository
@@ -241,12 +244,26 @@ class WorkflowService(
     private fun findCurrentUser(username: String) = helpers.findUser(username)
     private fun isAdmin(user: org.workflow.entity.User) = helpers.isAdmin(user)
 
-    /** Admins can access any workflow by ID; other users only their own. */
-    private fun findOwnedWorkflow(workflowId: UUID, currentUser: org.workflow.entity.User): Workflow? =
-        findOwned(isAdmin(currentUser), currentUser.id,
-            byId = { workflowRepository.findByIdOrNull(workflowId) },
-            byOwner = { workflowRepository.findByIdAndOwnerId(workflowId, it) }
-        )
+    /** Public workflows are accessible to everyone; private ones only to their owner and admins. */
+    private fun findPublicWorkflow(workflowId: UUID, currentUser: org.workflow.entity.User): Workflow? {
+        val workflow = workflowRepository.findByIdOrNull(workflowId) ?: return null
+        return if (isPublic(workflow.isPrivate, workflow.createdBy.id, isAdmin(currentUser), currentUser.id)) workflow else null
+    }
+
+    /**
+     * An execution is viewable when the caller triggered it, is an admin, or can access the
+     * workflow/task it belongs to (public resource, or private resource they own).
+     */
+    private fun canViewExecution(execution: org.workflow.entity.Execution, currentUser: org.workflow.entity.User): Boolean {
+        if (isAdmin(currentUser) || execution.triggeredBy.id == currentUser.id) return true
+
+        val workflow = execution.workflow ?: execution.task?.workflow
+        if (workflow != null) {
+            return isPublic(workflow.isPrivate, workflow.createdBy.id, isAdmin(currentUser), currentUser.id)
+        }
+        val task = execution.task
+        return task != null && isPublic(task.isPrivate, task.createdBy?.id, isAdmin(currentUser), currentUser.id)
+    }
 
     private fun Workflow.toResponse(): WorkflowResponse {
         val lastStatus = id?.let { executionRepository.findLatestByWorkflowId(it)?.status }

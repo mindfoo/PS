@@ -86,10 +86,8 @@ class ExecutionService(
         val user = helpers.findUser(authenticationName)
             ?: return failure(ExecutionError.UserNotFound)
 
-        val workflow = findOwned(isAdmin(user), user.id,
-            byId = { workflowRepository.findByIdOrNull(workflowId) },
-            byOwner = { workflowRepository.findByIdAndOwnerId(workflowId, it) }
-        ) ?: return failure(ExecutionError.WorkflowNotFound)
+        val workflow = findPublicWorkflow(workflowId, user)
+            ?: return failure(ExecutionError.WorkflowNotFound)
 
         val execution = executionRepository.save(
             Execution(
@@ -245,10 +243,8 @@ class ExecutionService(
         val user = helpers.findUser(authenticationName)
             ?: return failure(ExecutionError.UserNotFound)
 
-        val task = findOwned(isAdmin(user), user.id,
-            byId = { taskRepository.findByIdOrNull(taskId) },
-            byOwner = { taskRepository.findByIdAndOwnerId(taskId, it) }
-        ) ?: return failure(ExecutionError.TaskNotFound)
+        val task = findPublicTask(taskId, user)
+            ?: return failure(ExecutionError.TaskNotFound)
 
         val execution = executionRepository.save(
             Execution(
@@ -466,6 +462,18 @@ class ExecutionService(
     /* ---------- Helpers ---------- */
 
     private fun isAdmin(user: User) = helpers.isAdmin(user)
+
+    /** Public workflows are accessible to everyone; private ones only to their owner and admins. */
+    private fun findPublicWorkflow(workflowId: UUID, user: User): Workflow? {
+        val workflow = workflowRepository.findByIdOrNull(workflowId) ?: return null
+        return if (isPublic(workflow.isPrivate, workflow.createdBy.id, isAdmin(user), user.id)) workflow else null
+    }
+
+    /** Public tasks are accessible to everyone; private ones only to their owner and admins. */
+    private fun findPublicTask(taskId: UUID, user: User): Task? {
+        val task = taskRepository.findByIdOrNull(taskId) ?: return null
+        return if (isPublic(task.isPrivate, task.createdBy?.id, isAdmin(user), user.id)) task else null
+    }
 
     /** Publishes a pg_notify so ExecutionEventService can push the update to subscribed SSE clients. */
     private fun notifyStatusChange(

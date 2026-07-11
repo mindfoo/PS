@@ -39,7 +39,7 @@ class ScheduleService(
         val schedules = if (isAdmin(user)) {
             scheduleRepository.findAll()
         } else {
-            scheduleRepository.findAllByOwnerId(userId)
+            scheduleRepository.findAllPublic(userId)
         }
         return success(schedules.map { it.toResponse() })
     }
@@ -49,7 +49,7 @@ class ScheduleService(
         val user = findUser(authenticationName)
             ?: return failure(ScheduleError.UserNotFound)
 
-        val schedule = findOwnedSchedule(scheduleId, user)
+        val schedule = findPublicSchedule(scheduleId, user)
             ?: return failure(ScheduleError.ScheduleNotFound)
 
         return success(schedule.toResponse())
@@ -61,11 +61,9 @@ class ScheduleService(
             ?: return failure(ScheduleError.UserNotFound)
 
         val userId = user.id ?: return failure(ScheduleError.UserNotFound)
-        val workflow = if (isAdmin(user)) {
-            workflowRepository.findByIdOrNull(request.workflowId)
-        } else {
-            workflowRepository.findByIdAndOwnerId(request.workflowId, userId)
-        } ?: return failure(ScheduleError.WorkflowNotFound)
+        val workflow = workflowRepository.findByIdOrNull(request.workflowId)
+            ?.takeIf { isPublic(it.isPrivate, it.createdBy.id, isAdmin(user), userId) }
+            ?: return failure(ScheduleError.WorkflowNotFound)
 
         val nextRun = computeNextRun(request.cronExpression, request.timezone)
             ?: return failure(ScheduleError.InvalidCronExpression)
@@ -76,8 +74,7 @@ class ScheduleService(
             timezone = request.timezone,
             enabled = request.enabled,
             nextRunAt = nextRun,
-            createdBy = user,
-            description = request.description
+            createdBy = user
         )
 
         return success(scheduleRepository.save(schedule).toResponse())
@@ -92,7 +89,7 @@ class ScheduleService(
         val user = findUser(authenticationName)
             ?: return failure(ScheduleError.UserNotFound)
 
-        val schedule = findOwnedSchedule(scheduleId, user)
+        val schedule = findPublicSchedule(scheduleId, user)
             ?: return failure(ScheduleError.ScheduleNotFound)
 
         val nextRun = computeNextRun(request.cronExpression, request.timezone)
@@ -102,7 +99,6 @@ class ScheduleService(
         schedule.timezone = request.timezone
         schedule.enabled = request.enabled
         schedule.nextRunAt = nextRun
-        schedule.description = request.description
 
         return success(scheduleRepository.save(schedule).toResponse())
     }
@@ -112,7 +108,7 @@ class ScheduleService(
         val user = findUser(authenticationName)
             ?: return failure(ScheduleError.UserNotFound)
 
-        val schedule = findOwnedSchedule(scheduleId, user)
+        val schedule = findPublicSchedule(scheduleId, user)
             ?: return failure(ScheduleError.ScheduleNotFound)
 
         scheduleRepository.delete(schedule)
@@ -151,12 +147,12 @@ class ScheduleService(
     private fun findUser(username: String) = helpers.findUser(username)
     private fun isAdmin(user: User) = helpers.isAdmin(user)
 
-    /** Admins can access any schedule by ID; other users only their own. */
-    private fun findOwnedSchedule(scheduleId: UUID, user: User): Schedule? =
-        findOwned(isAdmin(user), user.id,
-            byId = { scheduleRepository.findByIdOrNull(scheduleId) },
-            byOwner = { scheduleRepository.findByIdAndOwnerId(scheduleId, it) }
-        )
+    /** Schedules follow their workflow's visibility: public workflows plus the user's own private ones. */
+    private fun findPublicSchedule(scheduleId: UUID, user: User): Schedule? {
+        val schedule = scheduleRepository.findByIdOrNull(scheduleId) ?: return null
+        val workflow = schedule.workflow
+        return if (isPublic(workflow.isPrivate, workflow.createdBy.id, isAdmin(user), user.id)) schedule else null
+    }
 
     private fun Schedule.toResponse(): ScheduleResponse =
         ScheduleResponse(
@@ -167,7 +163,6 @@ class ScheduleService(
             timezone = timezone,
             enabled = enabled,
             nextRunAt = nextRunAt,
-            lastRunAt = lastRunAt,
-            description = description
+            lastRunAt = lastRunAt
         )
 }

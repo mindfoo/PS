@@ -85,7 +85,7 @@ class WorkflowServiceTest {
         val alice = user()
         val wf    = workflow(alice)
         every { helpers.findUser("alice") } returns alice
-        every { workflowRepository.findAllVisible(alice.id!!) } returns listOf(wf)
+        every { workflowRepository.findAllPublic(alice.id!!) } returns listOf(wf)
         every { executionRepository.findLatestByWorkflowId(any()) } returns null
 
         val result = service.list("alice")
@@ -156,7 +156,7 @@ class WorkflowServiceTest {
         val alice = user()
         val wf    = workflow(alice)
         every { helpers.findUser("alice") } returns alice
-        every { workflowRepository.findByIdAndOwnerId(wf.id!!, alice.id!!) } returns wf
+        every { workflowRepository.findById(wf.id!!) } returns Optional.of(wf)
         every { workflowRepository.save(wf) } returns wf.apply { name = "New Name" }
         every { executionRepository.findLatestByWorkflowId(any()) } returns null
 
@@ -172,7 +172,7 @@ class WorkflowServiceTest {
         val alice = user()
         val wf    = workflow(alice)
         every { helpers.findUser("alice") } returns alice
-        every { workflowRepository.findByIdAndOwnerId(wf.id!!, alice.id!!) } returns wf
+        every { workflowRepository.findById(wf.id!!) } returns Optional.of(wf)
         every { executionRepository.deleteAllByWorkflowId(wf.id!!) } returns Unit
         every { scheduleRepository.deleteAllByWorkflowId(wf.id!!) } returns Unit
         every { wtoRepository.deleteAllByWorkflowId(wf.id!!) } returns Unit
@@ -190,7 +190,7 @@ class WorkflowServiceTest {
         val alice = user()
         val id    = UUID.randomUUID()
         every { helpers.findUser("alice") } returns alice
-        every { workflowRepository.findByIdAndOwnerId(id, alice.id!!) } returns null
+        every { workflowRepository.findById(id) } returns Optional.empty()
 
         val result = service.delete(id, "alice")
 
@@ -242,7 +242,7 @@ class WorkflowServiceTest {
         val alice = user()
         val id    = UUID.randomUUID()
         every { helpers.findUser("alice") } returns alice
-        every { workflowRepository.findByIdAndOwnerId(id, alice.id!!) } returns null
+        every { workflowRepository.findById(id) } returns Optional.empty()
 
         val result = service.update(id, WorkflowUpdateRequest("New"), "alice")
 
@@ -363,7 +363,7 @@ class WorkflowServiceTest {
         val wto     = WorkflowTaskOrder(id = orderId, workflow = wf, task = t, taskOrder = 1)
         val request = TaskReorderRequest(items = listOf(TaskOrderItem(orderId = orderId, taskOrder = 2)))
         every { helpers.findUser("alice") } returns alice
-        every { workflowRepository.findByIdAndOwnerId(wf.id!!, alice.id!!) } returns wf
+        every { workflowRepository.findById(wf.id!!) } returns Optional.of(wf)
         every { wtoRepository.findAllByWorkflowIdOrderByTaskOrderAsc(wf.id!!) } returns listOf(wto)
         every { wtoRepository.saveAll(any<Iterable<WorkflowTaskOrder>>()) } returns mutableListOf(wto)
 
@@ -388,7 +388,7 @@ class WorkflowServiceTest {
         val alice   = user()
         val id      = UUID.randomUUID()
         every { helpers.findUser("alice") } returns alice
-        every { workflowRepository.findByIdAndOwnerId(id, alice.id!!) } returns null
+        every { workflowRepository.findById(id) } returns Optional.empty()
 
         val result = service.reorderTasks(id, TaskReorderRequest(emptyList()), "alice")
 
@@ -406,7 +406,7 @@ class WorkflowServiceTest {
         val wto     = WorkflowTaskOrder(id = UUID.randomUUID(), workflow = wf, task = t, taskOrder = 1, retryPolicy = 0)
         val request = RetryPolicyUpdateRequest(retryPolicy = 3)
         every { helpers.findUser("alice") } returns alice
-        every { workflowRepository.findByIdAndOwnerId(wf.id!!, alice.id!!) } returns wf
+        every { workflowRepository.findById(wf.id!!) } returns Optional.of(wf)
         every { wtoRepository.findByWorkflowIdAndTaskId(wf.id!!, t.id!!) } returns wto
         every { wtoRepository.save(wto) } returns wto
 
@@ -432,7 +432,7 @@ class WorkflowServiceTest {
         val wf     = workflow(alice)
         val taskId = UUID.randomUUID()
         every { helpers.findUser("alice") } returns alice
-        every { workflowRepository.findByIdAndOwnerId(wf.id!!, alice.id!!) } returns wf
+        every { workflowRepository.findById(wf.id!!) } returns Optional.of(wf)
         every { wtoRepository.findByWorkflowIdAndTaskId(wf.id!!, taskId) } returns null
 
         val result = service.updateRetryPolicy(wf.id!!, taskId, RetryPolicyUpdateRequest(2), "alice")

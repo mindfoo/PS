@@ -37,9 +37,6 @@ class Schedule(
 
     var lastRunAt: LocalDateTime? = null,
 
-    @Column(length = 128)
-    var description: String? = null,
-
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by", nullable = false)
     var createdBy: User

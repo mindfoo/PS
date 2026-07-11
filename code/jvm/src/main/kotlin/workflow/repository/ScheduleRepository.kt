@@ -19,14 +19,8 @@ interface ScheduleRepository : JpaRepository<Schedule, UUID> {
     @Query("select s from Schedule s where s.enabled = true and s.nextRunAt <= :now")
     fun findDueSchedulesForUpdate(@Param("now") now: LocalDateTime): List<Schedule>
 
-    @Query("select s from Schedule s where s.createdBy.id = :userId")
-    fun findAllByOwnerId(@Param("userId") userId: UUID): List<Schedule>
-
-    @Query("select s from Schedule s where s.id = :scheduleId and s.createdBy.id = :userId")
-    fun findByIdAndOwnerId(
-        @Param("scheduleId") scheduleId: UUID,
-        @Param("userId") userId: UUID
-    ): Schedule?
+    @Query("select s from Schedule s where s.workflow.isPrivate = false or s.workflow.createdBy.id = :userId")
+    fun findAllPublic(@Param("userId") userId: UUID): List<Schedule>
 
     @Modifying
     @Query("delete from Schedule s where s.workflow.id = :workflowId")

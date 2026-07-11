@@ -22,6 +22,7 @@ import org.workflow.service.utils.ScheduleError
 import org.workflow.utils.Failure
 import org.workflow.utils.Success
 import java.time.LocalDateTime
+import java.util.Optional
 import java.util.UUID
 
 class ScheduleServiceTest {
@@ -74,7 +75,8 @@ class ScheduleServiceTest {
     fun `list returns owned schedules for non-admin`() {
         val alice = user()
         every { helpers.findUser("alice") } returns alice
-        every { scheduleRepository.findAllByOwnerId(alice.id!!) } returns listOf(schedule(alice, workflow(alice)))
+
+        every { scheduleRepository.findAllPublic(alice.id!!) } returns listOf(schedule(alice, workflow(alice)))
 
         val result = service.list("alice")
 
@@ -98,7 +100,7 @@ class ScheduleServiceTest {
         val alice = user()
         val s     = schedule(alice, workflow(alice))
         every { helpers.findUser("alice") } returns alice
-        every { scheduleRepository.findByIdAndOwnerId(scheduleId, alice.id!!) } returns s
+        every { scheduleRepository.findById(scheduleId) } returns Optional.of(s)
 
         val result = service.getById(scheduleId, "alice")
 
@@ -109,7 +111,7 @@ class ScheduleServiceTest {
     fun `getById returns ScheduleNotFound when missing`() {
         val alice = user()
         every { helpers.findUser("alice") } returns alice
-        every { scheduleRepository.findByIdAndOwnerId(scheduleId, alice.id!!) } returns null
+        every { scheduleRepository.findById(scheduleId) } returns Optional.empty()
 
         val result = service.getById(scheduleId, "alice")
 
@@ -125,7 +127,7 @@ class ScheduleServiceTest {
         val wf    = workflow(alice)
         val s     = schedule(alice, wf)
         every { helpers.findUser("alice") } returns alice
-        every { workflowRepository.findByIdAndOwnerId(wfId, alice.id!!) } returns wf
+        every { workflowRepository.findById(wfId) } returns Optional.of(wf)
         every { scheduleRepository.save(any()) } returns s
 
         val result = service.create(ScheduleCreateRequest(wfId, validCron, "UTC"), "alice")
@@ -139,7 +141,7 @@ class ScheduleServiceTest {
         val alice = user()
         val wf    = workflow(alice)
         every { helpers.findUser("alice") } returns alice
-        every { workflowRepository.findByIdAndOwnerId(wfId, alice.id!!) } returns wf
+        every { workflowRepository.findById(wfId) } returns Optional.of(wf)
 
         val result = service.create(ScheduleCreateRequest(wfId, invalidCron, "UTC"), "alice")
 
@@ -151,7 +153,7 @@ class ScheduleServiceTest {
     fun `create returns WorkflowNotFound when workflow not found`() {
         val alice = user()
         every { helpers.findUser("alice") } returns alice
-        every { workflowRepository.findByIdAndOwnerId(wfId, alice.id!!) } returns null
+        every { workflowRepository.findById(wfId) } returns Optional.empty()
 
         val result = service.create(ScheduleCreateRequest(wfId, validCron, "UTC"), "alice")
 
@@ -166,7 +168,7 @@ class ScheduleServiceTest {
         val alice = user()
         val s     = schedule(alice, workflow(alice))
         every { helpers.findUser("alice") } returns alice
-        every { scheduleRepository.findByIdAndOwnerId(scheduleId, alice.id!!) } returns s
+        every { scheduleRepository.findById(scheduleId) } returns Optional.of(s)
         every { scheduleRepository.save(s) } returns s
 
         val result = service.update(scheduleId,
@@ -180,7 +182,7 @@ class ScheduleServiceTest {
         val alice = user()
         val s     = schedule(alice, workflow(alice))
         every { helpers.findUser("alice") } returns alice
-        every { scheduleRepository.findByIdAndOwnerId(scheduleId, alice.id!!) } returns s
+        every { scheduleRepository.findById(scheduleId) } returns Optional.of(s)
 
         val result = service.update(scheduleId,
             ScheduleUpdateRequest(invalidCron, "UTC", true), "alice")
@@ -196,7 +198,7 @@ class ScheduleServiceTest {
         val alice = user()
         val s     = schedule(alice, workflow(alice))
         every { helpers.findUser("alice") } returns alice
-        every { scheduleRepository.findByIdAndOwnerId(scheduleId, alice.id!!) } returns s
+        every { scheduleRepository.findById(scheduleId) } returns Optional.of(s)
         every { scheduleRepository.delete(s) } returns Unit
 
         val result = service.delete(scheduleId, "alice")
@@ -209,7 +211,7 @@ class ScheduleServiceTest {
     fun `delete returns ScheduleNotFound when missing`() {
         val alice = user()
         every { helpers.findUser("alice") } returns alice
-        every { scheduleRepository.findByIdAndOwnerId(scheduleId, alice.id!!) } returns null
+        every { scheduleRepository.findById(scheduleId) } returns Optional.empty()
 
         val result = service.delete(scheduleId, "alice")
 

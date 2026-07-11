@@ -13,7 +13,6 @@ interface ScheduleSlot {
 	days: number[];
 	hour: number;
 	minute: number;
-	description: string;
 }
 
 const DAY_LABELS: [number, string][] = [
@@ -59,7 +58,7 @@ function formatUtcDate(dateStr: string | null): string {
 
 /* Placeholder values for form */
 function defaultSlot(): ScheduleSlot {
-	return { everyDay: true, days: [], hour: 9, minute: 0, description: "" };
+	return { everyDay: true, days: [], hour: 9, minute: 0 };
 }
 
 function slotToCron(slot: ScheduleSlot): string {
@@ -69,7 +68,7 @@ function slotToCron(slot: ScheduleSlot): string {
 	return `0 ${slot.minute} ${slot.hour} * * ${daysPart}`;
 }
 
-function cronToSlot(cron: string, description: string): ScheduleSlot {
+function cronToSlot(cron: string): ScheduleSlot {
 	/* Spring 6-field cron: sec min hour day month dayOfWeek */
 	const parts = cron.trim().split(/\s+/);
 	const minute = parseInt(parts[1] ?? "0", 10);
@@ -77,8 +76,9 @@ function cronToSlot(cron: string, description: string): ScheduleSlot {
 	const daysPart = parts[5] ?? "*";
 	const everyDay = daysPart === "*";
 	const days = everyDay ? [] : daysPart.split(",").map(Number);
-	return { everyDay, days, hour, minute, description };
+	return { everyDay, days, hour, minute };
 }
+
 
 function slotDescription(slot: ScheduleSlot): string {
 	const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -92,7 +92,6 @@ function slotDescription(slot: ScheduleSlot): string {
 	return `${daysStr} at ${time}`;
 }
 
-/* Slot row component */
 
 function SlotRow({
 	slot,
@@ -164,17 +163,6 @@ function SlotRow({
 					</div>
 				</div>
 
-				<div className="form-group slot-desc">
-					<label>
-						Label <small>(optional)</small>
-					</label>
-					<input
-						value={slot.description}
-						onChange={(e) => onChange({ ...slot, description: e.target.value })}
-						placeholder={slotDescription(slot)}
-					/>
-				</div>
-
 				{showRemove && (
 					<button type="button" className="btn btn-sm btn-danger slot-remove" onClick={onRemove}>
 						✕
@@ -201,7 +189,6 @@ export function SchedulesPage() {
 	const preselectedWorkflowId = searchParams.get("workflowId") ?? "";
 	const navigate = useNavigate();
 
-	// Form state
 	const [workflowId, setWorkflowId] = useState(preselectedWorkflowId);
 	const [slots, setSlots] = useState<ScheduleSlot[]>([defaultSlot()]);
 	const [timezone, setTimezone] = useState(browserTimezone());
@@ -239,7 +226,7 @@ export function SchedulesPage() {
 	function openEdit(s: ScheduleResponse) {
 		setEditTarget(s);
 		setWorkflowId(s.workflowId);
-		setSlots([cronToSlot(s.cronExpression, s.description ?? "")]);
+		setSlots([cronToSlot(s.cronExpression)]);
 		setTimezone(s.timezone);
 		setEnabled(s.enabled);
 		setShowForm(true);
@@ -268,7 +255,6 @@ export function SchedulesPage() {
 					cronExpression: slotToCron(slot),
 					timezone,
 					enabled,
-					description: slot.description || slotDescription(slot),
 				});
 				setSchedules((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
 			} else {
@@ -279,7 +265,6 @@ export function SchedulesPage() {
 							cronExpression: slotToCron(slot),
 							timezone,
 							enabled,
-							description: slot.description || slotDescription(slot),
 						}),
 					),
 				);
@@ -409,7 +394,6 @@ export function SchedulesPage() {
 						<thead>
 							<tr>
 								<th>Workflow</th>
-								<th>Schedule</th>
 								<th>Cron</th>
 								<th>Timezone</th>
 								<th>Status</th>
@@ -429,7 +413,6 @@ export function SchedulesPage() {
 											{s.workflowName}
 										</button>
 									</td>
-									<td>{s.description ?? "—"}</td>
 									<td>
 										<code>{s.cronExpression}</code>
 									</td>

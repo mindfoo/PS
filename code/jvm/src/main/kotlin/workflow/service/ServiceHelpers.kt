@@ -20,8 +20,8 @@ class ServiceHelpers(private val userRepository: UserRepository) {
 
 }
 
-/** Admins can look up any resource by id; other users are restricted to resources they own. */
-fun <T> findOwned(isAdmin: Boolean, userId: UUID?, byId: () -> T?, byOwner: (UUID) -> T?): T? {
-    if (userId == null) return null
-    return if (isAdmin) byId() else byOwner(userId)
-}
+/**
+ * Rule for when it is public,
+ */
+fun isPublic(isPrivate: Boolean, ownerId: UUID?, isAdmin: Boolean, userId: UUID?): Boolean =
+    isAdmin || !isPrivate || (ownerId != null && ownerId == userId)

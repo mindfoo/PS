@@ -9,7 +9,6 @@ const baseSched = {
 	enabled: true,
 	nextRunAt: "2026-06-01T09:30:00",
 	lastRunAt: null,
-	description: null,
 };
 
 function mockFetch(body: unknown, ok = true, status = 200) {

@@ -173,7 +173,7 @@ class ExecutionServiceTest {
         val t     = task(alice)
         val saved = execution(alice, ExecutionStatus.PENDING).also { it.id = execId }
         every { helpers.findUser("alice") } returns alice
-        every { taskRepository.findByIdAndOwnerId(taskId, userId) } returns t
+        every { taskRepository.findById(taskId) } returns Optional.of(t)
         every { executionRepository.save(any()) } returns saved
 
         val result = service.triggerManualTask(taskId, "alice")
@@ -195,8 +195,10 @@ class ExecutionServiceTest {
     @Test
     fun `triggerManualTask returns TaskNotFound when task not accessible to user`() {
         val alice = user()
+        val otherOwner = User(id = UUID.randomUUID(), username = "bob", passwordValidation = "h", role = role())
+        val privateTask = Task(id = taskId, name = "Secret", type = "SCRIPT", config = emptyMap(), createdBy = otherOwner, isPrivate = true)
         every { helpers.findUser("alice") } returns alice
-        every { taskRepository.findByIdAndOwnerId(taskId, userId) } returns null
+        every { taskRepository.findById(taskId) } returns Optional.of(privateTask)
 
         val result = service.triggerManualTask(taskId, "alice")
 

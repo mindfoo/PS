@@ -41,13 +41,15 @@ class TaskService(
 
         val userId = currentUser.id ?: return failure(TaskError.UserNotFound)
         val tasks = if (isAdmin(currentUser)) taskRepository.findAll()
-                     else taskRepository.findAllVisible(userId)
+                     else taskRepository.findAllPublic(userId)
+
         val taskIds = tasks.mapNotNull { it.id }.toSet()
         val linkedWorkflowByTaskId: Map<UUID, UUID?> = if (taskIds.isNotEmpty()) {
             workflowTaskOrderRepository.findAllByTaskIdIn(taskIds)
                 .mapNotNull { wto -> wto.task.id?.let { id -> id to wto } }
                 .groupBy({ it.first }, { it.second })
                 .mapValues { (_, wtos) -> wtos.firstOrNull()?.workflow?.id }
+
         } else emptyMap()
         return success(tasks.map { task ->
             task.toResponse(task.workflow?.id ?: linkedWorkflowByTaskId[task.id])
@@ -110,7 +112,7 @@ class TaskService(
 
         val task = taskRepository.findByIdOrNull(taskId)
             ?: return failure(TaskError.TaskNotFound)
-        if (!isAdmin(currentUser) && task.isPrivate && task.createdBy?.id != currentUser.id) {
+        if (!isPublic(task.isPrivate, task.createdBy?.id, isAdmin(currentUser), currentUser.id)) {
             return failure(TaskError.AccessDenied)
         }
 
@@ -125,7 +127,7 @@ class TaskService(
             ?: return failure(TaskError.UserNotFound)
 
         val workflow = if (request.workflowId != null) {
-            findAccessibleWorkflow(request.workflowId, currentUser)
+            findPublicWorkflow(request.workflowId, currentUser)
                 ?: return failure(TaskError.WorkflowNotFound)
         } else null
 
@@ -159,7 +161,7 @@ class TaskService(
         val currentUser = findCurrentUser(authenticationName)
             ?: return failure(TaskError.UserNotFound)
 
-        val task = findOwnedTask(taskId, currentUser)
+        val task = findPublicTask(taskId, currentUser)
             ?: return failure(TaskError.TaskNotFound)
 
         task.name = request.name
@@ -175,7 +177,7 @@ class TaskService(
         val currentUser = findCurrentUser(authenticationName)
             ?: return failure(TaskError.UserNotFound)
 
-        val task = findOwnedTask(taskId, currentUser)
+        val task = findPublicTask(taskId, currentUser)
             ?: return failure(TaskError.TaskNotFound)
 
         val tId = task.id ?: return failure(TaskError.TaskNotFound)
@@ -191,10 +193,10 @@ class TaskService(
         val currentUser = findCurrentUser(authenticationName)
             ?: return failure(TaskError.UserNotFound)
 
-        val task = findOwnedTask(taskId, currentUser)
+        val task = findPublicTask(taskId, currentUser)
             ?: return failure(TaskError.TaskNotFound)
 
-        val workflow = findAccessibleWorkflow(workflowId, currentUser)
+        val workflow = findPublicWorkflow(workflowId, currentUser)
             ?: return failure(TaskError.WorkflowNotFound)
 
         val wfId = workflow.id ?: return failure(TaskError.WorkflowNotFound)
@@ -217,10 +219,10 @@ class TaskService(
         val currentUser = findCurrentUser(authenticationName)
             ?: return failure(TaskError.UserNotFound)
 
-        val task = findOwnedTask(taskId, currentUser)
+        val task = findPublicTask(taskId, currentUser)
             ?: return failure(TaskError.TaskNotFound)
 
-        val workflow = findAccessibleWorkflow(workflowId, currentUser)
+        val workflow = findPublicWorkflow(workflowId, currentUser)
             ?: return failure(TaskError.WorkflowNotFound)
 
         val wfId = workflow.id ?: return failure(TaskError.WorkflowNotFound)
@@ -230,7 +232,6 @@ class TaskService(
 
         workflowTaskOrderRepository.deleteAll(rows)
 
-        // Clear the direct FK if it still points to this workflow (set when task was created inside it)
         if (task.workflow?.id == workflow.id) {
             task.workflow = null
             taskRepository.save(task)
@@ -239,7 +240,6 @@ class TaskService(
         return success(Unit)
     }
 
-    /** Filenames sitting in [scriptsBaseDir] — placed there manually by DEV/ADMIN — offered as choices when configuring a SCRIPT task. */
     fun listAvailableScripts(): List<String> {
         val dir = Paths.get(scriptsBaseDir)
         if (!Files.isDirectory(dir)) return emptyList()
@@ -254,29 +254,28 @@ class TaskService(
 
     // Helpers
 
-    private fun findAccessibleWorkflow(workflowId: UUID, user: User): org.workflow.entity.Workflow? =
-        findOwned(isAdmin(user), user.id,
-            byId = { workflowRepository.findByIdOrNull(workflowId) },
-            byOwner = { workflowRepository.findByIdAndOwnerId(workflowId, it) }
-        )
+    /** Public workflows are accessible to everyone; private ones only to their owner and admins. */
+    private fun findPublicWorkflow(workflowId: UUID, user: User): org.workflow.entity.Workflow? {
+        val workflow = workflowRepository.findByIdOrNull(workflowId) ?: return null
+        return if (isPublic(workflow.isPrivate, workflow.createdBy.id, isAdmin(user), user.id)) workflow else null
+    }
 
-    /** Admins can access any task by ID; other users only their own. */
-    private fun findOwnedTask(taskId: UUID, user: User): Task? =
-        findOwned(isAdmin(user), user.id,
-            byId = { taskRepository.findByIdOrNull(taskId) },
-            byOwner = { taskRepository.findByIdAndOwnerId(taskId, it) }
-        )
+    /** Public tasks are accessible to everyone; private ones only to their owner and admins. */
+    private fun findPublicTask(taskId: UUID, user: User): Task? {
+        val task = taskRepository.findByIdOrNull(taskId) ?: return null
+        return if (isPublic(task.isPrivate, task.createdBy?.id, isAdmin(user), user.id)) task else null
+    }
 
     private fun findCurrentUser(username: String) = helpers.findUser(username)
     private fun isAdmin(user: User) = helpers.isAdmin(user)
 
-    private fun Task.toResponse(effectiveWorkflowId: UUID? = workflow?.id): TaskResponse =
+    private fun Task.toResponse(workflowId: UUID? = workflow?.id): TaskResponse =
         TaskResponse(
             id = id,
             name = name,
             type = type,
             config = config,
-            workflowId = effectiveWorkflowId,
+            workflowId = workflowId,
             isPrivate = isPrivate
         )
 }
