@@ -12,10 +12,6 @@ import java.util.UUID
 @Repository
 interface TaskRepository : JpaRepository<Task, UUID> {
 
-    /** Tasks scoped to a workflow via the direct workflow FK. */
-    @Query("select t from Task t where t.workflow.id = :workflowId")
-    fun findAllByWorkflowId(@Param("workflowId") workflowId: UUID): List<Task>
-
     /** Delete tasks that are directly scoped to the workflow. */
     @Modifying
     @Query("delete from Task t where t.workflow.id = :workflowId")

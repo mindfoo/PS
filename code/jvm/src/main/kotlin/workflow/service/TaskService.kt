@@ -44,13 +44,16 @@ class TaskService(
                      else taskRepository.findAllPublic(userId)
 
         val taskIds = tasks.mapNotNull { it.id }.toSet()
-        val linkedWorkflowByTaskId: Map<UUID, UUID?> = if (taskIds.isNotEmpty()) {
-            workflowTaskOrderRepository.findAllByTaskIdIn(taskIds)
-                .mapNotNull { wto -> wto.task.id?.let { id -> id to wto } }
-                .groupBy({ it.first }, { it.second })
-                .mapValues { (_, wtos) -> wtos.firstOrNull()?.workflow?.id }
-
-        } else emptyMap()
+        val linkedWorkflowByTaskId = mutableMapOf<UUID, UUID>()
+        if (taskIds.isNotEmpty()) {
+            for (wto in workflowTaskOrderRepository.findAllByTaskIdIn(taskIds)) {
+                val tId = wto.task.id
+                val wId = wto.workflow.id
+                if (tId != null && wId != null) {
+                    linkedWorkflowByTaskId.putIfAbsent(tId, wId)
+                }
+            }
+        }
         return success(tasks.map { task ->
             task.toResponse(task.workflow?.id ?: linkedWorkflowByTaskId[task.id])
         })
@@ -81,26 +84,7 @@ class TaskService(
             )
         }
 
-        // Include tasks linked via direct workflow FK that have no WorkflowTaskOrder row yet
-        val orderedTaskIds = orderRows.map { it.task.id }.toSet()
-        val nextStage = (orderRows.maxOfOrNull { it.taskOrder } ?: 0) + 1
-        val unordered = taskRepository.findAllByWorkflowId(wfId)
-            .filter { it.id !in orderedTaskIds }
-            .mapIndexed { idx, task ->
-                WorkflowTaskEntry(
-                    taskId = task.id,
-                    name = task.name,
-                    type = task.type,
-                    config = task.config,
-                    orderId = null,
-                    taskOrder = nextStage + idx,
-                    retryPolicy = 0,
-                    dependsOnTaskId = null,
-                    isPrivate = task.isPrivate
-                )
-            }
-
-        return success(ordered + unordered)
+        return success(ordered)
     }
 
     // CRUD

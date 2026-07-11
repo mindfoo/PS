@@ -68,10 +68,13 @@ class DataInitializer(
             it.permissions.addAll(setOf(wRead, tRead, sRead, eRead))
         }
         val writer = Roles(name = RoleType.WRITER).also {
-            it.permissions.addAll(setOf(wRead, wWrite, wDelete, tRead, tWrite, tDelete, sRead, sWrite, sDelete, eRead))
+            it.permissions.addAll(
+                setOf(wRead, wWrite, wDelete, wExecute, tRead, tWrite, tDelete, tExecute, sRead, sWrite, sDelete, eRead)
+            )
         }
         val dev = Roles(name = RoleType.DEV).also {
-            it.permissions.addAll(setOf(wRead, wExecute, tRead, tExecute, eRead))
+            // cannot execute
+            it.permissions.addAll(setOf(wRead, wWrite, tRead, tWrite, eRead))
         }
         val admin = Roles(name = RoleType.ADMIN).also {
             it.permissions.addAll(setOf(wRead, wWrite, wDelete, wExecute,

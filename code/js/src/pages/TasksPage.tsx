@@ -83,7 +83,7 @@ export function TasksPage() {
 								<th>Config</th>
 								<th>Workflow</th>
 								<th>Privacy</th>
-								<th>Actions</th>
+								{(perms.canWriteTasks || perms.canDeleteTasks) && <th>Actions</th>}
 							</tr>
 						</thead>
 						<tbody>
@@ -112,27 +112,32 @@ export function TasksPage() {
 												<span className="text-muted">Public</span>
 											)}
 										</td>
-										<td className="actions-cell">
-											{perms.canWriteTasks && (
-												<Link to={`/tasks/${t.id}/edit`} className="btn btn-sm btn-secondary">
-													Edit
-												</Link>
-											)}
-											{perms.canDeleteTasks && (
-												<button
-													className="btn btn-sm btn-danger"
-													onClick={() => void handleDelete(t.id)}
-													disabled={inUse}
-													title={
-														inUse
-															? "Cannot delete: task is linked to a workflow. Unlink it first."
-															: undefined
-													}
-												>
-													Delete
-												</button>
-											)}
-										</td>
+										{(perms.canWriteTasks || perms.canDeleteTasks) && (
+											<td className="actions-cell">
+												{perms.canWriteTasks && (
+													<Link
+														to={`/tasks/${t.id}/edit`}
+														className="btn btn-sm btn-secondary"
+													>
+														Edit
+													</Link>
+												)}
+												{perms.canDeleteTasks && (
+													<button
+														className="btn btn-sm btn-danger"
+														onClick={() => void handleDelete(t.id)}
+														disabled={inUse}
+														title={
+															inUse
+																? "Cannot delete: task is linked to a workflow. Unlink it first."
+																: undefined
+														}
+													>
+														Delete
+													</button>
+												)}
+											</td>
+										)}
 									</tr>
 								);
 							})}

@@ -70,12 +70,12 @@ export function usePermissions() {
 	return {
 		// Workflows
 		canReadWorkflows: isRead,
-		canWriteWorkflows: isWriter,
+		canWriteWorkflows: isWriter || isDev,
 		canDeleteWorkflows: isWriter,
-		canExecuteWorkflows: isWriter || isDev,
+		canExecuteWorkflows: isWriter,
 		// Tasks
 		canReadTasks: isRead,
-		canWriteTasks: isWriter,
+		canWriteTasks: isWriter || isDev,
 		canDeleteTasks: isWriter,
 		// Schedules
 		canReadSchedules: isRead,

@@ -229,7 +229,6 @@ class TaskServiceTest {
         every { helpers.findUser("alice") } returns alice
         every { workflowRepository.findById(wf.id!!) } returns Optional.of(wf)
         every { wtoRepository.findAllByWorkflowIdOrderByTaskOrderAsc(wf.id!!) } returns listOf(wto)
-        every { taskRepository.findAllByWorkflowId(wf.id!!) } returns emptyList()
 
         val result = service.listByWorkflow(wf.id!!, "alice")
 
