@@ -9,6 +9,7 @@ import org.workflow.dto.ScheduleResponse
 import org.workflow.dto.ScheduleUpdateRequest
 import org.workflow.entity.Schedule
 import org.workflow.entity.User
+import org.workflow.entity.Workflow
 import org.workflow.repository.ScheduleRepository
 import org.workflow.repository.WorkflowRepository
 import org.workflow.service.utils.ScheduleError
@@ -60,9 +61,7 @@ class ScheduleService(
         val user = findUser(authenticationName)
             ?: return failure(ScheduleError.UserNotFound)
 
-        val userId = user.id ?: return failure(ScheduleError.UserNotFound)
-        val workflow = workflowRepository.findByIdOrNull(request.workflowId)
-            ?.takeIf { isPublic(it.isPrivate, it.createdBy.id, isAdmin(user), userId) }
+        val workflow = findPublicWorkflow(request.workflowId, user)
             ?: return failure(ScheduleError.WorkflowNotFound)
 
         val nextRun = computeNextRun(request.cronExpression, request.timezone)
@@ -152,6 +151,12 @@ class ScheduleService(
         val schedule = scheduleRepository.findByIdOrNull(scheduleId) ?: return null
         val workflow = schedule.workflow
         return if (isPublic(workflow.isPrivate, workflow.createdBy.id, isAdmin(user), user.id)) schedule else null
+    }
+
+
+    private fun findPublicWorkflow(workflowId: UUID, user: User): Workflow? {
+        val workflow = workflowRepository.findByIdOrNull(workflowId) ?: return null
+        return if (isPublic(workflow.isPrivate, workflow.createdBy.id, isAdmin(user), user.id)) workflow else null
     }
 
     private fun Schedule.toResponse(): ScheduleResponse =

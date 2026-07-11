@@ -231,6 +231,7 @@ class TaskService(
         return Files.list(dir).use { files ->
             files.filter { Files.isRegularFile(it) }
                 .map { it.fileName.toString() }
+                .filter { !it.startsWith(".") } // .DS_Store
                 .sorted()
                 .toList()
         }

@@ -11,6 +11,7 @@ import org.workflow.dto.WorkflowCreateRequest
 import org.workflow.dto.WorkflowResponse
 import org.workflow.dto.WorkflowUpdateRequest
 import org.workflow.entity.Workflow
+import org.workflow.entity.WorkflowTaskOrder
 import org.workflow.repository.ExecutionRepository
 import org.workflow.repository.ScheduleRepository
 import org.workflow.repository.TaskRepository
@@ -124,15 +125,19 @@ class WorkflowService(
 
         val wid = workflow.id ?: return failure(WorkflowError.WorkflowNotFound)
         val orderRows = workflowTaskOrderRepository.findAllByWorkflowIdOrderByTaskOrderAsc(wid)
-            .associateBy { it.id ?: return failure(WorkflowError.WorkflowNotFound) }
 
-        request.items.forEach { item ->
-            val row = orderRows[item.orderId]
-                ?: return failure(WorkflowError.WorkflowNotFound)
+        val rowsByOrderId = mutableMapOf<UUID, WorkflowTaskOrder>()
+        for (row in orderRows) {
+            val orderId = row.id ?: return failure(WorkflowError.WorkflowNotFound)
+            rowsByOrderId[orderId] = row
+        }
+
+        for (item in request.items) {
+            val row = rowsByOrderId[item.orderId] ?: return failure(WorkflowError.WorkflowNotFound)
             row.taskOrder = item.taskOrder
         }
 
-        workflowTaskOrderRepository.saveAll(orderRows.values)
+        workflowTaskOrderRepository.saveAll(rowsByOrderId.values)
         return success(Unit)
     }
 
