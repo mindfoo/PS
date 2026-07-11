@@ -5,6 +5,8 @@
     "dev": "concurrently --names \"JVM,JS\" --prefix-colors \"cyan,magenta\" \"npm run dev:jvm\" \"npm run dev:js\"",
     "dev:jvm": "cd code/jvm && ./gradlew dev",
     "dev:js":  "cd code/js  && npm run dev",
+    "docker": "docker compose up --build -d",
+    "docker:down": "docker compose down",
     "test": "npm run test:jvm && npm run test:js",
     "test:jvm": "cd code/jvm && ./gradlew test",
     "test:js":  "cd code/js  && npm run test",

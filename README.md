@@ -67,6 +67,22 @@ npm run dev             # starts Vite dev server on http://localhost:5173
 
 ---
 
+### Option 3 — Full stack in Docker (database + backend + frontend)
+
+Builds the backend and frontend images and starts all three containers:
+
+```bash
+npm run docker          # equivalent to: docker compose up --build -d
+```
+
+To stop the containers:
+
+```bash
+npm run docker:down
+```
+
+---
+
 > If you need to reset the database to a clean state:
 > ```bash
 > cd code/jvm
@@ -78,9 +94,7 @@ npm run dev             # starts Vite dev server on http://localhost:5173
 
 ## Database Schema Management
 
-### 🔄 Automatic (Hibernate DDL - Current Mode)
-
-The application uses **Hibernate's auto-update mode** for development convenience:
+The application uses **Hibernate's auto-update mode** — no SQL migration scripts are needed:
 
 ```properties
 # code/jvm/src/main/resources/application.properties
@@ -91,33 +105,7 @@ spring.jpa.hibernate.ddl-auto=update
 - ✅ **Tables are created automatically** from `@Entity` classes on first startup
 - ✅ **Your data is SAFE** - `update` mode never drops tables or deletes data
 - ✅ **Schema changes are applied automatically** when you add new fields to entities
-- ✅ **Initial data is seeded** by `DataInitializer.kt` (only on first run)
-
-### 📝 Manual (SQL Scripts - Best Practice)
-
-For production or when you want explicit control, SQL scripts are available in `code/jvm/src/main/resources/db/`:
-
-| Script | Purpose |
-|--------|---------|
-| `schema.sql` | Complete DDL (tables, indexes, constraints) |
-| `data-seed.sql` | Initial data (roles, permissions, admin user) |
-
-#### Execute scripts manually:
-
-```bash
-cd code/jvm
-
-# Option 1: Initialize from scratch (schema + seed data)
-./gradlew dbInit
-
-# Option 2: Run scripts individually
-./gradlew dbSchema    # create tables only
-./gradlew dbSeed      # populate initial data only
-
-# Option 3: Using psql directly
-docker exec -i workflow-postgres psql -U admin -d workflow_db < src/main/resources/db/schema.sql
-docker exec -i workflow-postgres psql -U admin -d workflow_db < src/main/resources/db/data-seed.sql
-```
+- ✅ **Initial data is seeded** by `DataInitializer.kt` (only on first run: roles, permissions and the default admin account)
 
 ---
 
