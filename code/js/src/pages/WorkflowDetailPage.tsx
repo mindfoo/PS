@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
 import { workflowApi, type TaskOrderItem } from "../api/workflows";
@@ -54,11 +54,18 @@ export function WorkflowDetailPage() {
 	const [allTasks, setAllTasks] = useState<TaskResponse[]>([]);
 	const [linkLoading, setLinkLoading] = useState(false);
 
-	// --- Execution & SSE State ---
+	// --- Execution State ---
 	const [executions, setExecutions] = useState<ExecutionSummaryResponse[]>([]);
 	const [execLoading, setExecLoading] = useState(false);
 	const [execOpen, setExecOpen] = useState(true);
-	const [taskStatuses, setTaskStatuses] = useState<Record<string, ExecutionStatus>>({});
+
+	const taskStatuses = useMemo(() => {
+		const statuses: Record<string, ExecutionStatus> = {};
+		executions[0]?.taskExecutions?.forEach((te) => {
+			if (te.taskId) statuses[te.taskId] = te.status;
+		});
+		return statuses;
+	}, [executions]);
 
 	// --- Core API Data Loaders ---
 	const loadExecutions = useCallback(async () => {
@@ -97,45 +104,21 @@ export function WorkflowDetailPage() {
 		};
 	}, [id, loadExecutions]);
 
+
 	useEffect(() => {
-		if (!id || !execOpen) return;
-		const interval = setInterval(() => {
-			executionApi
-				.listByWorkflow(id)
-				.then(setExecutions)
-				.catch(() => {});
-		}, 20_000);
-		return () => clearInterval(interval);
-	}, [id, execOpen]);
-
-	// --- SSE Tracking Monitor ---
-	const unsubscribeRef = useRef<(() => void) | null>(null);
-
-	const stopMonitoring = useCallback(() => {
-		unsubscribeRef.current?.();
-		unsubscribeRef.current = null;
-	}, []);
-
-	// The backend sends a catch-up event with the current status as soon as the SSE
-	// connection opens, so subscribing is enough even if the execution already finished.
-	const monitorExecution = useCallback(
-		(execId: string) => {
-			stopMonitoring();
-			unsubscribeRef.current = executionApi.subscribeToExecution(execId, (event) => {
-				setTaskStatuses((prev) => ({ ...prev, ...event.taskStatuses }));
-				setExecutions((prev) =>
-					prev.map((ex) => (ex.id === event.executionId ? { ...ex, status: event.status } : ex)),
-				);
-				if (!isActiveExecutionStatus(event.status)) {
-					stopMonitoring();
-					void loadExecutions();
-				}
-			});
-		},
-		[stopMonitoring, loadExecutions],
-	);
-
-	useEffect(() => stopMonitoring, [stopMonitoring]);
+		if (!id) return;
+		const hasActive = executions.some((e) => isActiveExecutionStatus(e.status));
+		const timer = setTimeout(
+			() => {
+				executionApi
+					.listByWorkflow(id)
+					.then(setExecutions)
+					.catch(() => {});
+			},
+			hasActive ? 5_000 : 20_000,
+		);
+		return () => clearTimeout(timer);
+	}, [id, executions]);
 
 	async function persistOrder(updated: WorkflowTaskEntry[]) {
 		if (!id) return;
@@ -168,7 +151,7 @@ export function WorkflowDetailPage() {
 		void persistOrder(renumbered);
 	}
 
-	// --- Interactive Configuration Modifiers ---
+
 	function beginEditStage(taskId: string, current: number) {
 		setEditingStage(taskId);
 		setStageInput(String(current));
@@ -219,13 +202,7 @@ export function WorkflowDetailPage() {
 		setRunning(true);
 		setError("");
 		try {
-			const pending: Record<string, ExecutionStatus> = {};
-			tasks.forEach((t) => {
-				if (t.taskId) pending[t.taskId] = ExecutionStatus.PENDING;
-			});
-			setTaskStatuses(pending);
-			const res = await workflowApi.run(id);
-			monitorExecution(res.executionId);
+			await workflowApi.run(id);
 			void loadExecutions();
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Run failed");

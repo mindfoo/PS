@@ -101,11 +101,10 @@ class WorkflowService(
             ?: return failure(WorkflowError.WorkflowNotFound)
 
         val wid = workflow.id ?: return failure(WorkflowError.WorkflowNotFound)
-        /* Cascade-delete in FK dependency order: executions → schedules → workflow_tasks_order → tasks → workflow */
         executionRepository.deleteAllByWorkflowId(wid)
         scheduleRepository.deleteAllByWorkflowId(wid)
         workflowTaskOrderRepository.deleteAllByWorkflowId(wid)
-        taskRepository.deleteAllByWorkflowId(wid)
+        taskRepository.detachFromWorkflow(wid)
 
         workflowRepository.delete(workflow)
         return success(Unit)

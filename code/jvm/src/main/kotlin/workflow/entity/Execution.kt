@@ -48,6 +48,7 @@ class Execution(
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "workflow_id")
+    @OnDelete(action = OnDeleteAction.SET_NULL)
     var workflow: Workflow? = null,
 
     /** ID of the parent workflow execution (populated on child task-level records). */

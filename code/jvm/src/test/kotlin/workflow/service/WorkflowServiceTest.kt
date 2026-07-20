@@ -176,7 +176,7 @@ class WorkflowServiceTest {
         every { executionRepository.deleteAllByWorkflowId(wf.id!!) } returns Unit
         every { scheduleRepository.deleteAllByWorkflowId(wf.id!!) } returns Unit
         every { wtoRepository.deleteAllByWorkflowId(wf.id!!) } returns Unit
-        every { taskRepository.deleteAllByWorkflowId(wf.id!!) } returns Unit
+        every { taskRepository.detachFromWorkflow(wf.id!!) } returns Unit
         every { workflowRepository.delete(wf) } returns Unit
 
         val result = service.delete(wf.id!!, "alice")

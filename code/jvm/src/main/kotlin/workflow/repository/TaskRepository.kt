@@ -12,10 +12,10 @@ import java.util.UUID
 @Repository
 interface TaskRepository : JpaRepository<Task, UUID> {
 
-    /** Delete tasks that are directly scoped to the workflow. */
+    /** Detaches tasks */
     @Modifying
-    @Query("delete from Task t where t.workflow.id = :workflowId")
-    fun deleteAllByWorkflowId(@Param("workflowId") workflowId: UUID)
+    @Query("update Task t set t.workflow = null where t.workflow.id = :workflowId")
+    fun detachFromWorkflow(@Param("workflowId") workflowId: UUID)
 
     /** Returns public tasks plus private tasks owned by the user. */
     @Query("select t from Task t where t.isPrivate = false or t.createdBy.id = :userId")
