@@ -15,6 +15,7 @@ import org.workflow.entity.Task
 import org.workflow.entity.User
 import org.workflow.entity.Workflow
 import org.workflow.entity.WorkflowTaskOrder
+import org.workflow.repository.ExecutionRepository
 import org.workflow.repository.TaskRepository
 import org.workflow.repository.WorkflowRepository
 import org.workflow.repository.WorkflowTaskOrderRepository
@@ -38,6 +39,7 @@ class TaskServiceTest {
     private lateinit var taskRepository: TaskRepository
     private lateinit var workflowRepository: WorkflowRepository
     private lateinit var wtoRepository: WorkflowTaskOrderRepository
+    private lateinit var executionRepository: ExecutionRepository
     private lateinit var helpers: ServiceHelpers
     private lateinit var service: TaskService
 
@@ -54,10 +56,11 @@ class TaskServiceTest {
         taskRepository     = mockk()
         workflowRepository = mockk()
         wtoRepository      = mockk()
+        executionRepository = mockk()
         helpers            = mockk()
         every { helpers.isAdmin(any()) } answers { firstArg<User>().role.name == RoleType.ADMIN }
         service = TaskService(
-            taskRepository, workflowRepository, wtoRepository, helpers,
+            taskRepository, workflowRepository, wtoRepository, executionRepository, helpers,
             scriptsBaseDir = tempDir.toString()
         )
     }
@@ -195,6 +198,7 @@ class TaskServiceTest {
         val t     = task(alice)
         every { helpers.findUser("alice") } returns alice
         every { taskRepository.findById(t.id!!) } returns Optional.of(t)
+        every { executionRepository.deleteAllByTaskId(t.id!!) } returns Unit
         every { wtoRepository.findAllByTaskId(t.id!!) } returns emptyList()
         every { wtoRepository.deleteAll(emptyList()) } returns Unit
         every { taskRepository.delete(t) } returns Unit
@@ -471,7 +475,7 @@ class TaskServiceTest {
     @Test
     fun `listAvailableScripts returns empty list when directory does not exist`() {
         service = TaskService(
-            taskRepository, workflowRepository, wtoRepository, helpers,
+            taskRepository, workflowRepository, wtoRepository, executionRepository, helpers,
             scriptsBaseDir = tempDir.resolve("does-not-exist").toString()
         )
 
