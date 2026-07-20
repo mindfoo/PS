@@ -10,7 +10,7 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import org.workflow.utils.Problem
 
 /**
- * Centralised exception handler that maps domain exceptions to RFC 7807 Problem responses.
+ * Centralised exception handler that maps domain exceptions to Problem responses.
  */
 @RestControllerAdvice
 class GlobalExceptionHandler {

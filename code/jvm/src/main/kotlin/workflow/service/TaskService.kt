@@ -11,6 +11,7 @@ import org.workflow.dto.WorkflowTaskEntry
 import org.workflow.entity.Task
 import org.workflow.entity.User
 import org.workflow.entity.WorkflowTaskOrder
+import org.workflow.repository.ExecutionRepository
 import org.workflow.repository.TaskRepository
 import org.workflow.repository.WorkflowRepository
 import org.workflow.repository.WorkflowTaskOrderRepository
@@ -28,6 +29,7 @@ class TaskService(
     private val taskRepository: TaskRepository,
     private val workflowRepository: WorkflowRepository,
     private val workflowTaskOrderRepository: WorkflowTaskOrderRepository,
+    private val executionRepository: ExecutionRepository,
     private val helpers: ServiceHelpers,
     @Value("\${app.scripts.base-dir:./scripts}") private val scriptsBaseDir: String
 ) {
@@ -165,6 +167,8 @@ class TaskService(
             ?: return failure(TaskError.TaskNotFound)
 
         val tId = task.id ?: return failure(TaskError.TaskNotFound)
+        /* Cascade-delete in FK dependency order: executions → workflow_tasks_order → task */
+        executionRepository.deleteAllByTaskId(tId)
         workflowTaskOrderRepository.deleteAll(workflowTaskOrderRepository.findAllByTaskId(tId))
         taskRepository.delete(task)
         return success(Unit)

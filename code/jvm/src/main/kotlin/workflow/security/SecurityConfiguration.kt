@@ -41,11 +41,10 @@ class SecurityConfiguration(
         http
             /* No server-side session — each request is authenticated from its cookie alone. */
             .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
-            /* Disable Spring's built-in form login and HTTP Basic — we handle auth ourselves. */
+            /* Disable Spring's built-in form login and HTTP Basic */
             .httpBasic { it.disable() }
             .formLogin { it.disable() }
             .csrf { it.disable() }
-            /* Run our cookie filter before Spring's default username/password filter. */
             .addFilterBefore(cookieAuthenticationFilter(), UsernamePasswordAuthenticationFilter::class.java)
             .authorizeHttpRequests { auth ->
                 /* ASYNC and ERROR dispatches are internal Tomcat callbacks (e.g., SSE completion).

@@ -44,7 +44,7 @@ class ExecutionEventService(
 
     companion object {
         private const val SUBSCRIPTION_TIMEOUT_MS = 5 * 60 * 1000L // an SSE connection is dropped after 5 min of inactivity
-        private const val POLL_TIMEOUT_MS = 5_000                  // how long each getNotifications() call blocks at most (ms)
+        private const val NOTIFICATION_WAIT_TIMEOUT_MS = 5_000     // wait time for notifications
         private const val RECONNECT_DELAY_MS = 5_000L              // wait time before retrying a dropped DB connection
     }
 
@@ -82,7 +82,7 @@ class ExecutionEventService(
             log.info("LISTEN execution_events started")
 
             while (running) {
-                val notifications = pgConnection.getNotifications(POLL_TIMEOUT_MS) ?: continue
+                val notifications = pgConnection.getNotifications(NOTIFICATION_WAIT_TIMEOUT_MS) ?: continue
                 notifications.forEach { n -> handleNotification(n) }
             }
         }
@@ -136,7 +136,7 @@ class ExecutionEventService(
         }
     }
 
-    /** Sends [event] to every client currently subscribed to [executionId]. */
+    /** Sends event to every client currently subscribed to executionId. */
     fun broadcast(executionId: UUID, event: ExecutionEvent) {
         val subscribers = emitters[executionId] ?: return
 

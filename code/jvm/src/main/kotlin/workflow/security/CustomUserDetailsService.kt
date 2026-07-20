@@ -18,7 +18,6 @@ class CustomUserDetailsService(
     /**
      * @Transactional(readOnly = true) keeps the Hibernate session open during the entire method,
      * so that the LAZY permissions collection on role can be accessed safely.
-     * The JOIN FETCH query also pre-loads everything in a single SQL call.
      */
     @Transactional(readOnly = true)
     override fun loadUserByUsername(username: String): UserDetails {

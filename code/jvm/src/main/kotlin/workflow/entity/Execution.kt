@@ -2,6 +2,8 @@ package org.workflow.entity
 
 import jakarta.persistence.*
 import org.hibernate.annotations.JdbcTypeCode
+import org.hibernate.annotations.OnDelete
+import org.hibernate.annotations.OnDeleteAction
 import org.hibernate.type.SqlTypes
 import java.time.LocalDateTime
 import java.util.UUID
@@ -41,6 +43,7 @@ class Execution(
     /** Set on task-level execution records; null on top-level workflow executions. */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "task_id")
+    @OnDelete(action = OnDeleteAction.SET_NULL)
     var task: Task? = null,
 
     @ManyToOne(fetch = FetchType.LAZY)

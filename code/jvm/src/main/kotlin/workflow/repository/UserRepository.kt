@@ -15,8 +15,6 @@ interface UserRepository : JpaRepository<User, UUID> {
 
     /**
      * Loads user → role → permissions in a single SQL JOIN FETCH.
-     * Must be used by [org.workflow.security.CustomUserDetailsService] to avoid
-     * LazyInitializationException when the Hibernate session is closed after the call.
      */
     @Query("""
         SELECT u FROM User u

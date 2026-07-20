@@ -31,10 +31,17 @@ interface ExecutionRepository : JpaRepository<Execution, UUID> {
     @Query("select e.task.id, e.status from Execution e where e.parentExecutionId = :parentId and e.task is not null")
     fun findTaskStatusesByParentId(@Param("parentId") parentId: UUID): List<Array<Any>>
 
-    /** Delete all execution records (children first, then parents) for a workflow. */
+    /**
+     * Delete all execution records for a workflow
+     */
     @Modifying
-    @Query("delete from Execution e where e.workflow.id = :workflowId")
+    @Query("delete from Execution e where e.workflow.id = :workflowId or e.task.workflow.id = :workflowId")
     fun deleteAllByWorkflowId(workflowId: UUID)
+
+    /** Delete all execution records referencing a specific task (used before hard-deleting a task). */
+    @Modifying
+    @Query("delete from Execution e where e.task.id = :taskId")
+    fun deleteAllByTaskId(taskId: UUID)
 
     /**
      * Atomically sets [Execution.cancelRequested] to true only while the execution is still
