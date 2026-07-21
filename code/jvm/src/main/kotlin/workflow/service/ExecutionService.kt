@@ -23,6 +23,7 @@ import org.workflow.entity.TaskType
 import org.workflow.entity.Task
 import org.workflow.entity.User
 import org.workflow.entity.Workflow
+import org.workflow.entity.WorkflowTaskOrder
 import org.workflow.repository.ExecutionRepository
 import org.workflow.repository.TaskRepository
 import org.workflow.repository.WorkflowRepository
@@ -156,71 +157,8 @@ class ExecutionService(
         executionRepository.save(execution)
         notifyStatusChange(executionId, ExecutionStatus.RUNNING)
 
-        var wasCanceled = false
-
         try {
-            val wfId = workflow.id
-                ?: throw IllegalStateException("Workflow id is null for execution $executionId — data integrity violation")
-
-            // Every workflow-linked task has a WorkflowTaskOrder row (created on task creation/link),
-            // so the order rows are the single source of stages.
-            val orderRows = workflowTaskOrderRepository.findAllByWorkflowIdOrderByTaskOrderAsc(wfId)
-
-            val stages: Map<Int, List<Task>> = orderRows.groupBy({ it.taskOrder }, { it.task })
-
-            val retryPolicies: Map<UUID, Int> = orderRows
-                .mapNotNull { row -> row.task.id?.let { id -> id to row.retryPolicy } }
-                .toMap()
-
-            val taskExecIds: Map<UUID, UUID> = stages.values.flatten()
-                .mapNotNull { task -> task.id?.let { id -> id to createPendingTaskExecution(execution, task) } }
-                .toMap()
-
-            // Per-task status, sent along with every NOTIFY so subscribers see live progress.
-            val taskStatusMap = mutableMapOf<String, String>()
-            stages.values.flatten().forEach { task -> task.id?.let { taskStatusMap[it.toString()] = ExecutionStatus.PENDING } }
-
-            var totalExecuted = 0
-            val taskOutputs = mutableListOf<Map<String, Any>>()
-
-            for ((stage, tasksInStage) in stages.entries.sortedBy { it.key }) {
-                if (executionRepository.isCancelRequested(executionId)) {
-                    wasCanceled = true
-                    break
-                }
-
-                val results = tasksInStage.mapNotNull { task ->
-                    val taskId = task.id ?: return@mapNotNull null
-                    val childId = taskExecIds[taskId] ?: return@mapNotNull null
-                    CompletableFuture.supplyAsync(
-                        { task to runTaskWithTracking(task, childId, retryPolicies[taskId] ?: 0) },
-                        executionExecutor
-                    )
-                }.map { it.join() }
-
-                results.forEach { (task, output) ->
-                    taskOutputs += output
-                    task.id?.let { taskStatusMap[it.toString()] = (output["status"] as? String) ?: ExecutionStatus.ERROR }
-                }
-                totalExecuted += results.size
-                notifyStatusChange(executionId, ExecutionStatus.RUNNING, taskStatusMap)
-            }
-
-            if (wasCanceled) cancelPendingChildren(executionId)
-
-            val anyTaskFailed = taskOutputs.any { (it["status"] as? String) == ExecutionStatus.ERROR }
-            execution.status = when {
-                wasCanceled   -> ExecutionStatus.CANCELED
-                anyTaskFailed -> ExecutionStatus.ERROR
-                else          -> ExecutionStatus.SUCCESS
-            }
-            execution.finishedAt = LocalDateTime.now()
-            execution.output = if (wasCanceled) {
-                mapOf("info" to "Canceled by user")
-            } else {
-                mapOf("workflowId" to wfId.toString(), "tasksExecuted" to totalExecuted, "taskOutputs" to taskOutputs)
-            }
-
+            runAllStages(executionId, execution, workflow)
         } catch (ex: Exception) {
             execution.status = ExecutionStatus.ERROR
             execution.retryCount += 1
@@ -235,6 +173,119 @@ class ExecutionService(
         executionRepository.save(execution)
         log.info("Execution {} finished — status: {}", executionId, execution.status)
         notifyStatusChange(executionId, execution.status, emptyMap(), terminal = true)
+    }
+
+    /**
+     * Runs every stage of the workflow, in order, and records the final status and
+     * output on [execution]. Stops early if the user requested cancellation.
+     */
+    private fun runAllStages(executionId: UUID, execution: Execution, workflow: Workflow) {
+        val wfId = workflow.id
+            ?: throw IllegalStateException("Workflow id is null for execution $executionId — data integrity violation")
+
+        val orderRows = workflowTaskOrderRepository.findAllByWorkflowIdOrderByTaskOrderAsc(wfId)
+
+        val stages = groupTasksByStage(orderRows)
+
+        // Retry policy of each task, keyed by task id.
+        val retryPolicies = mutableMapOf<UUID, Int>()
+        for (row in orderRows) {
+            val taskId = row.task.id ?: continue
+            retryPolicies[taskId] = row.retryPolicy
+        }
+
+        // Create one PENDING child execution per task, up front, so the UI shows them immediately.
+        val taskExecIds = mutableMapOf<UUID, UUID>()       // task id -> child execution id
+        val taskStatusMap = mutableMapOf<String, String>() // task id -> current status (sent over SSE)
+        for (tasksInStage in stages.values) {
+            for (task in tasksInStage) {
+                val taskId = task.id ?: continue
+                taskExecIds[taskId] = createPendingTaskExecution(execution, task)
+                taskStatusMap[taskId.toString()] = ExecutionStatus.PENDING
+            }
+        }
+
+        var wasCanceled = false
+        var totalExecuted = 0
+        val taskOutputs = mutableListOf<Map<String, Any>>()
+
+        for (stage in stages.keys.sorted()) {
+            if (executionRepository.isCancelRequested(executionId)) {
+                wasCanceled = true
+                break
+            }
+            val tasksInStage = stages[stage] ?: continue
+
+            val results = runStageInParallel(tasksInStage, taskExecIds, retryPolicies)
+
+            for (pair in results) {
+                val task = pair.first
+                val output = pair.second
+                taskOutputs.add(output)
+                totalExecuted++
+                val taskId = task.id
+                if (taskId != null) {
+                    taskStatusMap[taskId.toString()] = (output["status"] as? String) ?: ExecutionStatus.ERROR
+                }
+            }
+            notifyStatusChange(executionId, ExecutionStatus.RUNNING, taskStatusMap)
+        }
+
+        if (wasCanceled) cancelPendingChildren(executionId)
+
+        val anyTaskFailed = taskOutputs.any { (it["status"] as? String) == ExecutionStatus.ERROR }
+        execution.status = when {
+            wasCanceled   -> ExecutionStatus.CANCELED
+            anyTaskFailed -> ExecutionStatus.ERROR
+            else          -> ExecutionStatus.SUCCESS
+        }
+        execution.finishedAt = LocalDateTime.now()
+        execution.output = if (wasCanceled) {
+            mapOf("info" to "Canceled by user")
+        } else {
+            mapOf("workflowId" to wfId.toString(), "tasksExecuted" to totalExecuted, "taskOutputs" to taskOutputs)
+        }
+    }
+
+    /** Groups the workflow's tasks by stage number. Tasks that share the same stage run in parallel. */
+    private fun groupTasksByStage(orderRows: List<WorkflowTaskOrder>): Map<Int, List<Task>> {
+        val stages = mutableMapOf<Int, MutableList<Task>>()
+        for (row in orderRows) {
+            var tasksInStage = stages[row.taskOrder]
+            if (tasksInStage == null) {
+                tasksInStage = mutableListOf()
+                stages[row.taskOrder] = tasksInStage
+            }
+            tasksInStage.add(row.task)
+        }
+        return stages
+    }
+
+    /** Starts every task of one stage in parallel (one virtual thread each) and waits for all to finish. */
+    private fun runStageInParallel(
+        tasksInStage: List<Task>,
+        taskExecIds: Map<UUID, UUID>,
+        retryPolicies: Map<UUID, Int>
+    ): List<Pair<Task, Map<String, Any>>> {
+        // 1) Start every task — supplyAsync returns immediately; the work runs on another thread.
+        val running = mutableListOf<Pair<Task, CompletableFuture<Map<String, Any>>>>()
+        for (task in tasksInStage) {
+            val taskId = task.id ?: continue
+            val childId = taskExecIds[taskId] ?: continue
+            val retryPolicy = retryPolicies[taskId] ?: 0
+            val future = CompletableFuture.supplyAsync(
+                { runTaskWithTracking(task, childId, retryPolicy) },
+                executionExecutor
+            )
+            running.add(Pair(task, future))
+        }
+
+        // 2) Wait for each task to finish — join() blocks until that task's result is ready.
+        val results = mutableListOf<Pair<Task, Map<String, Any>>>()
+        for (pair in running) {
+            results.add(Pair(pair.first, pair.second.join()))
+        }
+        return results
     }
 
     /** Creates a PENDING task execution and runs it asynchronously; returns its id right away. */
@@ -438,7 +489,9 @@ class ExecutionService(
 
         val headers = HttpHeaders()
         val headersMap = config["headers"] as? Map<String, String> ?: emptyMap()
-        headersMap.forEach { (k, v) -> headers.set(k, v) }
+        for (entry in headersMap) {
+            headers.set(entry.key, entry.value)
+        }
 
         val body = config["body"] as? String
         val entity = HttpEntity(body, headers)
